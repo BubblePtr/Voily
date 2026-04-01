@@ -1,0 +1,10 @@
+.DS_Store
+.build/
+.swiftpm/
+
+DerivedData/
+*.xcuserstate
+*.xcscmblueprint
+
+Voily.xcodeproj/project.xcworkspace/xcuserdata/
+Voily.xcodeproj/xcuserdata/

@@ -1,0 +1,309 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		A00100010000000000000000 /* AppController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00200010000000000000000 /* AppController.swift */; };
+		A00100020000000000000000 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00200020000000000000000 /* AppDelegate.swift */; };
+		A00100030000000000000000 /* AppSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00200030000000000000000 /* AppSettings.swift */; };
+		A00100040000000000000000 /* AudioCaptureService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00200040000000000000000 /* AudioCaptureService.swift */; };
+		A00100050000000000000000 /* FnKeyMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00200050000000000000000 /* FnKeyMonitor.swift */; };
+		A00100060000000000000000 /* LLMRefinementService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00200060000000000000000 /* LLMRefinementService.swift */; };
+		A00100070000000000000000 /* OverlayPanelController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00200070000000000000000 /* OverlayPanelController.swift */; };
+		A00100080000000000000000 /* OverlayState.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00200080000000000000000 /* OverlayState.swift */; };
+		A00100090000000000000000 /* PermissionCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00200090000000000000000 /* PermissionCoordinator.swift */; };
+		A001000A0000000000000000 /* SettingsWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A002000A0000000000000000 /* SettingsWindowController.swift */; };
+		A001000B0000000000000000 /* SpeechTranscriptionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A002000B0000000000000000 /* SpeechTranscriptionService.swift */; };
+		A001000C0000000000000000 /* SupportedLanguage.swift in Sources */ = {isa = PBXBuildFile; fileRef = A002000C0000000000000000 /* SupportedLanguage.swift */; };
+		A001000D0000000000000000 /* TextInjectionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A002000D0000000000000000 /* TextInjectionService.swift */; };
+		A001000E0000000000000000 /* VoilyMain.swift in Sources */ = {isa = PBXBuildFile; fileRef = A002000E0000000000000000 /* VoilyMain.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		A00200010000000000000000 /* AppController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppController.swift; sourceTree = "<group>"; };
+		A00200020000000000000000 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
+		A00200030000000000000000 /* AppSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppSettings.swift; sourceTree = "<group>"; };
+		A00200040000000000000000 /* AudioCaptureService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioCaptureService.swift; sourceTree = "<group>"; };
+		A00200050000000000000000 /* FnKeyMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FnKeyMonitor.swift; sourceTree = "<group>"; };
+		A00200060000000000000000 /* LLMRefinementService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LLMRefinementService.swift; sourceTree = "<group>"; };
+		A00200070000000000000000 /* OverlayPanelController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OverlayPanelController.swift; sourceTree = "<group>"; };
+		A00200080000000000000000 /* OverlayState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OverlayState.swift; sourceTree = "<group>"; };
+		A00200090000000000000000 /* PermissionCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PermissionCoordinator.swift; sourceTree = "<group>"; };
+		A002000A0000000000000000 /* SettingsWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsWindowController.swift; sourceTree = "<group>"; };
+		A002000B0000000000000000 /* SpeechTranscriptionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeechTranscriptionService.swift; sourceTree = "<group>"; };
+		A002000C0000000000000000 /* SupportedLanguage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupportedLanguage.swift; sourceTree = "<group>"; };
+		A002000D0000000000000000 /* TextInjectionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextInjectionService.swift; sourceTree = "<group>"; };
+		A002000E0000000000000000 /* VoilyMain.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoilyMain.swift; sourceTree = "<group>"; };
+		A002000F0000000000000000 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		A00200100000000000000000 /* Voily.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Voily.app; sourceTree = BUILT_PRODUCTS_DIR; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		A00300010000000000000000 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		A00400010000000000000000 = {
+			isa = PBXGroup;
+			children = (
+				A00400020000000000000000 /* Sources */,
+				A00400030000000000000000 /* Config */,
+				A00400040000000000000000 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		A00400020000000000000000 /* Sources */ = {
+			isa = PBXGroup;
+			path = Sources/Voily;
+			sourceTree = SOURCE_ROOT;
+			children = (
+				A00200010000000000000000 /* AppController.swift */,
+				A00200020000000000000000 /* AppDelegate.swift */,
+				A00200030000000000000000 /* AppSettings.swift */,
+				A00200040000000000000000 /* AudioCaptureService.swift */,
+				A00200050000000000000000 /* FnKeyMonitor.swift */,
+				A00200060000000000000000 /* LLMRefinementService.swift */,
+				A00200070000000000000000 /* OverlayPanelController.swift */,
+				A00200080000000000000000 /* OverlayState.swift */,
+				A00200090000000000000000 /* PermissionCoordinator.swift */,
+				A002000A0000000000000000 /* SettingsWindowController.swift */,
+				A002000B0000000000000000 /* SpeechTranscriptionService.swift */,
+				A002000C0000000000000000 /* SupportedLanguage.swift */,
+				A002000D0000000000000000 /* TextInjectionService.swift */,
+				A002000E0000000000000000 /* VoilyMain.swift */,
+			);
+		};
+		A00400030000000000000000 /* Config */ = {
+			isa = PBXGroup;
+			path = Config;
+			sourceTree = SOURCE_ROOT;
+			children = (
+				A002000F0000000000000000 /* Info.plist */,
+			);
+		};
+		A00400040000000000000000 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				A00200100000000000000000 /* Voily.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		A00500010000000000000000 /* Voily */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A00600020000000000000000 /* Build configuration list for PBXNativeTarget "Voily" */;
+			buildPhases = (
+				A00300020000000000000000 /* Sources */,
+				A00300010000000000000000 /* Frameworks */,
+				A00300030000000000000000 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+			);
+			name = Voily;
+			packageProductDependencies = (
+			);
+			productName = Voily;
+			productReference = A00200100000000000000000 /* Voily.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		A00600010000000000000000 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 2611;
+				LastUpgradeCheck = 2611;
+				TargetAttributes = {
+					A00500010000000000000000 = {
+						CreatedOnToolsVersion = 26.1.1;
+					};
+				};
+			};
+			buildConfigurationList = A00600030000000000000000 /* Build configuration list for PBXProject "Voily" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = A00400010000000000000000;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
+			productRefGroup = A00400040000000000000000 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				A00500010000000000000000 /* Voily */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		A00300030000000000000000 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		A00300020000000000000000 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A00100010000000000000000 /* AppController.swift in Sources */,
+				A00100020000000000000000 /* AppDelegate.swift in Sources */,
+				A00100030000000000000000 /* AppSettings.swift in Sources */,
+				A00100040000000000000000 /* AudioCaptureService.swift in Sources */,
+				A00100050000000000000000 /* FnKeyMonitor.swift in Sources */,
+				A00100060000000000000000 /* LLMRefinementService.swift in Sources */,
+				A00100070000000000000000 /* OverlayPanelController.swift in Sources */,
+				A00100080000000000000000 /* OverlayState.swift in Sources */,
+				A00100090000000000000000 /* PermissionCoordinator.swift in Sources */,
+				A001000A0000000000000000 /* SettingsWindowController.swift in Sources */,
+				A001000B0000000000000000 /* SpeechTranscriptionService.swift in Sources */,
+				A001000C0000000000000000 /* SupportedLanguage.swift in Sources */,
+				A001000D0000000000000000 /* TextInjectionService.swift in Sources */,
+				A001000E0000000000000000 /* VoilyMain.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		A00700010000000000000000 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CLDANG_ENABLE_MODULES = YES;
+				CODE_SIGN_STYLE = Automatic;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_APP_SANDBOX = NO;
+				ENABLE_HARDENED_RUNTIME = NO;
+				ENABLE_PREVIEWS = YES;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.void.voily;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 6.0;
+			};
+			name = Debug;
+		};
+		A00700020000000000000000 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CLDANG_ENABLE_MODULES = YES;
+				CODE_SIGN_STYLE = Automatic;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_APP_SANDBOX = NO;
+				ENABLE_HARDENED_RUNTIME = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.void.voily;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 6.0;
+			};
+			name = Release;
+		};
+		A00700030000000000000000 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Config/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.void.voily;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				TARGETED_DEVICE_FAMILY = "";
+			};
+			name = Debug;
+		};
+		A00700040000000000000000 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Config/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.void.voily;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				TARGETED_DEVICE_FAMILY = "";
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		A00600020000000000000000 /* Build configuration list for PBXNativeTarget "Voily" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A00700030000000000000000 /* Debug */,
+				A00700040000000000000000 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		A00600030000000000000000 /* Build configuration list for PBXProject "Voily" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A00700010000000000000000 /* Debug */,
+				A00700020000000000000000 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = A00600010000000000000000 /* Project object */;
+}
