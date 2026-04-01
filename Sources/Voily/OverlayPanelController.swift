@@ -2,6 +2,14 @@ import AppKit
 import SwiftUI
 import Observation
 
+private let overlayHeight: CGFloat = 56
+private let overlayMinimumWidth: CGFloat = 160
+private let overlayMaximumWidth: CGFloat = 560
+private let overlayHorizontalPadding: CGFloat = 18
+private let overlayWaveformWidth: CGFloat = 32
+private let overlayWaveformSpacing: CGFloat = 12
+
+@available(macOS 26.0, *)
 @MainActor
 final class OverlayPanelController {
     private let model = OverlayViewModel()
@@ -27,11 +35,12 @@ final class OverlayPanelController {
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .ignoresCycle]
         panel.hidesOnDeactivate = false
         panel.ignoresMouseEvents = true
-        panel.contentView = VisualEffectContainerView(contentView: hostView)
+        panel.contentView = TransparentContainerView(contentView: hostView)
         panel.orderOut(nil)
     }
 
     func show(state: OverlayState) {
+        debugLog("OverlayPanelController.show phase=\(state.phase) textLength=\(state.text.count)")
         hideTask?.cancel()
         model.state = state
         panel.setFrame(frame(for: state), display: true)
@@ -58,6 +67,7 @@ final class OverlayPanelController {
     }
 
     func hide() {
+        debugLog("OverlayPanelController.hide()")
         hideTask?.cancel()
         hideTask = Task { @MainActor in
             guard panel.isVisible else { return }
@@ -80,11 +90,11 @@ final class OverlayPanelController {
     }
 
     private func frame(for state: OverlayState) -> NSRect {
-        let width = measuredWidth(for: state.text)
+        let width = measuredWidth(for: OverlayRootView.displayText(for: state))
         let visibleFrame = NSScreen.main?.visibleFrame ?? .zero
         let originX = visibleFrame.midX - (width / 2)
         let originY = visibleFrame.minY + 48
-        return NSRect(x: originX, y: originY, width: width, height: 56)
+        return NSRect(x: originX, y: originY, width: width, height: overlayHeight)
     }
 
     private func positionPanel() {
@@ -93,13 +103,13 @@ final class OverlayPanelController {
     }
 
     private func measuredWidth(for text: String) -> CGFloat {
-        let shownText = text.isEmpty ? "Listening…" : text
         let attributes: [NSAttributedString.Key: Any] = [
             .font: NSFont.systemFont(ofSize: 16, weight: .medium),
         ]
 
-        let textWidth = (shownText as NSString).size(withAttributes: attributes).width
-        return min(max(textWidth + 120, 160), 560)
+        let textWidth = (text as NSString).size(withAttributes: attributes).width
+        let chromeWidth = (overlayHorizontalPadding * 2) + overlayWaveformWidth + overlayWaveformSpacing + 26
+        return min(max(textWidth + chromeWidth, overlayMinimumWidth), overlayMaximumWidth)
     }
 }
 
@@ -109,15 +119,11 @@ final class OverlayViewModel {
     var state: OverlayState = .idle
 }
 
-private final class VisualEffectContainerView: NSVisualEffectView {
+private final class TransparentContainerView: NSView {
     init(contentView: NSView) {
-        super.init(frame: NSRect(x: 0, y: 0, width: 240, height: 56))
-        material = .hudWindow
-        blendingMode = .withinWindow
-        state = .active
+        super.init(frame: NSRect(x: 0, y: 0, width: 240, height: overlayHeight))
         wantsLayer = true
-        layer?.cornerRadius = 28
-        layer?.cornerCurve = .continuous
+        layer?.backgroundColor = NSColor.clear.cgColor
 
         contentView.translatesAutoresizingMaskIntoConstraints = false
         addSubview(contentView)
@@ -135,55 +141,193 @@ private final class VisualEffectContainerView: NSVisualEffectView {
     }
 }
 
+@available(macOS 26.0, *)
 private struct OverlayRootView: View {
     @Bindable var model: OverlayViewModel
+    private let capsuleShape = Capsule()
 
     var body: some View {
-        HStack(spacing: 14) {
-            WaveformView(rms: model.state.rmsLevel)
-                .frame(width: 44, height: 32)
+        GlassEffectContainer(spacing: 0) {
+            HStack(spacing: overlayWaveformSpacing) {
+                WaveformView(rms: model.state.rmsLevel)
+                    .frame(width: overlayWaveformWidth, height: 32)
 
-            Text(displayText)
-                .font(.system(size: 16, weight: .medium))
-                .foregroundStyle(.white.opacity(0.96))
-                .lineLimit(1)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .animation(.easeInOut(duration: 0.25), value: displayText)
+                SlidingPreviewText(text: displayText)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+            }
+            .padding(.horizontal, overlayHorizontalPadding)
+            .frame(height: overlayHeight)
+            .overlay {
+                FlowingHighlightView()
+                    .clipShape(capsuleShape)
+                    .allowsHitTesting(false)
+            }
+            .shadow(color: .black.opacity(0.08), radius: 10, y: 4)
+            .glassEffect(.clear.tint(.white.opacity(0.06)), in: capsuleShape)
         }
-        .padding(.horizontal, 18)
-        .frame(height: 56)
     }
 
-    private var displayText: String {
-        switch model.state.phase {
+    fileprivate var displayText: String {
+        Self.displayText(for: model.state)
+    }
+
+    fileprivate static func displayText(for state: OverlayState) -> String {
+        switch state.phase {
         case .idle:
             return ""
         case .recording:
-            return model.state.text.isEmpty ? "Listening…" : model.state.text
+            return state.text.isEmpty ? "Listening…" : state.text
         case .transcribing:
-            return model.state.text.isEmpty ? "Transcribing…" : model.state.text
+            return state.text.isEmpty ? "Transcribing…" : state.text
         case .refining:
             return "Refining..."
         case .injecting:
-            return model.state.text.isEmpty ? "Injecting…" : model.state.text
+            return state.text.isEmpty ? "Injecting…" : state.text
+        }
+    }
+}
+
+@available(macOS 26.0, *)
+private struct SlidingPreviewText: View {
+    let text: String
+
+    @State private var contentWidth: CGFloat = 0
+    @State private var viewportWidth: CGFloat = 0
+    @State private var offset: CGFloat = 0
+    @State private var displayLinkStart = Date()
+
+    var body: some View {
+        GeometryReader { proxy in
+            let width = max(0, proxy.size.width)
+
+            HStack(spacing: 0) {
+                Text(text)
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundStyle(.white.opacity(0.98))
+                    .lineLimit(1)
+                    .fixedSize(horizontal: true, vertical: false)
+                    .offset(x: offset)
+                    .shadow(color: .black.opacity(0.22), radius: 2, y: 1)
+                    .background(
+                        WidthReader(width: $contentWidth)
+                    )
+                Spacer(minLength: 0)
+            }
+            .frame(width: width, height: proxy.size.height, alignment: .leading)
+            .clipped()
+            .onAppear {
+                viewportWidth = width
+                syncOffset(animated: false)
+            }
+            .onChange(of: width) { _, newValue in
+                viewportWidth = newValue
+                syncOffset(animated: false)
+            }
+        }
+        .frame(maxHeight: .infinity, alignment: .center)
+        .onAppear {
+            displayLinkStart = .now
+            syncOffset(animated: false)
+        }
+        .onChange(of: text) { _, _ in
+            syncOffset(animated: true)
+        }
+        .onChange(of: contentWidth) { _, _ in
+            syncOffset(animated: true)
+        }
+        .onChange(of: viewportWidth) { _, _ in
+            syncOffset(animated: false)
+        }
+    }
+
+    private func syncOffset(animated: Bool) {
+        let overflow = max(0, contentWidth - viewportWidth)
+        let targetOffset: CGFloat = overflow > 1 ? -overflow : 0
+
+        guard abs(offset - targetOffset) > 0.5 else {
+            offset = targetOffset
+            return
+        }
+
+        guard animated else {
+            offset = targetOffset
+            return
+        }
+
+        let delta = abs(targetOffset - offset)
+        let duration = min(0.36, max(0.18, Double(delta / 140)))
+        withAnimation(.interactiveSpring(response: duration, dampingFraction: 0.9, blendDuration: 0.18)) {
+            offset = targetOffset
+        }
+    }
+}
+
+@available(macOS 26.0, *)
+private struct WidthReader: View {
+    @Binding var width: CGFloat
+
+    var body: some View {
+        GeometryReader { proxy in
+            Color.clear
+                .onAppear {
+                    width = proxy.size.width
+                }
+                .onChange(of: proxy.size.width) { _, newValue in
+                    width = newValue
+                }
+        }
+    }
+}
+
+@available(macOS 26.0, *)
+private struct FlowingHighlightView: View {
+    var body: some View {
+        TimelineView(.animation) { timeline in
+            let time = timeline.date.timeIntervalSinceReferenceDate
+            let cycle = time.truncatingRemainder(dividingBy: 4.4) / 4.4
+            let travel = CGFloat(cycle) * 1.85 - 0.45
+
+            GeometryReader { proxy in
+                let shimmerWidth = max(54, proxy.size.width * 0.2)
+
+                LinearGradient(
+                    colors: [
+                        .white.opacity(0.0),
+                        .white.opacity(0.04),
+                        .white.opacity(0.14),
+                        .white.opacity(0.04),
+                        .white.opacity(0.0),
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .frame(width: shimmerWidth, height: proxy.size.height * 1.25)
+                .rotationEffect(.degrees(14))
+                .blur(radius: 5)
+                .offset(
+                    x: (proxy.size.width * travel) - (shimmerWidth / 2),
+                    y: -proxy.size.height * 0.06
+                )
+            }
         }
     }
 }
 
 private struct WaveformView: View {
     let rms: Float
-    private let weights: [CGFloat] = [0.5, 0.8, 1.0, 0.75, 0.55]
-    private let seeds: [Double] = [0.0, 0.17, 0.31, 0.47, 0.61]
+    private let weights: [CGFloat] = [0.58, 0.88, 1.0, 0.84, 0.62]
+    private let seeds: [Double] = [0.03, 0.16, 0.29, 0.44, 0.58]
 
     var body: some View {
         TimelineView(.animation) { timeline in
             let time = timeline.date.timeIntervalSinceReferenceDate
 
-            HStack(spacing: 4) {
+            HStack(spacing: 3) {
                 ForEach(Array(weights.enumerated()), id: \.offset) { index, weight in
                     RoundedRectangle(cornerRadius: 2)
-                        .fill(.white.opacity(0.95))
-                        .frame(width: 5, height: barHeight(index: index, weight: weight, time: time))
+                        .fill(.white.opacity(0.98))
+                        .frame(width: 3, height: barHeight(index: index, weight: weight, time: time))
+                        .shadow(color: .black.opacity(0.16), radius: 1, y: 1)
                 }
             }
             .frame(maxHeight: .infinity, alignment: .center)
@@ -191,8 +335,13 @@ private struct WaveformView: View {
     }
 
     private func barHeight(index: Int, weight: CGFloat, time: TimeInterval) -> CGFloat {
-        let base = max(6, CGFloat(rms) * 30 * weight + 6)
-        let jitter = 1 + (sin(time * 11 + seeds[index] * 8) * 0.04)
-        return min(32, max(6, base * jitter))
+        let primary = (sin(time * 4.8 + seeds[index] * 10) + 1) * 0.5
+        let secondary = (sin(time * 7.9 + seeds[index] * 17) + 1) * 0.5
+        let envelope = (primary * 0.72) + (secondary * 0.28)
+        let minHeight: CGFloat = 8
+        let maxHeight: CGFloat = 22
+        let range = (maxHeight - minHeight) * weight
+        _ = rms
+        return minHeight + (range * envelope)
     }
 }

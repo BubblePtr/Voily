@@ -1,6 +1,23 @@
 import AppKit
 import Foundation
 
+func debugLog(_ message: String) {
+    let line = "[Voily] \(message)\n"
+    let data = Data(line.utf8)
+    let url = URL(fileURLWithPath: "/tmp/voily.log")
+
+    if FileManager.default.fileExists(atPath: url.path) {
+        if let handle = try? FileHandle(forWritingTo: url) {
+            defer { try? handle.close() }
+            _ = try? handle.seekToEnd()
+            try? handle.write(contentsOf: data)
+        }
+    } else {
+        try? data.write(to: url)
+    }
+}
+
+@available(macOS 26.0, *)
 @MainActor
 final class AppController: NSObject {
     private let settings = AppSettings()
@@ -22,16 +39,33 @@ final class AppController: NSObject {
     private var smoothedRMS: Float = 0
 
     func start() {
+        debugLog("AppController.start()")
         permissionCoordinator.requestStartupPermissions()
         configureStatusItem()
-        configureFnMonitoring()
-        permissionCoordinator.promptForAccessibilityIfNeeded()
+        configureAccessibilityFeatures()
     }
 
     func stop() {
+        debugLog("AppController.stop()")
         fnKeyMonitor.stop()
         audioCaptureService.stop()
         speechService.cancel()
+    }
+
+    private func configureAccessibilityFeatures() {
+        debugLog("configureAccessibilityFeatures trusted=\(permissionCoordinator.isAccessibilityTrusted)")
+        guard permissionCoordinator.isAccessibilityTrusted else {
+            debugLog("Accessibility not trusted yet, prompting and waiting")
+            permissionCoordinator.promptForAccessibilityIfNeeded()
+            permissionCoordinator.waitForAccessibilityGrant { [weak self] in
+                debugLog("Accessibility granted, starting fn monitoring")
+                self?.configureFnMonitoring()
+            }
+            return
+        }
+
+        debugLog("Accessibility already trusted, starting fn monitoring")
+        configureFnMonitoring()
     }
 
     private func configureStatusItem() {
@@ -100,13 +134,16 @@ final class AppController: NSObject {
     }
 
     private func configureFnMonitoring() {
+        debugLog("configureFnMonitoring()")
         fnKeyMonitor.onPress = { [weak self] in
+            debugLog("Fn onPress callback")
             Task { @MainActor in
                 await self?.beginRecording()
             }
         }
 
         fnKeyMonitor.onRelease = { [weak self] in
+            debugLog("Fn onRelease callback")
             Task { @MainActor in
                 await self?.finishRecording()
             }
@@ -116,6 +153,7 @@ final class AppController: NSObject {
     }
 
     private func setOverlay(text: String, rmsLevel: Float, phase: OverlayPhase) {
+        debugLog("setOverlay phase=\(phase) textLength=\(text.count) rms=\(String(format: "%.3f", rmsLevel))")
         currentText = text
         currentPhase = phase
         overlayController.show(state: OverlayState(text: text, rmsLevel: rmsLevel, phase: phase))
@@ -134,6 +172,7 @@ final class AppController: NSObject {
 
     private func beginRecording() async {
         guard currentPhase == .idle else { return }
+        debugLog("beginRecording()")
         currentText = ""
         smoothedRMS = 0
         setOverlay(text: "", rmsLevel: 0, phase: .recording)
@@ -164,6 +203,7 @@ final class AppController: NSObject {
 
     private func finishRecording() async {
         guard currentPhase == .recording else { return }
+        debugLog("finishRecording()")
 
         currentPhase = .transcribing
         overlayController.show(state: OverlayState(text: currentText, rmsLevel: smoothedRMS, phase: .transcribing))
@@ -201,6 +241,9 @@ final class AppController: NSObject {
         let injectionResult = await textInjectionService.inject(text: finalText)
         if injectionResult != .success {
             NSLog("Text injection finished with result: \(String(describing: injectionResult))")
+            if injectionResult == .accessibilityDenied {
+                permissionCoordinator.promptForAccessibilityIfNeeded(force: true)
+            }
         }
 
         try? await Task.sleep(for: .milliseconds(150))

@@ -1,6 +1,7 @@
 import AppKit
 
 @main
+@available(macOS 26.0, *)
 enum VoilyMain {
     static func main() {
         let application = NSApplication.shared
