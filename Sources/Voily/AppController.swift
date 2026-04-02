@@ -1,6 +1,10 @@
 import AppKit
 import Foundation
 
+func isRunningInXcodePreview() -> Bool {
+    ProcessInfo.processInfo.environment["XCODE_RUNNING_FOR_PREVIEWS"] == "1"
+}
+
 func debugLog(_ message: String) {
     let line = "[Voily] \(message)\n"
     let data = Data(line.utf8)
@@ -40,8 +44,8 @@ final class AppController: NSObject {
 
     func start() {
         debugLog("AppController.start()")
-        permissionCoordinator.requestStartupPermissions()
         configureStatusItem()
+        permissionCoordinator.requestStartupPermissions()
         configureAccessibilityFeatures()
     }
 

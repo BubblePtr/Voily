@@ -6,6 +6,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var appController: AppController?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        guard !isRunningInXcodePreview() else { return }
         try? FileManager.default.removeItem(atPath: "/tmp/voily.log")
         debugLog("AppDelegate.applicationDidFinishLaunching")
         appController = AppController()

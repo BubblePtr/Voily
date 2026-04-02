@@ -2,12 +2,22 @@ import AppKit
 import SwiftUI
 import Observation
 
-private let overlayHeight: CGFloat = 56
+let overlayHeight: CGFloat = 52
 private let overlayMinimumWidth: CGFloat = 160
 private let overlayMaximumWidth: CGFloat = 560
 private let overlayHorizontalPadding: CGFloat = 18
 private let overlayWaveformWidth: CGFloat = 32
 private let overlayWaveformSpacing: CGFloat = 12
+
+func overlayWidth(for text: String) -> CGFloat {
+    let attributes: [NSAttributedString.Key: Any] = [
+        .font: NSFont.systemFont(ofSize: 16, weight: .medium),
+    ]
+
+    let textWidth = (text as NSString).size(withAttributes: attributes).width
+    let chromeWidth = (overlayHorizontalPadding * 2) + overlayWaveformWidth + overlayWaveformSpacing + 26
+    return min(max(textWidth + chromeWidth, overlayMinimumWidth), overlayMaximumWidth)
+}
 
 @available(macOS 26.0, *)
 @MainActor
@@ -22,7 +32,7 @@ final class OverlayPanelController {
         hostView = NSHostingView(rootView: rootView)
 
         panel = NSPanel(
-            contentRect: NSRect(x: 0, y: 0, width: 240, height: 56),
+            contentRect: NSRect(x: 0, y: 0, width: 240, height: overlayHeight),
             styleMask: [.nonactivatingPanel, .borderless],
             backing: .buffered,
             defer: false
@@ -90,26 +100,16 @@ final class OverlayPanelController {
     }
 
     private func frame(for state: OverlayState) -> NSRect {
-        let width = measuredWidth(for: OverlayRootView.displayText(for: state))
+        let width = overlayWidth(for: OverlayRootView.displayText(for: state))
         let visibleFrame = NSScreen.main?.visibleFrame ?? .zero
         let originX = visibleFrame.midX - (width / 2)
-        let originY = visibleFrame.minY + 48
+        let originY = visibleFrame.minY + 28
         return NSRect(x: originX, y: originY, width: width, height: overlayHeight)
     }
 
     private func positionPanel() {
         let frame = frame(for: model.state)
         panel.setFrameOrigin(frame.origin)
-    }
-
-    private func measuredWidth(for text: String) -> CGFloat {
-        let attributes: [NSAttributedString.Key: Any] = [
-            .font: NSFont.systemFont(ofSize: 16, weight: .medium),
-        ]
-
-        let textWidth = (text as NSString).size(withAttributes: attributes).width
-        let chromeWidth = (overlayHorizontalPadding * 2) + overlayWaveformWidth + overlayWaveformSpacing + 26
-        return min(max(textWidth + chromeWidth, overlayMinimumWidth), overlayMaximumWidth)
     }
 }
 
@@ -142,14 +142,26 @@ private final class TransparentContainerView: NSView {
 }
 
 @available(macOS 26.0, *)
-private struct OverlayRootView: View {
+struct OverlayRootView: View {
     @Bindable var model: OverlayViewModel
+    let animateInPreview: Bool
+    let previewTime: TimeInterval?
     private let capsuleShape = Capsule()
+
+    init(model: OverlayViewModel, animateInPreview: Bool = false, previewTime: TimeInterval? = nil) {
+        _model = Bindable(model)
+        self.animateInPreview = animateInPreview
+        self.previewTime = previewTime
+    }
 
     var body: some View {
         GlassEffectContainer(spacing: 0) {
             HStack(spacing: overlayWaveformSpacing) {
-                WaveformView(rms: model.state.rmsLevel)
+                WaveformView(
+                    rms: model.state.rmsLevel,
+                    animateInPreview: animateInPreview,
+                    previewTime: previewTime
+                )
                     .frame(width: overlayWaveformWidth, height: 32)
 
                 SlidingPreviewText(text: displayText)
@@ -158,12 +170,20 @@ private struct OverlayRootView: View {
             .padding(.horizontal, overlayHorizontalPadding)
             .frame(height: overlayHeight)
             .overlay {
-                FlowingHighlightView()
-                    .clipShape(capsuleShape)
+                OverlayGlassChrome(shape: capsuleShape)
                     .allowsHitTesting(false)
             }
-            .shadow(color: .black.opacity(0.08), radius: 10, y: 4)
-            .glassEffect(.clear.tint(.white.opacity(0.06)), in: capsuleShape)
+            .overlay {
+                FlowingHighlightView(
+                    animateInPreview: animateInPreview,
+                    previewTime: previewTime
+                )
+                    .clipShape(capsuleShape)
+                    .blendMode(.screen)
+                    .allowsHitTesting(false)
+            }
+            .shadow(color: .black.opacity(0.08), radius: 12, y: 7)
+            .glassEffect(.clear.tint(.white.opacity(0.003)), in: capsuleShape)
         }
     }
 
@@ -171,7 +191,7 @@ private struct OverlayRootView: View {
         Self.displayText(for: model.state)
     }
 
-    fileprivate static func displayText(for state: OverlayState) -> String {
+    static func displayText(for state: OverlayState) -> String {
         switch state.phase {
         case .idle:
             return ""
@@ -280,68 +300,180 @@ private struct WidthReader: View {
 }
 
 @available(macOS 26.0, *)
-private struct FlowingHighlightView: View {
+private struct OverlayGlassChrome<S: InsettableShape>: View {
+    let shape: S
+
     var body: some View {
-        TimelineView(.animation) { timeline in
-            let time = timeline.date.timeIntervalSinceReferenceDate
-            let cycle = time.truncatingRemainder(dividingBy: 4.4) / 4.4
-            let travel = CGFloat(cycle) * 1.85 - 0.45
-
-            GeometryReader { proxy in
-                let shimmerWidth = max(54, proxy.size.width * 0.2)
-
+        shape
+            .inset(by: 1)
+            .strokeBorder(
                 LinearGradient(
                     colors: [
-                        .white.opacity(0.0),
-                        .white.opacity(0.04),
-                        .white.opacity(0.14),
-                        .white.opacity(0.04),
-                        .white.opacity(0.0),
+                        .white.opacity(0.3),
+                        .white.opacity(0.08),
+                        .white.opacity(0.015),
                     ],
                     startPoint: .top,
                     endPoint: .bottom
-                )
-                .frame(width: shimmerWidth, height: proxy.size.height * 1.25)
-                .rotationEffect(.degrees(14))
-                .blur(radius: 5)
-                .offset(
-                    x: (proxy.size.width * travel) - (shimmerWidth / 2),
-                    y: -proxy.size.height * 0.06
-                )
+                ),
+                lineWidth: 1
+            )
+    }
+}
+
+@available(macOS 26.0, *)
+private struct FlowingHighlightView: View {
+    let animateInPreview: Bool
+    let previewTime: TimeInterval?
+
+    var body: some View {
+        if let previewTime {
+            shimmer(cycle: previewTime.truncatingRemainder(dividingBy: 4.8) / 4.8)
+        } else if isRunningInXcodePreview() && !animateInPreview {
+            shimmer(cycle: 0.36)
+        } else {
+            TimelineView(.animation) { timeline in
+                let time = timeline.date.timeIntervalSinceReferenceDate
+                let cycle = time.truncatingRemainder(dividingBy: 4.8) / 4.8
+                shimmer(cycle: cycle)
             }
+        }
+    }
+
+    private func shimmer(cycle: Double) -> some View {
+        let travel = CGFloat(cycle) * 1.85 - 0.45
+
+        return GeometryReader { proxy in
+            let shimmerWidth = max(72, proxy.size.width * 0.22)
+
+            LinearGradient(
+                colors: [
+                    .white.opacity(0.0),
+                    .white.opacity(0.03),
+                    .white.opacity(0.12),
+                    .white.opacity(0.04),
+                    .white.opacity(0.0),
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .frame(width: shimmerWidth, height: proxy.size.height * 1.25)
+            .rotationEffect(.degrees(12))
+            .blur(radius: 10)
+            .offset(
+                x: (proxy.size.width * travel) - (shimmerWidth / 2),
+                y: -proxy.size.height * 0.06
+            )
+            .opacity(0.8)
         }
     }
 }
 
 private struct WaveformView: View {
     let rms: Float
+    let animateInPreview: Bool
+    let previewTime: TimeInterval?
     private let weights: [CGFloat] = [0.58, 0.88, 1.0, 0.84, 0.62]
     private let seeds: [Double] = [0.03, 0.16, 0.29, 0.44, 0.58]
 
     var body: some View {
-        TimelineView(.animation) { timeline in
-            let time = timeline.date.timeIntervalSinceReferenceDate
-
-            HStack(spacing: 3) {
-                ForEach(Array(weights.enumerated()), id: \.offset) { index, weight in
-                    RoundedRectangle(cornerRadius: 2)
-                        .fill(.white.opacity(0.98))
-                        .frame(width: 3, height: barHeight(index: index, weight: weight, time: time))
-                        .shadow(color: .black.opacity(0.16), radius: 1, y: 1)
-                }
+        if let previewTime {
+            bars(time: previewTime)
+        } else if isRunningInXcodePreview() && !animateInPreview {
+            bars(time: 0.42)
+        } else {
+            TimelineView(.animation) { timeline in
+                bars(time: timeline.date.timeIntervalSinceReferenceDate)
             }
-            .frame(maxHeight: .infinity, alignment: .center)
         }
+    }
+
+    private func bars(time: TimeInterval) -> some View {
+        HStack(spacing: 3) {
+            ForEach(Array(weights.enumerated()), id: \.offset) { index, weight in
+                RoundedRectangle(cornerRadius: 2)
+                    .fill(.white.opacity(0.98))
+                    .frame(width: 3, height: barHeight(index: index, weight: weight, time: time))
+                    .shadow(color: .black.opacity(0.16), radius: 1, y: 1)
+                }
+        }
+        .frame(maxHeight: .infinity, alignment: .center)
     }
 
     private func barHeight(index: Int, weight: CGFloat, time: TimeInterval) -> CGFloat {
         let primary = (sin(time * 4.8 + seeds[index] * 10) + 1) * 0.5
         let secondary = (sin(time * 7.9 + seeds[index] * 17) + 1) * 0.5
         let envelope = (primary * 0.72) + (secondary * 0.28)
-        let minHeight: CGFloat = 8
-        let maxHeight: CGFloat = 22
-        let range = (maxHeight - minHeight) * weight
-        _ = rms
+        let minHeight: CGFloat = 9
+        let maxHeight: CGFloat = 24
+        let normalizedRMS = min(max(CGFloat(rms), 0), 1)
+        let activity = max(0.18, normalizedRMS)
+        let range = (maxHeight - minHeight) * weight * activity
         return minHeight + (range * envelope)
     }
+}
+
+@available(macOS 26.0, *)
+private struct OverlayPreviewScene: View {
+    @State private var model: OverlayViewModel
+
+    init(state: OverlayState) {
+        let model = OverlayViewModel()
+        model.state = state
+        _model = State(initialValue: model)
+    }
+
+    var body: some View {
+        ZStack {
+            LinearGradient(
+                colors: [
+                    Color(nsColor: .init(red: 0.17, green: 0.25, blue: 0.37, alpha: 1)),
+                    Color(nsColor: .init(red: 0.12, green: 0.17, blue: 0.24, alpha: 1)),
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+
+            Circle()
+                .fill(Color.white.opacity(0.12))
+                .blur(radius: 40)
+                .frame(width: 220, height: 220)
+                .offset(x: -110, y: -70)
+
+            Circle()
+                .fill(Color.cyan.opacity(0.16))
+                .blur(radius: 50)
+                .frame(width: 180, height: 180)
+                .offset(x: 130, y: 60)
+
+            OverlayRootView(model: model)
+                .frame(
+                    width: overlayWidth(for: OverlayRootView.displayText(for: model.state)),
+                    height: overlayHeight
+                )
+        }
+        .frame(width: 460, height: 220)
+    }
+}
+
+@available(macOS 26.0, *)
+#Preview("Overlay Listening") {
+    OverlayPreviewScene(
+        state: OverlayState(
+            text: "Listening…",
+            rmsLevel: 0.62,
+            phase: .recording
+        )
+    )
+}
+
+@available(macOS 26.0, *)
+#Preview("Overlay Long Text") {
+    OverlayPreviewScene(
+        state: OverlayState(
+            text: "Transcribing the selected text into a more natural sentence…",
+            rmsLevel: 0.28,
+            phase: .transcribing
+        )
+    )
 }
