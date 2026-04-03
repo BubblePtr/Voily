@@ -22,6 +22,7 @@
 		A001000D0000000000000000 /* TextInjectionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A002000D0000000000000000 /* TextInjectionService.swift */; };
 		A001000E0000000000000000 /* VoilyMain.swift in Sources */ = {isa = PBXBuildFile; fileRef = A002000E0000000000000000 /* VoilyMain.swift */; };
 		A00100100000000000000000 /* OverlayPreview.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00200120000000000000000 /* OverlayPreview.swift */; };
+		A00100110000000000000000 /* BrandIcons in Resources */ = {isa = PBXBuildFile; fileRef = A00200130000000000000000 /* BrandIcons */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -42,6 +43,7 @@
 		A002000F0000000000000000 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		A00200100000000000000000 /* Voily.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Voily.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A00200120000000000000000 /* OverlayPreview.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OverlayPreview.swift; sourceTree = "<group>"; };
+		A00200130000000000000000 /* BrandIcons */ = {isa = PBXFileReference; lastKnownFileType = folder; path = Resources/BrandIcons; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -67,6 +69,7 @@
 		A00400020000000000000000 /* Sources/Voily */ = {
 			isa = PBXGroup;
 			children = (
+				A00200130000000000000000 /* BrandIcons */,
 				A00200010000000000000000 /* AppController.swift */,
 				A00200020000000000000000 /* AppDelegate.swift */,
 				A00200030000000000000000 /* AppSettings.swift */,
@@ -163,6 +166,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A00100110000000000000000 /* BrandIcons in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
