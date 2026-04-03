@@ -13,7 +13,8 @@ final class LLMRefinementService {
 
     @MainActor
     func refine(_ request: RefinementRequest, settings: AppSettings) async throws -> String {
-        let trimmedBaseURL = settings.llmBaseURL.trimmingCharacters(in: .whitespacesAndNewlines)
+        let config = settings.selectedTextProviderConfig
+        let trimmedBaseURL = config.baseURL.trimmingCharacters(in: .whitespacesAndNewlines)
         guard let baseURL = URL(string: trimmedBaseURL) else {
             throw LLMError.invalidBaseURL
         }
@@ -27,10 +28,10 @@ final class LLMRefinementService {
         urlRequest.httpMethod = "POST"
         urlRequest.timeoutInterval = 15
         urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        urlRequest.setValue("Bearer \(settings.llmAPIKey)", forHTTPHeaderField: "Authorization")
+        urlRequest.setValue("Bearer \(config.apiKey)", forHTTPHeaderField: "Authorization")
 
         let payload = ChatCompletionsRequest(
-            model: settings.llmModel,
+            model: config.model,
             messages: [
                 .init(role: "system", content: Self.systemPrompt(languageCode: request.languageCode)),
                 .init(role: "user", content: request.text),

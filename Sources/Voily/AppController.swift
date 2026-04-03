@@ -37,7 +37,7 @@ final class AppController: NSObject {
 
     private var statusItem: NSStatusItem?
     private var languageMenuItems: [SupportedLanguage: NSMenuItem] = [:]
-    private var llmEnabledMenuItem: NSMenuItem?
+    private var textRefinementMenuItem: NSMenuItem?
     private var currentPhase: OverlayPhase = .idle
     private var currentText = ""
     private var smoothedRMS: Float = 0
@@ -86,9 +86,9 @@ final class AppController: NSObject {
         languageItem.submenu = makeLanguageMenu()
         menu.addItem(languageItem)
 
-        let llmItem = NSMenuItem(title: "LLM Refinement", action: nil, keyEquivalent: "")
-        llmItem.submenu = makeLLMMenu()
-        menu.addItem(llmItem)
+        let textRefinementItem = NSMenuItem(title: "Text Refinement", action: nil, keyEquivalent: "")
+        textRefinementItem.submenu = makeTextRefinementMenu()
+        menu.addItem(textRefinementItem)
 
         menu.addItem(.separator())
 
@@ -121,13 +121,13 @@ final class AppController: NSObject {
         return menu
     }
 
-    private func makeLLMMenu() -> NSMenu {
+    private func makeTextRefinementMenu() -> NSMenu {
         let menu = NSMenu()
 
         let toggle = NSMenuItem(title: "Enable Refinement", action: #selector(toggleLLM), keyEquivalent: "")
         toggle.target = self
-        toggle.state = settings.llmEnabled ? .on : .off
-        llmEnabledMenuItem = toggle
+        toggle.state = settings.textRefinementEnabled ? .on : .off
+        textRefinementMenuItem = toggle
         menu.addItem(toggle)
 
         let settingsItem = NSMenuItem(title: "Settings…", action: #selector(openSettings), keyEquivalent: "")
@@ -223,7 +223,7 @@ final class AppController: NSObject {
         }
 
         let finalText: String
-        if settings.llmEnabled && settings.isLLMConfigured {
+        if settings.textRefinementEnabled && settings.isTextRefinementConfigured {
             currentPhase = .refining
             overlayController.show(state: OverlayState(text: recognizedText, rmsLevel: 0, phase: .refining))
 
@@ -272,8 +272,8 @@ final class AppController: NSObject {
 
     @objc
     private func toggleLLM() {
-        settings.llmEnabled.toggle()
-        llmEnabledMenuItem?.state = settings.llmEnabled ? .on : .off
+        settings.textRefinementEnabled.toggle()
+        textRefinementMenuItem?.state = settings.textRefinementEnabled ? .on : .off
     }
 
     @objc
