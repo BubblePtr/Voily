@@ -1,6 +1,36 @@
 import AppKit
 import SwiftUI
 
+private enum OverlayPreviewScript {
+    static let recordingSamples: [String] = [
+        "现在来测试一下我自己的这个语音输入法",
+        "现在来测试一下我自己的这个语音输入法，感觉其实还不错",
+        "现在来测试一下我自己的这个语音输入法，感觉其实还不错，然后我再来看一下它滑动窗口有效果吧",
+        "现在来测试一下我自己的这个语音输入法，感觉其实还不错，然后我再来看一下它滑动窗口有效果吧，感觉还是有点钝的",
+        "现在来测试一下我自己的这个语音输入法，感觉其实还不错，然后我再来看一下它滑动窗口有效果吧，感觉还是有点钝的，就是不太平滑这个滑动窗口的效果"
+    ]
+
+    static let finalText = "现在来测试一下我自己的这个语音输入法，感觉其实还不错，然后我再来看一下它滑动窗口有效果吧，感觉还是有点钝的，就是不太平滑这个滑动窗口的效果。"
+
+    static func state(at time: TimeInterval) -> OverlayState {
+        let cycle = time.truncatingRemainder(dividingBy: 9.6)
+        let rms = Float((sin(time * 3.6) + 1) * 0.5 * 0.75 + 0.15)
+
+        switch cycle {
+        case 0..<4.8:
+            let progress = max(0, min(0.999, cycle / 4.8))
+            let index = min(recordingSamples.count - 1, Int(progress * Double(recordingSamples.count)))
+            return OverlayState(text: recordingSamples[index], rmsLevel: rms, phase: .recording)
+        case 4.8..<6.4:
+            return OverlayState(text: finalText, rmsLevel: rms * 0.22, phase: .transcribing)
+        case 6.4..<7.5:
+            return OverlayState(text: finalText, rmsLevel: 0, phase: .refining)
+        default:
+            return OverlayState(text: finalText, rmsLevel: 0, phase: .injecting)
+        }
+    }
+}
+
 private enum OverlayPreviewBackground: String, CaseIterable, Identifiable {
     case sea
     case pink
@@ -99,8 +129,7 @@ private struct OverlayAnimatedPreviewCanvas: View {
     var body: some View {
         TimelineView(.periodic(from: .now, by: 1.0 / 24.0)) { timeline in
             let time = timeline.date.timeIntervalSinceReferenceDate
-            let rms = Float((sin(time * 3.6) + 1) * 0.5 * 0.75 + 0.15)
-            let state = OverlayState(text: "Listening…", rmsLevel: rms, phase: .recording)
+            let state = OverlayPreviewScript.state(at: time)
 
             OverlayPreviewFrame(
                 state: state,
@@ -131,6 +160,10 @@ private struct OverlayAnimatedPreview: View {
 
             OverlayAnimatedPreviewCanvas(background: selectedBackground)
                 .id(selectedBackground)
+
+            Text("Mock transcript grows over time so the preview can show the sliding window behavior.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
         }
         .padding(16)
         .frame(width: 500)

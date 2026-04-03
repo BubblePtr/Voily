@@ -4,7 +4,7 @@ import Observation
 
 let overlayHeight: CGFloat = 52
 private let overlayMinimumWidth: CGFloat = 160
-private let overlayMaximumWidth: CGFloat = 560
+private let overlayMaximumWidth: CGFloat = 420
 private let overlayHorizontalPadding: CGFloat = 18
 private let overlayWaveformWidth: CGFloat = 46
 private let overlayWaveformSpacing: CGFloat = 12
@@ -52,27 +52,29 @@ final class OverlayPanelController {
     func show(state: OverlayState) {
         debugLog("OverlayPanelController.show phase=\(state.phase) textLength=\(state.text.count)")
         hideTask?.cancel()
+        let targetFrame = frame(for: state)
+        let needsFrameUpdate = !panel.frame.equalTo(targetFrame)
         model.state = state
-        panel.setFrame(frame(for: state), display: true)
-        positionPanel()
 
         if !panel.isVisible {
             panel.alphaValue = 0
-            panel.setFrameOrigin(frame(for: state).origin)
+            panel.setFrame(targetFrame, display: true)
             panel.orderFrontRegardless()
-            panel.animator().alphaValue = 1
 
             NSAnimationContext.runAnimationGroup { context in
-                context.duration = 0.35
+                context.duration = 0.18
                 context.timingFunction = CAMediaTimingFunction(name: .easeOut)
-                panel.animator().setFrame(frame(for: state), display: true)
+                panel.animator().alphaValue = 1
             }
-        } else {
-            NSAnimationContext.runAnimationGroup { context in
-                context.duration = 0.25
-                context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
-                panel.animator().setFrame(frame(for: state), display: true)
-            }
+            return
+        }
+
+        guard needsFrameUpdate else { return }
+
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = 0.14
+            context.timingFunction = CAMediaTimingFunction(name: .easeOut)
+            panel.animator().setFrame(targetFrame, display: true)
         }
     }
 
@@ -106,11 +108,6 @@ final class OverlayPanelController {
         let originY = visibleFrame.minY + 28
         return NSRect(x: originX, y: originY, width: width, height: overlayHeight)
     }
-
-    private func positionPanel() {
-        let frame = frame(for: model.state)
-        panel.setFrameOrigin(frame.origin)
-    }
 }
 
 @MainActor
@@ -141,7 +138,6 @@ private final class TransparentContainerView: NSView {
     }
 }
 
-@available(macOS 26.0, *)
 struct OverlayRootView: View {
     @Bindable var model: OverlayViewModel
     let animateInPreview: Bool
@@ -210,15 +206,16 @@ struct OverlayRootView: View {
 @available(macOS 26.0, *)
 private struct SlidingPreviewText: View {
     let text: String
+    private let fadeWidth: CGFloat = 16
 
     @State private var contentWidth: CGFloat = 0
     @State private var viewportWidth: CGFloat = 0
     @State private var offset: CGFloat = 0
-    @State private var displayLinkStart = Date()
 
     var body: some View {
         GeometryReader { proxy in
             let width = max(0, proxy.size.width)
+            let overflow = max(0, contentWidth - width)
 
             HStack(spacing: 0) {
                 Text(text)
@@ -235,6 +232,14 @@ private struct SlidingPreviewText: View {
             }
             .frame(width: width, height: proxy.size.height, alignment: .leading)
             .clipped()
+            .mask(
+                SlidingPreviewFadeMask(
+                    width: width,
+                    fadeWidth: min(fadeWidth, width * 0.18),
+                    showsLeadingFade: overflow > 1 && offset < -0.5,
+                    showsTrailingFade: overflow > 1 && offset > -(overflow - 0.5)
+                )
+            )
             .onAppear {
                 viewportWidth = width
                 syncOffset(animated: false)
@@ -245,10 +250,6 @@ private struct SlidingPreviewText: View {
             }
         }
         .frame(maxHeight: .infinity, alignment: .center)
-        .onAppear {
-            displayLinkStart = .now
-            syncOffset(animated: false)
-        }
         .onChange(of: text) { _, _ in
             syncOffset(animated: true)
         }
@@ -256,7 +257,7 @@ private struct SlidingPreviewText: View {
             syncOffset(animated: true)
         }
         .onChange(of: viewportWidth) { _, _ in
-            syncOffset(animated: false)
+            syncOffset(animated: true)
         }
     }
 
@@ -275,9 +276,47 @@ private struct SlidingPreviewText: View {
         }
 
         let delta = abs(targetOffset - offset)
-        let duration = min(0.36, max(0.18, Double(delta / 140)))
-        withAnimation(.interactiveSpring(response: duration, dampingFraction: 0.9, blendDuration: 0.18)) {
+        let duration = min(0.16, max(0.06, Double(delta / 420)))
+        withAnimation(.linear(duration: duration)) {
             offset = targetOffset
+        }
+    }
+}
+
+@available(macOS 26.0, *)
+private struct SlidingPreviewFadeMask: View {
+    let width: CGFloat
+    let fadeWidth: CGFloat
+    let showsLeadingFade: Bool
+    let showsTrailingFade: Bool
+
+    var body: some View {
+        let edgeWidth = max(0, min(fadeWidth, width / 2))
+
+        HStack(spacing: 0) {
+            LinearGradient(
+                colors: [
+                    .white.opacity(showsLeadingFade ? 0 : 1),
+                    .white,
+                ],
+                startPoint: .leading,
+                endPoint: .trailing
+            )
+            .frame(width: edgeWidth)
+
+            Rectangle()
+                .fill(.white)
+                .frame(width: max(0, width - (edgeWidth * 2)))
+
+            LinearGradient(
+                colors: [
+                    .white,
+                    .white.opacity(showsTrailingFade ? 0 : 1),
+                ],
+                startPoint: .leading,
+                endPoint: .trailing
+            )
+            .frame(width: edgeWidth)
         }
     }
 }
