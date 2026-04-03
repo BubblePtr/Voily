@@ -6,7 +6,7 @@ let overlayHeight: CGFloat = 52
 private let overlayMinimumWidth: CGFloat = 160
 private let overlayMaximumWidth: CGFloat = 560
 private let overlayHorizontalPadding: CGFloat = 18
-private let overlayWaveformWidth: CGFloat = 32
+private let overlayWaveformWidth: CGFloat = 46
 private let overlayWaveformSpacing: CGFloat = 12
 
 func overlayWidth(for text: String) -> CGFloat {
@@ -374,7 +374,9 @@ private struct WaveformView: View {
     let animateInPreview: Bool
     let previewTime: TimeInterval?
     private let weights: [CGFloat] = [0.58, 0.88, 1.0, 0.84, 0.62]
-    private let seeds: [Double] = [0.03, 0.16, 0.29, 0.44, 0.58]
+    private let positions: [Double] = [-2, -1, 0, 1, 2]
+    private let spatialPhaseStep: Double = .pi / 3.2
+    private let loopDuration: TimeInterval = 0.84
 
     var body: some View {
         if let previewTime {
@@ -389,21 +391,24 @@ private struct WaveformView: View {
     }
 
     private func bars(time: TimeInterval) -> some View {
-        HStack(spacing: 3) {
+        HStack(spacing: 2.5) {
             ForEach(Array(weights.enumerated()), id: \.offset) { index, weight in
-                RoundedRectangle(cornerRadius: 2)
+                RoundedRectangle(cornerRadius: 1.5)
                     .fill(.white.opacity(0.98))
-                    .frame(width: 3, height: barHeight(index: index, weight: weight, time: time))
+                    .frame(width: 2.2, height: barHeight(index: index, weight: weight, time: time))
                     .shadow(color: .black.opacity(0.16), radius: 1, y: 1)
-                }
+            }
         }
         .frame(maxHeight: .infinity, alignment: .center)
     }
 
     private func barHeight(index: Int, weight: CGFloat, time: TimeInterval) -> CGFloat {
-        let primary = (sin(time * 4.8 + seeds[index] * 10) + 1) * 0.5
-        let secondary = (sin(time * 7.9 + seeds[index] * 17) + 1) * 0.5
-        let envelope = (primary * 0.72) + (secondary * 0.28)
+        let cycle = time.truncatingRemainder(dividingBy: loopDuration) / loopDuration
+        let phase = cycle * .pi * 2
+        let localPhase = phase - (positions[index] * spatialPhaseStep)
+        let primary = (sin(localPhase) + 1) * 0.5
+        let secondary = (sin((localPhase * 2) - .pi / 6) + 1) * 0.5
+        let envelope = (primary * 0.82) + (secondary * 0.18)
         let minHeight: CGFloat = 9
         let maxHeight: CGFloat = 24
         let normalizedRMS = min(max(CGFloat(rms), 0), 1)

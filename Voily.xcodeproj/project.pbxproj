@@ -58,16 +58,14 @@
 		A00400010000000000000000 = {
 			isa = PBXGroup;
 			children = (
-				A00400020000000000000000 /* Sources */,
+				A00400020000000000000000 /* Sources/Voily */,
 				A00400030000000000000000 /* Config */,
 				A00400040000000000000000 /* Products */,
 			);
 			sourceTree = "<group>";
 		};
-		A00400020000000000000000 /* Sources */ = {
+		A00400020000000000000000 /* Sources/Voily */ = {
 			isa = PBXGroup;
-			path = Sources/Voily;
-			sourceTree = SOURCE_ROOT;
 			children = (
 				A00200010000000000000000 /* AppController.swift */,
 				A00200020000000000000000 /* AppDelegate.swift */,
@@ -85,14 +83,16 @@
 				A002000D0000000000000000 /* TextInjectionService.swift */,
 				A002000E0000000000000000 /* VoilyMain.swift */,
 			);
+			path = Sources/Voily;
+			sourceTree = SOURCE_ROOT;
 		};
 		A00400030000000000000000 /* Config */ = {
 			isa = PBXGroup;
-			path = Config;
-			sourceTree = SOURCE_ROOT;
 			children = (
 				A002000F0000000000000000 /* Info.plist */,
 			);
+			path = Config;
+			sourceTree = SOURCE_ROOT;
 		};
 		A00400040000000000000000 /* Products */ = {
 			isa = PBXGroup;
@@ -116,8 +116,6 @@
 			buildRules = (
 			);
 			dependencies = (
-			);
-			fileSystemSynchronizedGroups = (
 			);
 			name = Voily;
 			packageProductDependencies = (
@@ -211,7 +209,7 @@
 				GCC_NO_COMMON_BLOCKS = YES;
 				GCC_OPTIMIZATION_LEVEL = 0;
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.void.voily;
+				PRODUCT_BUNDLE_IDENTIFIER = com.tokendance.voily;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = macosx;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
@@ -234,7 +232,7 @@
 				ENABLE_HARDENED_RUNTIME = NO;
 				GCC_NO_COMMON_BLOCKS = YES;
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.void.voily;
+				PRODUCT_BUNDLE_IDENTIFIER = com.tokendance.voily;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = macosx;
 				SWIFT_COMPILATION_MODE = wholemodule;
@@ -249,16 +247,16 @@
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = "";
+				DEVELOPMENT_TEAM = 9KZ32XLVQW;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Config/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 1.0;
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.void.voily;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.tokendance.voily;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = macosx;
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -271,16 +269,16 @@
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = "";
+				DEVELOPMENT_TEAM = 9KZ32XLVQW;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Config/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 1.0;
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.void.voily;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.tokendance.voily;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = macosx;
 				SWIFT_EMIT_LOC_STRINGS = YES;

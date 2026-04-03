@@ -7,7 +7,7 @@
 	<key>CFBundleExecutable</key>
 	<string>Voily</string>
 	<key>CFBundleIdentifier</key>
-	<string>com.void.voily</string>
+	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
@@ -22,9 +22,9 @@
 	<string>26.0</string>
 	<key>LSUIElement</key>
 	<true/>
-	<key>NSSpeechRecognitionUsageDescription</key>
-	<string>Voily uses speech recognition to transcribe your voice into text.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Voily uses the microphone while you hold Fn to capture speech.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>Voily uses speech recognition to transcribe your voice into text.</string>
 </dict>
 </plist>
