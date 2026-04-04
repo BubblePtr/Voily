@@ -23,6 +23,8 @@
 		A001000E0000000000000000 /* VoilyMain.swift in Sources */ = {isa = PBXBuildFile; fileRef = A002000E0000000000000000 /* VoilyMain.swift */; };
 		A00100100000000000000000 /* OverlayPreview.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00200120000000000000000 /* OverlayPreview.swift */; };
 		A00100110000000000000000 /* BrandIcons in Resources */ = {isa = PBXBuildFile; fileRef = A00200130000000000000000 /* BrandIcons */; };
+		A00100120000000000000000 /* DashboardHomePage.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00200140000000000000000 /* DashboardHomePage.swift */; };
+		A00100130000000000000000 /* UsageStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00200150000000000000000 /* UsageStore.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -44,6 +46,8 @@
 		A00200100000000000000000 /* Voily.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Voily.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A00200120000000000000000 /* OverlayPreview.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OverlayPreview.swift; sourceTree = "<group>"; };
 		A00200130000000000000000 /* BrandIcons */ = {isa = PBXFileReference; lastKnownFileType = folder; path = Resources/BrandIcons; sourceTree = "<group>"; };
+		A00200140000000000000000 /* DashboardHomePage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardHomePage.swift; sourceTree = "<group>"; };
+		A00200150000000000000000 /* UsageStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UsageStore.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -80,10 +84,12 @@
 				A00200120000000000000000 /* OverlayPreview.swift */,
 				A00200080000000000000000 /* OverlayState.swift */,
 				A00200090000000000000000 /* PermissionCoordinator.swift */,
+				A00200140000000000000000 /* DashboardHomePage.swift */,
 				A002000A0000000000000000 /* SettingsWindowController.swift */,
 				A002000B0000000000000000 /* SpeechTranscriptionService.swift */,
 				A002000C0000000000000000 /* SupportedLanguage.swift */,
 				A002000D0000000000000000 /* TextInjectionService.swift */,
+				A00200150000000000000000 /* UsageStore.swift */,
 				A002000E0000000000000000 /* VoilyMain.swift */,
 			);
 			path = Sources/Voily;
@@ -187,10 +193,12 @@
 				A00100100000000000000000 /* OverlayPreview.swift in Sources */,
 				A00100080000000000000000 /* OverlayState.swift in Sources */,
 				A00100090000000000000000 /* PermissionCoordinator.swift in Sources */,
+				A00100120000000000000000 /* DashboardHomePage.swift in Sources */,
 				A001000A0000000000000000 /* SettingsWindowController.swift in Sources */,
 				A001000B0000000000000000 /* SpeechTranscriptionService.swift in Sources */,
 				A001000C0000000000000000 /* SupportedLanguage.swift in Sources */,
 				A001000D0000000000000000 /* TextInjectionService.swift in Sources */,
+				A00100130000000000000000 /* UsageStore.swift in Sources */,
 				A001000E0000000000000000 /* VoilyMain.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

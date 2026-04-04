@@ -3,8 +3,8 @@ import SwiftUI
 
 @MainActor
 final class SettingsWindowController: NSWindowController {
-    init(settings: AppSettings, llmService: LLMRefinementService) {
-        let view = SettingsRootView(settings: settings, llmService: llmService)
+    init(settings: AppSettings, usageStore: UsageStore, llmService: LLMRefinementService) {
+        let view = SettingsRootView(settings: settings, usageStore: usageStore, llmService: llmService)
         let hostingController = NSHostingController(rootView: view)
         let window = NSWindow(contentViewController: hostingController)
         window.title = "Voily Settings"
@@ -59,6 +59,7 @@ private enum SettingsPage: String, CaseIterable, Identifiable, Hashable {
 
 private struct SettingsRootView: View {
     @Bindable var settings: AppSettings
+    let usageStore: UsageStore
     let llmService: LLMRefinementService
 
     @State private var selection: SettingsPage? = .home
@@ -71,7 +72,7 @@ private struct SettingsRootView: View {
             Group {
                 switch selection ?? .home {
                 case .home:
-                    SettingsHomePage(settings: settings)
+                    DashboardHomePage(usageStore: usageStore)
                 case .model:
                     ModelSettingsPage(settings: settings, llmService: llmService)
                 case .glossary:
@@ -110,64 +111,6 @@ private struct SettingsSidebar: View {
             .padding(.top, 20)
             .padding(.bottom, 14)
             .background(.regularMaterial)
-        }
-    }
-}
-
-private struct SettingsHomePage: View {
-    @Bindable var settings: AppSettings
-
-    var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 24) {
-                SettingsPageHeader(
-                    title: "首页",
-                    subtitle: "查看当前语音输入配置，并快速调整常用设置。"
-                )
-
-                SettingsCard(title: "基础设置", subtitle: "语言与纠错开关") {
-                    VStack(alignment: .leading, spacing: 18) {
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("识别语言")
-                                .font(.system(size: 13, weight: .semibold))
-                                .foregroundStyle(.secondary)
-
-                            Picker("识别语言", selection: $settings.selectedLanguageCode) {
-                                ForEach(SupportedLanguage.allCases) { language in
-                                    Text(language.displayName)
-                                        .tag(language.rawValue)
-                                }
-                            }
-                            .labelsHidden()
-                            .pickerStyle(.menu)
-                        }
-
-                        Toggle("启用语音输入润色", isOn: $settings.textRefinementEnabled)
-                            .toggleStyle(.switch)
-
-                        Divider()
-
-                        SettingsInfoRow(label: "当前语言", value: settings.selectedLanguage.displayName)
-                        SettingsInfoRow(label: "语音识别模型", value: settings.selectedASRProvider.displayName)
-                        SettingsInfoRow(label: "语音输入模型", value: settings.selectedTextProvider.displayName)
-                        SettingsInfoRow(
-                            label: "润色状态",
-                            value: settings.isTextRefinementConfigured ? "已配置" : "未配置"
-                        )
-                        SettingsInfoRow(label: "词库词条数", value: "\(settings.glossaryItems.count)")
-                    }
-                }
-
-                SettingsCard(title: "使用方式", subtitle: "当前交互约定") {
-                    VStack(alignment: .leading, spacing: 12) {
-                        SettingsBullet(text: "按住 Fn 开始录音，松开后自动结束并注入文本。")
-                        SettingsBullet(text: "模型配置页支持默认模型选择和按服务商弹窗配置。")
-                        SettingsBullet(text: "词库页可维护常用术语、产品名和专有名词。")
-                    }
-                }
-            }
-            .padding(28)
-            .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 }
@@ -945,7 +888,7 @@ private struct GlossarySettingsPage: View {
     }
 }
 
-private struct SettingsPageHeader: View {
+struct SettingsPageHeader: View {
     let title: String
     let subtitle: String
 
@@ -961,7 +904,7 @@ private struct SettingsPageHeader: View {
     }
 }
 
-private struct SettingsCard<Content: View>: View {
+struct SettingsCard<Content: View>: View {
     let title: String
     let subtitle: String
     @ViewBuilder let content: Content
@@ -1041,7 +984,7 @@ private struct SettingsBullet: View {
 }
 
 @MainActor
-private enum SettingsPreviewData {
+enum SettingsPreviewData {
     static func configuredSettings() -> AppSettings {
         let suiteName = "Voily.SettingsPreview.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!
@@ -1115,6 +1058,34 @@ private enum SettingsPreviewData {
         let defaults = UserDefaults(suiteName: suiteName)!
         defaults.removePersistentDomain(forName: suiteName)
         return AppSettings(defaults: defaults)
+    }
+
+    static func populatedUsageStore() -> UsageStore {
+        let store = UsageStore(databasePath: ":memory:")
+        let now = Date()
+        for dayOffset in stride(from: -55, through: 0, by: 1) {
+            let sessionCount = dayOffset == 0 ? 3 : abs(dayOffset % 4)
+            for index in 0..<sessionCount {
+                let baseDate = Calendar.autoupdatingCurrent.date(byAdding: .day, value: dayOffset, to: now) ?? now
+                let endDate = Calendar.autoupdatingCurrent.date(bySettingHour: 9 + (index * 2), minute: 20, second: 0, of: baseDate) ?? baseDate
+                let startedAt = endDate.addingTimeInterval(TimeInterval(-(35 + (index * 20))))
+                let sessionID = store.recordSession(
+                    VoiceInputSessionDraft(
+                        startedAt: startedAt,
+                        endedAt: endDate,
+                        languageCode: SupportedLanguage.simplifiedChinese.rawValue,
+                        recognizedText: "识别文本 \(dayOffset)-\(index)",
+                        finalText: "这是第 \(index + 1) 条预览历史记录，用来展示 dashboard 首页里的完整历史与复制能力。",
+                        refinementApplied: index % 2 == 0
+                    ),
+                    now: now
+                )
+                if let sessionID {
+                    store.markInjectionResult(sessionID: sessionID, succeeded: index % 3 != 0, now: now)
+                }
+            }
+        }
+        return store
     }
 }
 
@@ -1201,7 +1172,7 @@ private extension TextRefinementProvider {
 
 @available(macOS 26.0, *)
 #Preview("Settings Home") {
-    SettingsHomePage(settings: SettingsPreviewData.configuredSettings())
+    DashboardHomePage(usageStore: SettingsPreviewData.populatedUsageStore())
         .frame(width: 760, height: 700)
 }
 

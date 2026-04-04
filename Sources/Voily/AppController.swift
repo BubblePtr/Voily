@@ -25,6 +25,7 @@ func debugLog(_ message: String) {
 @MainActor
 final class AppController: NSObject {
     private let settings = AppSettings()
+    private let usageStore = UsageStore()
     private let permissionCoordinator = PermissionCoordinator()
     private let fnKeyMonitor = FnKeyMonitor()
     private let audioCaptureService = AudioCaptureService()
@@ -33,7 +34,11 @@ final class AppController: NSObject {
     private let textInjectionService = TextInjectionService()
     private let llmRefinementService = LLMRefinementService()
 
-    private lazy var settingsWindowController = SettingsWindowController(settings: settings, llmService: llmRefinementService)
+    private lazy var settingsWindowController = SettingsWindowController(
+        settings: settings,
+        usageStore: usageStore,
+        llmService: llmRefinementService
+    )
 
     private var statusItem: NSStatusItem?
     private var languageMenuItems: [SupportedLanguage: NSMenuItem] = [:]
@@ -41,6 +46,7 @@ final class AppController: NSObject {
     private var currentPhase: OverlayPhase = .idle
     private var currentText = ""
     private var smoothedRMS: Float = 0
+    private var currentSessionStartedAt: Date?
 
     func start() {
         debugLog("AppController.start()")
@@ -179,6 +185,7 @@ final class AppController: NSObject {
         debugLog("beginRecording()")
         currentText = ""
         smoothedRMS = 0
+        currentSessionStartedAt = Date()
         setOverlay(text: "", rmsLevel: 0, phase: .recording)
 
         do {
@@ -202,6 +209,7 @@ final class AppController: NSObject {
             NSLog("Recording start failed: \(error.localizedDescription)")
             overlayController.hide()
             currentPhase = .idle
+            currentSessionStartedAt = nil
         }
     }
 
@@ -215,10 +223,12 @@ final class AppController: NSObject {
 
         let recognizedText = await speechService.finish().trimmingCharacters(in: .whitespacesAndNewlines)
         currentText = recognizedText
+        let endedAt = Date()
 
         guard !recognizedText.isEmpty else {
             overlayController.hide()
             currentPhase = .idle
+            currentSessionStartedAt = nil
             return
         }
 
@@ -240,9 +250,23 @@ final class AppController: NSObject {
             finalText = recognizedText
         }
 
+        let sessionID = usageStore.recordSession(
+            VoiceInputSessionDraft(
+                startedAt: currentSessionStartedAt ?? endedAt,
+                endedAt: endedAt,
+                languageCode: settings.selectedLanguageCode,
+                recognizedText: recognizedText,
+                finalText: finalText,
+                refinementApplied: settings.textRefinementEnabled && settings.isTextRefinementConfigured
+            )
+        )
+
         currentPhase = .injecting
         overlayController.show(state: OverlayState(text: finalText, rmsLevel: 0, phase: .injecting))
         let injectionResult = await textInjectionService.inject(text: finalText)
+        if let sessionID {
+            usageStore.markInjectionResult(sessionID: sessionID, succeeded: injectionResult == .success)
+        }
         if injectionResult != .success {
             NSLog("Text injection finished with result: \(String(describing: injectionResult))")
             if injectionResult == .accessibilityDenied {
@@ -253,6 +277,7 @@ final class AppController: NSObject {
         try? await Task.sleep(for: .milliseconds(150))
         overlayController.hide()
         currentPhase = .idle
+        currentSessionStartedAt = nil
     }
 
     @objc
