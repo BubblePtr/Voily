@@ -48,7 +48,7 @@ actor QwenRealtimeASRService {
     private var createdContinuation: CheckedContinuation<Void, Error>?
     private var finishContinuation: CheckedContinuation<QwenRealtimeASRResult, Error>?
     private var commandSummary = ""
-    private var finalTranscript = ""
+    private var transcriptAccumulator = TranscriptAccumulator()
     private var finalStartedAt: Date?
     private var isFinishing = false
 
@@ -91,7 +91,7 @@ actor QwenRealtimeASRService {
         webSocketTask = task
         self.onPartialText = onPartialText
         commandSummary = websocketURL.absoluteString
-        finalTranscript = ""
+        transcriptAccumulator.reset()
         finalStartedAt = nil
         isFinishing = false
 
@@ -157,7 +157,7 @@ actor QwenRealtimeASRService {
         webSocketTask = nil
         onPartialText = nil
         commandSummary = ""
-        finalTranscript = ""
+        transcriptAccumulator.reset()
         finalStartedAt = nil
         isFinishing = false
     }
@@ -234,22 +234,24 @@ actor QwenRealtimeASRService {
             createdContinuation = nil
         case "conversation.item.input_audio_transcription.text":
             guard let partial = Self.partialText(from: payload), !partial.isEmpty else { return }
-            debugLog("Qwen realtime partial length=\(partial.count)")
-            onPartialText?(partial)
+            let displayText = transcriptAccumulator.updatePartial(partial)
+            debugLog("Qwen realtime partial length=\(displayText.count)")
+            onPartialText?(displayText)
         case "conversation.item.input_audio_transcription.completed":
             if let transcript = Self.finalTranscript(from: payload), !transcript.isEmpty {
-                debugLog("Qwen realtime final length=\(transcript.count)")
-                finalTranscript = transcript
+                let committedText = transcriptAccumulator.commit(transcript)
+                debugLog("Qwen realtime final length=\(committedText.count)")
             }
         case "session.finished":
             debugLog("Qwen realtime event type=session.finished")
             if let finishContinuation {
-                if finalTranscript.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                let finalText = transcriptAccumulator.finalText
+                if finalText.isEmpty {
                     finishContinuation.resume(throwing: QwenRealtimeASRServiceError.emptyTranscript)
                 } else {
                     let duration = finalStartedAt.map { Date().timeIntervalSince($0) } ?? 0
                     finishContinuation.resume(returning: QwenRealtimeASRResult(
-                        text: finalTranscript.trimmingCharacters(in: .whitespacesAndNewlines),
+                        text: finalText,
                         duration: duration,
                         commandSummary: commandSummary
                     ))
@@ -267,10 +269,11 @@ actor QwenRealtimeASRService {
     }
 
     private func handleReceiveFailure(_ error: Error) async {
-        if isFinishing, !finalTranscript.isEmpty, let finishContinuation {
+        let finalText = transcriptAccumulator.finalText
+        if isFinishing, !finalText.isEmpty, let finishContinuation {
             let duration = finalStartedAt.map { Date().timeIntervalSince($0) } ?? 0
             finishContinuation.resume(returning: QwenRealtimeASRResult(
-                text: finalTranscript.trimmingCharacters(in: .whitespacesAndNewlines),
+                text: finalText,
                 duration: duration,
                 commandSummary: commandSummary
             ))

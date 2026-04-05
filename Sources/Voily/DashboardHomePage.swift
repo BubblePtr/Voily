@@ -18,9 +18,10 @@ struct DashboardHomePage: View {
                     subtitle: "今天的语音输入情况、趋势变化和完整历史都集中放在这里。"
                 )
 
-                TodayMetricsSection(summary: usageStore.todaySummary)
-
-                TodayPerformanceSection(summary: usageStore.todayASRSummary)
+                TodayMetricsSection(
+                    summary: usageStore.todaySummary,
+                    asrSummary: usageStore.todayASRSummary
+                )
 
                 LazyVGrid(columns: historyColumns, spacing: 20) {
                     TrendChartsSection(
@@ -64,9 +65,9 @@ struct DashboardHomePage: View {
 @available(macOS 26.0, *)
 private struct TodayMetricsSection: View {
     let summary: TodayUsageSummary
+    let asrSummary: TodayASRPerformanceSummary
 
     private let columns = [
-        GridItem(.flexible(), spacing: 18),
         GridItem(.flexible(), spacing: 18),
         GridItem(.flexible(), spacing: 18),
     ]
@@ -88,17 +89,24 @@ private struct TodayMetricsSection: View {
             )
 
             MetricCard(
-                title: "平均每次输出字数",
-                value: averageCharacters(summary: summary),
-                footnote: "帮助判断单次输入的密度",
+                title: "平均每分钟字数",
+                value: averageCharactersPerMinute(summary: summary),
+                footnote: summary.totalDurationMs == 0 ? "还没有足够的语音输入数据" : "按今日语音输入时长折算",
                 accent: .orange
+            )
+            MetricCard(
+                title: "今日平均延时",
+                value: formattedRecognitionDuration(asrSummary.averageRecognitionMs),
+                footnote: asrSummary.sessionCount == 0 ? "还没有识别性能数据" : "从结束录音到转文字完成",
+                accent: .pink
             )
         }
     }
 
-    private func averageCharacters(summary: TodayUsageSummary) -> String {
-        guard summary.sessionCount > 0 else { return "0" }
-        return "\(summary.totalCharacters / summary.sessionCount)"
+    private func averageCharactersPerMinute(summary: TodayUsageSummary) -> String {
+        guard summary.totalDurationMs > 0, summary.totalCharacters > 0 else { return "0" }
+        let charactersPerMinute = (Double(summary.totalCharacters) * 60_000.0) / Double(summary.totalDurationMs)
+        return "\(Int(charactersPerMinute.rounded()))"
     }
 
     private func formattedDuration(_ durationMs: Int) -> String {
@@ -115,36 +123,8 @@ private struct TodayMetricsSection: View {
         }
         return "\(seconds)s"
     }
-}
 
-@available(macOS 26.0, *)
-private struct TodayPerformanceSection: View {
-    let summary: TodayASRPerformanceSummary
-
-    private let columns = [
-        GridItem(.flexible(), spacing: 18),
-        GridItem(.flexible(), spacing: 18),
-    ]
-
-    var body: some View {
-        LazyVGrid(columns: columns, spacing: 18) {
-            MetricCard(
-                title: "今日平均首字延迟",
-                value: formatted(summary.averageFirstPartialMs),
-                footnote: summary.sessionCount == 0 ? "还没有 partial 数据" : "从开始录音到首次 partial",
-                accent: .purple
-            )
-
-            MetricCard(
-                title: "今日平均最终耗时",
-                value: formatted(summary.averageRecognitionMs),
-                footnote: summary.sessionCount == 0 ? "还没有识别性能数据" : "按完整转文字链路统计",
-                accent: .pink
-            )
-        }
-    }
-
-    private func formatted(_ durationMs: Int) -> String {
+    private func formattedRecognitionDuration(_ durationMs: Int) -> String {
         guard durationMs > 0 else { return "0 ms" }
         if durationMs >= 1000 {
             return String(format: "%.2f s", Double(durationMs) / 1000)
@@ -419,11 +399,8 @@ private struct HistorySessionRowView: View {
     private func asrMetrics(_ session: HistorySessionRow) -> String {
         let providerName = ASRProvider(rawValue: session.asrProvider)?.displayName ?? session.asrProvider
         var segments = [providerName, sourceLabel(session.asrSource)]
-        if let firstPartialMs = session.recognitionFirstPartialMs, firstPartialMs > 0 {
-            segments.append("首字 \(recognitionDuration(firstPartialMs))")
-        }
         let total = session.recognitionTotalMs > 0 ? recognitionDuration(session.recognitionTotalMs) : "--"
-        segments.append("最终 \(total)")
+        segments.append("延时 \(total)")
         return segments.joined(separator: " · ")
     }
 

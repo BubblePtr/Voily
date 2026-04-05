@@ -3,6 +3,25 @@ import AVFoundation
 @testable import Voily
 
 final class LocalASRServiceTests: XCTestCase {
+    func testTranscriptAccumulatorKeepsCommittedSegmentsAcrossPauses() {
+        var accumulator = TranscriptAccumulator()
+
+        XCTAssertEqual(accumulator.updatePartial("现在我来测试一下流式输出"), "现在我来测试一下流式输出")
+        XCTAssertEqual(accumulator.commit("现在我来测试一下流式输出"), "现在我来测试一下流式输出")
+        XCTAssertEqual(accumulator.updatePartial("如果我有停顿的话"), "现在我来测试一下流式输出如果我有停顿的话")
+        XCTAssertEqual(accumulator.commit("如果我有停顿的话"), "现在我来测试一下流式输出如果我有停顿的话")
+        XCTAssertEqual(accumulator.finalText, "现在我来测试一下流式输出如果我有停顿的话")
+    }
+
+    func testTranscriptAccumulatorAddsSpaceBetweenASCIIWordSegments() {
+        var accumulator = TranscriptAccumulator()
+
+        XCTAssertEqual(accumulator.commit("hello"), "hello")
+        XCTAssertEqual(accumulator.updatePartial("world"), "hello world")
+        XCTAssertEqual(accumulator.commit("world"), "hello world")
+        XCTAssertEqual(accumulator.finalText, "hello world")
+    }
+
     func testWhisperCommandUsesWhisperArguments() throws {
         let executablePath = try makeExecutable()
         let audioURL = URL(fileURLWithPath: "/tmp/sample.wav")
