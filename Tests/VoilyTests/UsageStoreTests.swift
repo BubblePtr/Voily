@@ -12,7 +12,13 @@ final class UsageStoreTests: XCTestCase {
                 languageCode: "zh-Hans",
                 recognizedText: "   ",
                 finalText: "   ",
-                refinementApplied: false
+                refinementApplied: false,
+                asrProvider: ASRProvider.senseVoice.rawValue,
+                asrSource: "local",
+                recognitionTotalMs: 420,
+                recognitionEngineMs: 390,
+                recognitionFirstPartialMs: 120,
+                recognitionPartialCount: 2
             ),
             now: date("2026-04-03T09:00:20Z")
         )
@@ -33,7 +39,13 @@ final class UsageStoreTests: XCTestCase {
                 languageCode: "zh-Hans",
                 recognizedText: "hello",
                 finalText: "你好世界",
-                refinementApplied: true
+                refinementApplied: true,
+                asrProvider: ASRProvider.senseVoice.rawValue,
+                asrSource: "local",
+                recognitionTotalMs: 350,
+                recognitionEngineMs: 320,
+                recognitionFirstPartialMs: 110,
+                recognitionPartialCount: 1
             ),
             now: now
         )
@@ -53,7 +65,13 @@ final class UsageStoreTests: XCTestCase {
                 languageCode: "zh-Hans",
                 recognizedText: "原始识别",
                 finalText: "润色后的最终结果",
-                refinementApplied: true
+                refinementApplied: true,
+                asrProvider: ASRProvider.senseVoice.rawValue,
+                asrSource: "local",
+                recognitionTotalMs: 360,
+                recognitionEngineMs: 330,
+                recognitionFirstPartialMs: 140,
+                recognitionPartialCount: 3
             ),
             now: now
         )
@@ -74,7 +92,13 @@ final class UsageStoreTests: XCTestCase {
                     languageCode: "zh-Hans",
                     recognizedText: "识别内容",
                     finalText: "最终文本",
-                    refinementApplied: false
+                    refinementApplied: false,
+                    asrProvider: ASRProvider.senseVoice.rawValue,
+                    asrSource: "local",
+                    recognitionTotalMs: 410,
+                    recognitionEngineMs: 380,
+                    recognitionFirstPartialMs: 125,
+                    recognitionPartialCount: 2
                 ),
                 now: now
             )
@@ -120,7 +144,13 @@ final class UsageStoreTests: XCTestCase {
                     languageCode: "zh-Hans",
                     recognizedText: session.finalText,
                     finalText: session.finalText,
-                    refinementApplied: false
+                    refinementApplied: false,
+                    asrProvider: ASRProvider.senseVoice.rawValue,
+                    asrSource: "local",
+                    recognitionTotalMs: 500,
+                    recognitionEngineMs: 450,
+                    recognitionFirstPartialMs: 150,
+                    recognitionPartialCount: 2
                 ),
                 now: session.now
             )
@@ -137,6 +167,54 @@ final class UsageStoreTests: XCTestCase {
         XCTAssertEqual(daily.count, 2)
         XCTAssertEqual(daily.last?.totalDurationMs, 65000)
         XCTAssertEqual(daily.last?.totalCharacters, 7)
+    }
+
+    func testTodayASRSummaryAggregatesCorrectly() {
+        let store = makeStore()
+        let now = date("2026-04-03T09:00:20Z")
+
+        _ = store.recordSession(
+            VoiceInputSessionDraft(
+                startedAt: date("2026-04-03T09:00:00Z"),
+                endedAt: date("2026-04-03T09:00:10Z"),
+                languageCode: "zh-Hans",
+                recognizedText: "你好",
+                finalText: "你好",
+                refinementApplied: false,
+                asrProvider: ASRProvider.senseVoice.rawValue,
+                asrSource: "local",
+                recognitionTotalMs: 420,
+                recognitionEngineMs: 390,
+                recognitionFirstPartialMs: 120,
+                recognitionPartialCount: 2
+            ),
+            now: now
+        )
+
+        _ = store.recordSession(
+            VoiceInputSessionDraft(
+                startedAt: date("2026-04-03T09:01:00Z"),
+                endedAt: date("2026-04-03T09:01:08Z"),
+                languageCode: "zh-Hans",
+                recognizedText: "hello",
+                finalText: "hello",
+                refinementApplied: false,
+                asrProvider: ASRProvider.qwenASR.rawValue,
+                asrSource: "system-speech",
+                recognitionTotalMs: 810,
+                recognitionEngineMs: 790,
+                recognitionFirstPartialMs: nil,
+                recognitionPartialCount: 0
+            ),
+            now: now
+        )
+
+        let summary = store.fetchTodayASRSummary(now: now)
+        XCTAssertEqual(summary.averageFirstPartialMs, 120)
+        XCTAssertEqual(summary.averageRecognitionMs, 615)
+        XCTAssertEqual(summary.partialCount, 2)
+        XCTAssertEqual(summary.localSessionCount, 1)
+        XCTAssertEqual(summary.sessionCount, 2)
     }
 
     private func makeStore() -> UsageStore {

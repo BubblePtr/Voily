@@ -1,11 +1,19 @@
 .DS_Store
 .build/
 .swiftpm/
+.venv*/
+.venv-sensevoice*/
 
 DerivedData/
 .xcodebuild/
 *.xcuserstate
 *.xcscmblueprint
+
+dist/local-asr/
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+*.log
 
 Voily.xcodeproj/project.xcworkspace/xcuserdata/
 Voily.xcodeproj/xcuserdata/

@@ -160,7 +160,7 @@ struct OverlayRootView: View {
                 )
                     .frame(width: overlayWaveformWidth, height: 32)
 
-                SlidingPreviewText(text: displayText)
+                SlidingPreviewText(text: displayText, isPartial: model.state.phase == .recordingPartial)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
             }
             .padding(.horizontal, overlayHorizontalPadding)
@@ -193,6 +193,8 @@ struct OverlayRootView: View {
             return ""
         case .recording:
             return state.text.isEmpty ? "Listening…" : state.text
+        case .recordingPartial:
+            return state.text.isEmpty ? "Listening…" : state.text
         case .transcribing:
             return state.text.isEmpty ? "Transcribing…" : state.text
         case .refining:
@@ -206,6 +208,7 @@ struct OverlayRootView: View {
 @available(macOS 26.0, *)
 private struct SlidingPreviewText: View {
     let text: String
+    let isPartial: Bool
     private let fadeWidth: CGFloat = 16
 
     @State private var contentWidth: CGFloat = 0
@@ -220,7 +223,7 @@ private struct SlidingPreviewText: View {
             HStack(spacing: 0) {
                 Text(text)
                     .font(.system(size: 16, weight: .medium))
-                    .foregroundStyle(.white.opacity(0.98))
+                    .foregroundStyle(.white.opacity(isPartial ? 0.82 : 0.98))
                     .lineLimit(1)
                     .fixedSize(horizontal: true, vertical: false)
                     .offset(x: offset)

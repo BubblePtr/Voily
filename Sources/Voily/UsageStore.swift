@@ -24,6 +24,12 @@ struct HistorySessionRow: Identifiable, Equatable {
     let characterCount: Int
     let refinementApplied: Bool
     let injectionSucceeded: Bool?
+    let asrProvider: String
+    let asrSource: String
+    let recognitionTotalMs: Int
+    let recognitionEngineMs: Int?
+    let recognitionFirstPartialMs: Int?
+    let recognitionPartialCount: Int
 }
 
 struct TodayUsageSummary: Equatable {
@@ -32,6 +38,22 @@ struct TodayUsageSummary: Equatable {
     let sessionCount: Int
 
     static let empty = TodayUsageSummary(totalDurationMs: 0, totalCharacters: 0, sessionCount: 0)
+}
+
+struct TodayASRPerformanceSummary: Equatable {
+    let averageFirstPartialMs: Int
+    let averageRecognitionMs: Int
+    let partialCount: Int
+    let localSessionCount: Int
+    let sessionCount: Int
+
+    static let empty = TodayASRPerformanceSummary(
+        averageFirstPartialMs: 0,
+        averageRecognitionMs: 0,
+        partialCount: 0,
+        localSessionCount: 0,
+        sessionCount: 0
+    )
 }
 
 struct DailyUsageSummary: Identifiable, Equatable {
@@ -50,6 +72,12 @@ struct VoiceInputSessionDraft {
     let recognizedText: String
     let finalText: String
     let refinementApplied: Bool
+    let asrProvider: String
+    let asrSource: String
+    let recognitionTotalMs: Int
+    let recognitionEngineMs: Int?
+    let recognitionFirstPartialMs: Int?
+    let recognitionPartialCount: Int
 }
 
 @MainActor
@@ -72,6 +100,7 @@ final class UsageStore {
     nonisolated(unsafe) private var database: OpaquePointer?
 
     private(set) var todaySummary: TodayUsageSummary = .empty
+    private(set) var todayASRSummary: TodayASRPerformanceSummary = .empty
     private(set) var weeklySummaries: [DailyUsageSummary] = []
     private(set) var heatmapSummaries: [DailyUsageSummary] = []
     private(set) var recentSessions: [HistorySessionRow] = []
@@ -94,6 +123,7 @@ final class UsageStore {
 
     func refresh(now: Date = Date()) {
         todaySummary = fetchTodaySummary(now: now)
+        todayASRSummary = fetchTodayASRSummary(now: now)
         weeklySummaries = fetchLastDays(count: Constants.trendDayCount, now: now)
         heatmapSummaries = fetchLastDays(count: Constants.heatmapDayCount, now: now)
         recentSessions = fetchRecentSessions(limit: Constants.recentSessionLimit, offset: 0)
@@ -172,6 +202,45 @@ final class UsageStore {
         return grouped.values.sorted { $0.date < $1.date }
     }
 
+    func fetchTodayASRSummary(now: Date = Date()) -> TodayASRPerformanceSummary {
+        let dayKey = Self.dayKey(for: now, calendar: calendar)
+        let sql = """
+        SELECT
+            COALESCE(AVG(CASE
+                WHEN recognition_first_partial_ms IS NOT NULL AND recognition_first_partial_ms > 0 THEN recognition_first_partial_ms
+                ELSE NULL
+            END), 0),
+            COALESCE(AVG(recognition_total_ms), 0),
+            COALESCE(SUM(CASE
+                WHEN recognition_partial_count IS NOT NULL AND recognition_partial_count > 0 THEN recognition_partial_count
+                ELSE 0
+            END), 0),
+            COALESCE(SUM(CASE WHEN asr_source = 'local' THEN 1 ELSE 0 END), 0),
+            COUNT(*)
+        FROM voice_input_sessions
+        WHERE day_key = ?1;
+        """
+
+        guard let statement = try? prepareStatement(sql: sql) else {
+            return .empty
+        }
+        defer { sqlite3_finalize(statement) }
+
+        sqlite3_bind_text(statement, 1, dayKey, -1, transientDestructor)
+
+        guard sqlite3_step(statement) == SQLITE_ROW else {
+            return .empty
+        }
+
+        return TodayASRPerformanceSummary(
+            averageFirstPartialMs: Int(sqlite3_column_int64(statement, 0)),
+            averageRecognitionMs: Int(sqlite3_column_int64(statement, 1)),
+            partialCount: Int(sqlite3_column_int64(statement, 2)),
+            localSessionCount: Int(sqlite3_column_int64(statement, 3)),
+            sessionCount: Int(sqlite3_column_int64(statement, 4))
+        )
+    }
+
     func fetchRecentSessions(limit: Int, offset: Int = 0) -> [HistorySessionRow] {
         let sql = """
         SELECT
@@ -182,7 +251,13 @@ final class UsageStore {
             final_text,
             character_count,
             refinement_applied,
-            injection_succeeded
+            injection_succeeded,
+            asr_provider,
+            asr_source,
+            recognition_total_ms,
+            recognition_engine_ms,
+            recognition_first_partial_ms,
+            recognition_partial_count
         FROM voice_input_sessions
         ORDER BY ended_at DESC
         LIMIT ?1 OFFSET ?2;
@@ -249,8 +324,14 @@ final class UsageStore {
             final_text,
             character_count,
             refinement_applied,
-            injection_succeeded
-        ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, NULL);
+            injection_succeeded,
+            asr_provider,
+            asr_source,
+            recognition_total_ms,
+            recognition_engine_ms,
+            recognition_first_partial_ms,
+            recognition_partial_count
+        ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, NULL, ?11, ?12, ?13, ?14, ?15, ?16);
         """
 
         guard let statement = try? prepareStatement(sql: sql) else {
@@ -268,6 +349,20 @@ final class UsageStore {
         sqlite3_bind_text(statement, 8, trimmedText, -1, transientDestructor)
         sqlite3_bind_int(statement, 9, Int32(trimmedText.count))
         sqlite3_bind_int(statement, 10, draft.refinementApplied ? 1 : 0)
+        sqlite3_bind_text(statement, 11, draft.asrProvider, -1, transientDestructor)
+        sqlite3_bind_text(statement, 12, draft.asrSource, -1, transientDestructor)
+        sqlite3_bind_int64(statement, 13, sqlite3_int64(max(0, draft.recognitionTotalMs)))
+        if let recognitionEngineMs = draft.recognitionEngineMs {
+            sqlite3_bind_int64(statement, 14, sqlite3_int64(max(0, recognitionEngineMs)))
+        } else {
+            sqlite3_bind_null(statement, 14)
+        }
+        if let recognitionFirstPartialMs = draft.recognitionFirstPartialMs {
+            sqlite3_bind_int64(statement, 15, sqlite3_int64(max(0, recognitionFirstPartialMs)))
+        } else {
+            sqlite3_bind_null(statement, 15)
+        }
+        sqlite3_bind_int64(statement, 16, sqlite3_int64(max(0, draft.recognitionPartialCount)))
 
         guard sqlite3_step(statement) == SQLITE_DONE else {
             return nil
@@ -332,6 +427,19 @@ final class UsageStore {
             injectionSucceeded = sqlite3_column_int(statement, 7) == 1
         }
 
+        let recognitionEngineMs: Int?
+        if sqlite3_column_type(statement, 11) == SQLITE_NULL {
+            recognitionEngineMs = nil
+        } else {
+            recognitionEngineMs = Int(sqlite3_column_int64(statement, 11))
+        }
+        let recognitionFirstPartialMs: Int?
+        if sqlite3_column_type(statement, 12) == SQLITE_NULL {
+            recognitionFirstPartialMs = nil
+        } else {
+            recognitionFirstPartialMs = Int(sqlite3_column_int64(statement, 12))
+        }
+
         return HistorySessionRow(
             id: id,
             endedAt: Date(timeIntervalSince1970: sqlite3_column_double(statement, 1)),
@@ -340,7 +448,13 @@ final class UsageStore {
             finalText: finalText,
             characterCount: Int(sqlite3_column_int64(statement, 5)),
             refinementApplied: sqlite3_column_int(statement, 6) == 1,
-            injectionSucceeded: injectionSucceeded
+            injectionSucceeded: injectionSucceeded,
+            asrProvider: sqlite3_column_text(statement, 8).map { String(cString: $0) } ?? "",
+            asrSource: sqlite3_column_text(statement, 9).map { String(cString: $0) } ?? "",
+            recognitionTotalMs: Int(sqlite3_column_int64(statement, 10)),
+            recognitionEngineMs: recognitionEngineMs,
+            recognitionFirstPartialMs: recognitionFirstPartialMs,
+            recognitionPartialCount: Int(sqlite3_column_int64(statement, 13))
         )
     }
 
@@ -373,7 +487,13 @@ final class UsageStore {
             final_text TEXT NOT NULL,
             character_count INTEGER NOT NULL,
             refinement_applied INTEGER NOT NULL,
-            injection_succeeded INTEGER NULL
+            injection_succeeded INTEGER NULL,
+            asr_provider TEXT NOT NULL DEFAULT '',
+            asr_source TEXT NOT NULL DEFAULT '',
+            recognition_total_ms INTEGER NOT NULL DEFAULT 0,
+            recognition_engine_ms INTEGER NULL,
+            recognition_first_partial_ms INTEGER NULL,
+            recognition_partial_count INTEGER NOT NULL DEFAULT 0
         );
 
         CREATE INDEX IF NOT EXISTS idx_voice_input_sessions_day_key
@@ -383,6 +503,32 @@ final class UsageStore {
         """
 
         guard sqlite3_exec(database, sql, nil, nil, nil) == SQLITE_OK else {
+            throw UsageStoreError.statementExecutionFailed(lastSQLiteErrorMessage())
+        }
+
+        try addColumnIfNeeded(name: "asr_provider", definition: "TEXT NOT NULL DEFAULT ''")
+        try addColumnIfNeeded(name: "asr_source", definition: "TEXT NOT NULL DEFAULT ''")
+        try addColumnIfNeeded(name: "recognition_total_ms", definition: "INTEGER NOT NULL DEFAULT 0")
+        try addColumnIfNeeded(name: "recognition_engine_ms", definition: "INTEGER NULL")
+        try addColumnIfNeeded(name: "recognition_first_partial_ms", definition: "INTEGER NULL")
+        try addColumnIfNeeded(name: "recognition_partial_count", definition: "INTEGER NOT NULL DEFAULT 0")
+    }
+
+    private func addColumnIfNeeded(name: String, definition: String) throws {
+        let sql = "PRAGMA table_info(voice_input_sessions);"
+        guard let statement = try? prepareStatement(sql: sql) else {
+            throw UsageStoreError.statementPrepareFailed(lastSQLiteErrorMessage())
+        }
+        defer { sqlite3_finalize(statement) }
+
+        while sqlite3_step(statement) == SQLITE_ROW {
+            if let rawName = sqlite3_column_text(statement, 1).map({ String(cString: $0) }), rawName == name {
+                return
+            }
+        }
+
+        let alterSQL = "ALTER TABLE voice_input_sessions ADD COLUMN \(name) \(definition);"
+        guard sqlite3_exec(database, alterSQL, nil, nil, nil) == SQLITE_OK else {
             throw UsageStoreError.statementExecutionFailed(lastSQLiteErrorMessage())
         }
     }

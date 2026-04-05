@@ -2,10 +2,13 @@ APP_NAME := Voily
 BUILD_DIR := .xcodebuild
 APP_PATH := $(BUILD_DIR)/Build/Products/Debug/$(APP_NAME).app
 
-.PHONY: build run install clean
+.PHONY: build test run install clean
 
 build:
 	xcodebuild -project Voily.xcodeproj -scheme Voily -configuration Debug -derivedDataPath $(BUILD_DIR) build
+
+test:
+	xcodebuild -project Voily.xcodeproj -scheme Voily -configuration Debug -derivedDataPath $(BUILD_DIR) test
 
 run: build
 	open "$(APP_PATH)"
@@ -17,4 +20,4 @@ install: build
 	@echo "Installed to $(HOME)/Applications/$(APP_NAME).app"
 
 clean:
-	rm -rf .build $(BUILD_DIR)
+	rm -rf $(BUILD_DIR)

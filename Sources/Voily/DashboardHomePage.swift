@@ -20,6 +20,8 @@ struct DashboardHomePage: View {
 
                 TodayMetricsSection(summary: usageStore.todaySummary)
 
+                TodayPerformanceSection(summary: usageStore.todayASRSummary)
+
                 LazyVGrid(columns: historyColumns, spacing: 20) {
                     TrendChartsSection(
                         title: "近 7 天语音输入时长",
@@ -39,8 +41,6 @@ struct DashboardHomePage: View {
                         formatter: formatCharacters
                     )
                 }
-
-                ActivityHeatmapSection(summaries: usageStore.heatmapSummaries)
 
                 HistoryListSection(usageStore: usageStore, sessions: usageStore.recentSessions)
             }
@@ -114,6 +114,42 @@ private struct TodayMetricsSection: View {
             return "\(minutes)m \(seconds)s"
         }
         return "\(seconds)s"
+    }
+}
+
+@available(macOS 26.0, *)
+private struct TodayPerformanceSection: View {
+    let summary: TodayASRPerformanceSummary
+
+    private let columns = [
+        GridItem(.flexible(), spacing: 18),
+        GridItem(.flexible(), spacing: 18),
+    ]
+
+    var body: some View {
+        LazyVGrid(columns: columns, spacing: 18) {
+            MetricCard(
+                title: "今日平均首字延迟",
+                value: formatted(summary.averageFirstPartialMs),
+                footnote: summary.sessionCount == 0 ? "还没有 partial 数据" : "从开始录音到首次 partial",
+                accent: .purple
+            )
+
+            MetricCard(
+                title: "今日平均最终耗时",
+                value: formatted(summary.averageRecognitionMs),
+                footnote: summary.sessionCount == 0 ? "还没有识别性能数据" : "按完整转文字链路统计",
+                accent: .pink
+            )
+        }
+    }
+
+    private func formatted(_ durationMs: Int) -> String {
+        guard durationMs > 0 else { return "0 ms" }
+        if durationMs >= 1000 {
+            return String(format: "%.2f s", Double(durationMs) / 1000)
+        }
+        return "\(durationMs) ms"
     }
 }
 
@@ -261,84 +297,6 @@ private struct SparklineChart: View {
 }
 
 @available(macOS 26.0, *)
-private struct ActivityHeatmapSection: View {
-    let summaries: [DailyUsageSummary]
-
-    private let columnCount = 12
-
-    var body: some View {
-        SettingsCard(title: "活跃热力图", subtitle: "最近 12 周按每天总输入时长着色") {
-            VStack(alignment: .leading, spacing: 16) {
-                if summaries.isEmpty {
-                    Text("还没有历史记录，后续语音输入会自动出现在这里。")
-                        .font(.system(size: 13))
-                        .foregroundStyle(.secondary)
-                } else {
-                    let columns = chunkedSummaries
-                    let maxDuration = max(summaries.map(\.totalDurationMs).max() ?? 0, 1)
-
-                    HStack(alignment: .top, spacing: 6) {
-                        VStack(alignment: .leading, spacing: 8) {
-                            ForEach(["一", "二", "三", "四", "五", "六", "日"], id: \.self) { label in
-                                Text(label)
-                                    .font(.system(size: 11, weight: .medium))
-                                    .foregroundStyle(.secondary)
-                                    .frame(height: 14)
-                            }
-                        }
-                        .padding(.top, 2)
-
-                        HStack(alignment: .top, spacing: 6) {
-                            ForEach(Array(columns.enumerated()), id: \.offset) { _, week in
-                                VStack(spacing: 6) {
-                                    ForEach(week.indices, id: \.self) { index in
-                                        let summary = week[index]
-                                        HeatmapCell(
-                                            intensity: Double(summary.totalDurationMs) / Double(maxDuration),
-                                            tooltip: tooltip(for: summary)
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    Text("颜色越深表示当天语音输入时长越高。")
-                        .font(.system(size: 12))
-                        .foregroundStyle(.secondary)
-                }
-            }
-        }
-    }
-
-    private var chunkedSummaries: [[DailyUsageSummary]] {
-        let padded = summaries.paddedToWeekday()
-        return stride(from: 0, to: padded.count, by: 7).map { start in
-            Array(padded[start..<min(start + 7, padded.count)])
-        }
-    }
-
-    private func tooltip(for summary: DailyUsageSummary) -> String {
-        let formatter = DateFormatter()
-        formatter.dateStyle = .medium
-        return "\(formatter.string(from: summary.date)) · \(summary.totalDurationMs / 1000) 秒 · \(summary.totalCharacters) 字"
-    }
-}
-
-@available(macOS 26.0, *)
-private struct HeatmapCell: View {
-    let intensity: Double
-    let tooltip: String
-
-    var body: some View {
-        RoundedRectangle(cornerRadius: 4, style: .continuous)
-            .fill(Color.accentColor.opacity(max(0.08, min(0.95, intensity * 0.9))))
-            .frame(width: 14, height: 14)
-            .help(tooltip)
-    }
-}
-
-@available(macOS 26.0, *)
 private struct HistoryListSection: View {
     let usageStore: UsageStore
     let sessions: [HistorySessionRow]
@@ -365,7 +323,7 @@ private struct HistorySessionRowView: View {
     let usageStore: UsageStore
     let session: HistorySessionRow
 
-    @State private var copied = false
+    @State private var showCopyToast = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -386,6 +344,7 @@ private struct HistorySessionRowView: View {
                         Text(duration(session.durationMs))
                         Text("\(session.characterCount) 字")
                         Text(languageName(for: session.languageCode))
+                        Text(asrMetrics(session))
                     }
                     .font(.system(size: 12))
                     .foregroundStyle(.secondary)
@@ -393,7 +352,7 @@ private struct HistorySessionRowView: View {
 
                 Spacer()
 
-                Button(copied ? "已复制" : "复制文本") {
+                Button("复制文本") {
                     copyText()
                 }
                 .buttonStyle(.bordered)
@@ -418,6 +377,15 @@ private struct HistorySessionRowView: View {
             RoundedRectangle(cornerRadius: 18, style: .continuous)
                 .fill(Color.primary.opacity(0.03))
         )
+        .overlay(alignment: .topTrailing) {
+            if showCopyToast {
+                CopyToastView()
+                    .padding(.top, 12)
+                    .padding(.trailing, 12)
+                    .transition(.move(edge: .top).combined(with: .opacity))
+            }
+        }
+        .animation(.easeInOut(duration: 0.18), value: showCopyToast)
     }
 
     private func copyText() {
@@ -425,11 +393,11 @@ private struct HistorySessionRowView: View {
         let pasteboard = NSPasteboard.general
         pasteboard.clearContents()
         pasteboard.setString(text, forType: .string)
-        copied = true
+        showCopyToast = true
 
         Task { @MainActor in
             try? await Task.sleep(for: .seconds(1))
-            copied = false
+            showCopyToast = false
         }
     }
 
@@ -446,6 +414,52 @@ private struct HistorySessionRowView: View {
 
     private func languageName(for code: String) -> String {
         SupportedLanguage(rawValue: code)?.displayName ?? code
+    }
+
+    private func asrMetrics(_ session: HistorySessionRow) -> String {
+        let providerName = ASRProvider(rawValue: session.asrProvider)?.displayName ?? session.asrProvider
+        var segments = [providerName, sourceLabel(session.asrSource)]
+        if let firstPartialMs = session.recognitionFirstPartialMs, firstPartialMs > 0 {
+            segments.append("首字 \(recognitionDuration(firstPartialMs))")
+        }
+        let total = session.recognitionTotalMs > 0 ? recognitionDuration(session.recognitionTotalMs) : "--"
+        segments.append("最终 \(total)")
+        return segments.joined(separator: " · ")
+    }
+
+    private func sourceLabel(_ source: String) -> String {
+        switch source {
+        case "local":
+            return "本地"
+        case "speech-fallback":
+            return "回退"
+        case "system-speech":
+            return "系统"
+        default:
+            return source
+        }
+    }
+
+    private func recognitionDuration(_ durationMs: Int) -> String {
+        if durationMs >= 1000 {
+            return String(format: "%.2f s", Double(durationMs) / 1000)
+        }
+        return "\(durationMs) ms"
+    }
+}
+
+@available(macOS 26.0, *)
+private struct CopyToastView: View {
+    var body: some View {
+        Text("复制成功")
+            .font(.system(size: 12, weight: .semibold))
+            .foregroundStyle(.white)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(
+                Capsule(style: .continuous)
+                    .fill(Color.black.opacity(0.82))
+            )
     }
 }
 

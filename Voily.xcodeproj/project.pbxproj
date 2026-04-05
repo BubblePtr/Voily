@@ -25,7 +25,25 @@
 		A00100110000000000000000 /* BrandIcons in Resources */ = {isa = PBXBuildFile; fileRef = A00200130000000000000000 /* BrandIcons */; };
 		A00100120000000000000000 /* DashboardHomePage.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00200140000000000000000 /* DashboardHomePage.swift */; };
 		A00100130000000000000000 /* UsageStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00200150000000000000000 /* UsageStore.swift */; };
+		A00100140000000000000000 /* UsageStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00200160000000000000000 /* UsageStoreTests.swift */; };
+		A00100150000000000000000 /* XCTest.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A00200180000000000000000 /* XCTest.framework */; };
+		A00100160000000000000000 /* AppIntents.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A00200190000000000000000 /* AppIntents.framework */; };
+		A00100170000000000000000 /* LocalASRService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A002001A0000000000000000 /* LocalASRService.swift */; };
+		A00100180000000000000000 /* LocalASRServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A002001B0000000000000000 /* LocalASRServiceTests.swift */; };
+			A00100190000000000000000 /* ManagedASRModelStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A002001C0000000000000000 /* ManagedASRModelStore.swift */; };
+			A001001A0000000000000000 /* SenseVoiceResidentService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A002001D0000000000000000 /* SenseVoiceResidentService.swift */; };
+			A001001B0000000000000000 /* QwenRealtimeASRService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A002001E0000000000000000 /* QwenRealtimeASRService.swift */; };
 /* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		A00800010000000000000000 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = A00600010000000000000000 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = A00500010000000000000000;
+			remoteInfo = Voily;
+		};
+/* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
 		A00200010000000000000000 /* AppController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppController.swift; sourceTree = "<group>"; };
@@ -48,6 +66,15 @@
 		A00200130000000000000000 /* BrandIcons */ = {isa = PBXFileReference; lastKnownFileType = folder; path = Resources/BrandIcons; sourceTree = "<group>"; };
 		A00200140000000000000000 /* DashboardHomePage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardHomePage.swift; sourceTree = "<group>"; };
 		A00200150000000000000000 /* UsageStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UsageStore.swift; sourceTree = "<group>"; };
+		A00200160000000000000000 /* UsageStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UsageStoreTests.swift; sourceTree = "<group>"; };
+		A00200170000000000000000 /* VoilyTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = VoilyTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		A00200180000000000000000 /* XCTest.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = XCTest.framework; path = System/Library/Frameworks/XCTest.framework; sourceTree = SDKROOT; };
+		A00200190000000000000000 /* AppIntents.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AppIntents.framework; path = System/Library/Frameworks/AppIntents.framework; sourceTree = SDKROOT; };
+		A002001A0000000000000000 /* LocalASRService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalASRService.swift; sourceTree = "<group>"; };
+			A002001B0000000000000000 /* LocalASRServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalASRServiceTests.swift; sourceTree = "<group>"; };
+			A002001C0000000000000000 /* ManagedASRModelStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ManagedASRModelStore.swift; sourceTree = "<group>"; };
+			A002001D0000000000000000 /* SenseVoiceResidentService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SenseVoiceResidentService.swift; sourceTree = "<group>"; };
+			A002001E0000000000000000 /* QwenRealtimeASRService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QwenRealtimeASRService.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -55,6 +82,15 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A00100160000000000000000 /* AppIntents.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A00300040000000000000000 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A00100150000000000000000 /* XCTest.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -65,6 +101,7 @@
 			isa = PBXGroup;
 			children = (
 				A00400020000000000000000 /* Sources/Voily */,
+				A00400050000000000000000 /* Tests/VoilyTests */,
 				A00400030000000000000000 /* Config */,
 				A00400040000000000000000 /* Products */,
 			);
@@ -80,11 +117,15 @@
 				A00200040000000000000000 /* AudioCaptureService.swift */,
 				A00200050000000000000000 /* FnKeyMonitor.swift */,
 				A00200060000000000000000 /* LLMRefinementService.swift */,
+				A002001A0000000000000000 /* LocalASRService.swift */,
+				A002001C0000000000000000 /* ManagedASRModelStore.swift */,
 				A00200070000000000000000 /* OverlayPanelController.swift */,
 				A00200120000000000000000 /* OverlayPreview.swift */,
 				A00200080000000000000000 /* OverlayState.swift */,
-				A00200090000000000000000 /* PermissionCoordinator.swift */,
-				A00200140000000000000000 /* DashboardHomePage.swift */,
+					A00200090000000000000000 /* PermissionCoordinator.swift */,
+					A002001E0000000000000000 /* QwenRealtimeASRService.swift */,
+					A002001D0000000000000000 /* SenseVoiceResidentService.swift */,
+					A00200140000000000000000 /* DashboardHomePage.swift */,
 				A002000A0000000000000000 /* SettingsWindowController.swift */,
 				A002000B0000000000000000 /* SpeechTranscriptionService.swift */,
 				A002000C0000000000000000 /* SupportedLanguage.swift */,
@@ -107,9 +148,19 @@
 			isa = PBXGroup;
 			children = (
 				A00200100000000000000000 /* Voily.app */,
+				A00200170000000000000000 /* VoilyTests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
+		};
+		A00400050000000000000000 /* Tests/VoilyTests */ = {
+			isa = PBXGroup;
+			children = (
+				A002001B0000000000000000 /* LocalASRServiceTests.swift */,
+				A00200160000000000000000 /* UsageStoreTests.swift */,
+			);
+			path = Tests/VoilyTests;
+			sourceTree = SOURCE_ROOT;
 		};
 /* End PBXGroup section */
 
@@ -133,6 +184,25 @@
 			productReference = A00200100000000000000000 /* Voily.app */;
 			productType = "com.apple.product-type.application";
 		};
+		A00500020000000000000000 /* VoilyTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A00600040000000000000000 /* Build configuration list for PBXNativeTarget "VoilyTests" */;
+			buildPhases = (
+				A00300050000000000000000 /* Sources */,
+				A00300040000000000000000 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				A00900010000000000000000 /* PBXTargetDependency */,
+			);
+			name = VoilyTests;
+			packageProductDependencies = (
+			);
+			productName = VoilyTests;
+			productReference = A00200170000000000000000 /* VoilyTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -145,6 +215,10 @@
 				TargetAttributes = {
 					A00500010000000000000000 = {
 						CreatedOnToolsVersion = 26.1.1;
+					};
+					A00500020000000000000000 = {
+						CreatedOnToolsVersion = 26.1.1;
+						TestTargetID = A00500010000000000000000;
 					};
 				};
 			};
@@ -163,6 +237,7 @@
 			projectRoot = "";
 			targets = (
 				A00500010000000000000000 /* Voily */,
+				A00500020000000000000000 /* VoilyTests */,
 			);
 		};
 /* End PBXProject section */
@@ -182,17 +257,21 @@
 		A00300020000000000000000 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
-			files = (
-				A00100010000000000000000 /* AppController.swift in Sources */,
-				A00100020000000000000000 /* AppDelegate.swift in Sources */,
+				files = (
+					A00100010000000000000000 /* AppController.swift in Sources */,
+					A00100020000000000000000 /* AppDelegate.swift in Sources */,
 				A00100030000000000000000 /* AppSettings.swift in Sources */,
 				A00100040000000000000000 /* AudioCaptureService.swift in Sources */,
 				A00100050000000000000000 /* FnKeyMonitor.swift in Sources */,
 				A00100060000000000000000 /* LLMRefinementService.swift in Sources */,
-				A00100070000000000000000 /* OverlayPanelController.swift in Sources */,
-				A00100100000000000000000 /* OverlayPreview.swift in Sources */,
-				A00100080000000000000000 /* OverlayState.swift in Sources */,
-				A00100090000000000000000 /* PermissionCoordinator.swift in Sources */,
+					A00100170000000000000000 /* LocalASRService.swift in Sources */,
+					A00100190000000000000000 /* ManagedASRModelStore.swift in Sources */,
+					A00100070000000000000000 /* OverlayPanelController.swift in Sources */,
+					A00100100000000000000000 /* OverlayPreview.swift in Sources */,
+					A00100080000000000000000 /* OverlayState.swift in Sources */,
+					A00100090000000000000000 /* PermissionCoordinator.swift in Sources */,
+					A001001B0000000000000000 /* QwenRealtimeASRService.swift in Sources */,
+					A001001A0000000000000000 /* SenseVoiceResidentService.swift in Sources */,
 				A00100120000000000000000 /* DashboardHomePage.swift in Sources */,
 				A001000A0000000000000000 /* SettingsWindowController.swift in Sources */,
 				A001000B0000000000000000 /* SpeechTranscriptionService.swift in Sources */,
@@ -203,7 +282,24 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		A00300050000000000000000 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A00100180000000000000000 /* LocalASRServiceTests.swift in Sources */,
+				A00100140000000000000000 /* UsageStoreTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		A00900010000000000000000 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = A00500010000000000000000 /* Voily */;
+			targetProxy = A00800010000000000000000 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		A00700010000000000000000 /* Debug */ = {
@@ -260,6 +356,8 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 9KZ32XLVQW;
+				DEFINES_MODULE = YES;
+				ENABLE_TESTABILITY = YES;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Config/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -282,6 +380,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 9KZ32XLVQW;
+				DEFINES_MODULE = YES;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Config/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -295,6 +394,62 @@
 				SDKROOT = macosx;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				TARGETED_DEVICE_FAMILY = "";
+			};
+			name = Release;
+		};
+		A00700050000000000000000 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_STYLE = Manual;
+				CODE_SIGNING_ALLOWED = YES;
+				CODE_SIGNING_REQUIRED = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 9KZ32XLVQW;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@loader_path/../Frameworks",
+					"@executable_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.tokendance.voilyTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 6.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Voily.app/Contents/MacOS/Voily";
+				TEST_TARGET_NAME = Voily;
+			};
+			name = Debug;
+		};
+		A00700060000000000000000 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_STYLE = Manual;
+				CODE_SIGNING_ALLOWED = YES;
+				CODE_SIGNING_REQUIRED = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 9KZ32XLVQW;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@loader_path/../Frameworks",
+					"@executable_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.tokendance.voilyTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 6.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Voily.app/Contents/MacOS/Voily";
+				TEST_TARGET_NAME = Voily;
 			};
 			name = Release;
 		};
@@ -315,6 +470,15 @@
 			buildConfigurations = (
 				A00700010000000000000000 /* Debug */,
 				A00700020000000000000000 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		A00600040000000000000000 /* Build configuration list for PBXNativeTarget "VoilyTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A00700050000000000000000 /* Debug */,
+				A00700060000000000000000 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

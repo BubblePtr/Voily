@@ -14,7 +14,7 @@ enum ASRProvider: String, CaseIterable, Codable, Identifiable {
         case .whisperCpp:
             return "whisper.cpp"
         case .senseVoice:
-            return "SenseVoice"
+            return "SenseVoice Small"
         case .doubaoStreaming:
             return "豆包流式语音识别"
         case .qwenASR:
@@ -115,9 +115,20 @@ struct ModelSettingsSnapshot: Codable, Equatable {
         selectedASRProvider: .whisperCpp,
         selectedTextProvider: .deepSeek,
         textRefinementEnabled: false,
-        asrConfigsByProvider: Dictionary(
-            uniqueKeysWithValues: ASRProvider.allCases.map { ($0, .empty) }
-        ),
+        asrConfigsByProvider: {
+            var configs: [ASRProvider: ASRProviderConfig] = Dictionary(
+                uniqueKeysWithValues: ASRProvider.allCases.map { ($0, ASRProviderConfig.empty) }
+            )
+            configs[.qwenASR] = ASRProviderConfig(
+                executablePath: "",
+                modelPath: "",
+                additionalArguments: "",
+                baseURL: "wss://dashscope.aliyuncs.com/api-ws/v1/realtime",
+                apiKey: "",
+                model: "qwen3-asr-flash-realtime"
+            )
+            return configs
+        }(),
         textConfigsByProvider: Dictionary(
             uniqueKeysWithValues: TextRefinementProvider.allCases.map { ($0, .empty) }
         )
@@ -181,7 +192,7 @@ final class AppSettings {
         self.selectedLanguageCode = defaults.string(forKey: Keys.selectedLanguageCode) ?? SupportedLanguage.simplifiedChinese.rawValue
         self.glossaryEntries = defaults.string(forKey: Keys.glossaryEntries) ?? ""
 
-        let snapshot = Self.loadSnapshot(from: defaults) ?? Self.makeLegacySnapshot(from: defaults)
+        let snapshot = Self.normalizedSnapshot(Self.loadSnapshot(from: defaults) ?? Self.makeLegacySnapshot(from: defaults))
         self.selectedASRProvider = snapshot.selectedASRProvider
         self.selectedTextProvider = snapshot.selectedTextProvider
         self.textRefinementEnabled = snapshot.textRefinementEnabled
@@ -272,7 +283,7 @@ final class AppSettings {
             snapshot.textConfigsByProvider[provider] = .empty
         }
 
-        return snapshot
+        return normalizedSnapshot(snapshot)
     }
 
     private static func makeLegacySnapshot(from defaults: UserDefaults) -> ModelSettingsSnapshot {
@@ -284,7 +295,7 @@ final class AppSettings {
         let model = defaults.string(forKey: Keys.legacyLLMModel) ?? ""
 
         if !baseURL.trimmed.isEmpty || !apiKey.trimmed.isEmpty || !model.trimmed.isEmpty {
-            snapshot.textConfigsByProvider[.deepSeek] = TextRefinementProviderConfig(
+            snapshot.textConfigsByProvider[TextRefinementProvider.deepSeek] = TextRefinementProviderConfig(
                 baseURL: baseURL,
                 apiKey: apiKey,
                 model: model
@@ -292,5 +303,18 @@ final class AppSettings {
         }
 
         return snapshot
+    }
+
+    private static func normalizedSnapshot(_ snapshot: ModelSettingsSnapshot) -> ModelSettingsSnapshot {
+        var normalized = snapshot
+        var qwenConfig = normalized.asrConfigsByProvider[.qwenASR] ?? .empty
+        if qwenConfig.baseURL.trimmed.isEmpty {
+            qwenConfig.baseURL = "wss://dashscope.aliyuncs.com/api-ws/v1/realtime"
+        }
+        if qwenConfig.model.trimmed.isEmpty {
+            qwenConfig.model = "qwen3-asr-flash-realtime"
+        }
+        normalized.asrConfigsByProvider[.qwenASR] = qwenConfig
+        return normalized
     }
 }

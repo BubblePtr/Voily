@@ -3,6 +3,7 @@ import Foundation
 enum OverlayPhase: Equatable {
     case idle
     case recording
+    case recordingPartial
     case transcribing
     case refining
     case injecting

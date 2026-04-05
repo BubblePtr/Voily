@@ -3,8 +3,8 @@ import SwiftUI
 
 @MainActor
 final class SettingsWindowController: NSWindowController {
-    init(settings: AppSettings, usageStore: UsageStore, llmService: LLMRefinementService) {
-        let view = SettingsRootView(settings: settings, usageStore: usageStore, llmService: llmService)
+    init(settings: AppSettings, usageStore: UsageStore, llmService: LLMRefinementService, managedASRModels: ManagedASRModelStore) {
+        let view = SettingsRootView(settings: settings, usageStore: usageStore, llmService: llmService, managedASRModels: managedASRModels)
         let hostingController = NSHostingController(rootView: view)
         let window = NSWindow(contentViewController: hostingController)
         window.title = "Voily Settings"
@@ -61,6 +61,7 @@ private struct SettingsRootView: View {
     @Bindable var settings: AppSettings
     let usageStore: UsageStore
     let llmService: LLMRefinementService
+    let managedASRModels: ManagedASRModelStore
 
     @State private var selection: SettingsPage? = .home
 
@@ -74,7 +75,7 @@ private struct SettingsRootView: View {
                 case .home:
                     DashboardHomePage(usageStore: usageStore)
                 case .model:
-                    ModelSettingsPage(settings: settings, llmService: llmService)
+                    ModelSettingsPage(settings: settings, llmService: llmService, managedASRModels: managedASRModels)
                 case .glossary:
                     GlossarySettingsPage(settings: settings)
                 }
@@ -136,6 +137,7 @@ private struct ProviderSheet: Identifiable {
 private struct ModelSettingsPage: View {
     @Bindable var settings: AppSettings
     let llmService: LLMRefinementService
+    @Bindable var managedASRModels: ManagedASRModelStore
 
     @State private var draftSelectedASRProvider: ASRProvider = .whisperCpp
     @State private var draftSelectedTextProvider: TextRefinementProvider = .deepSeek
@@ -172,15 +174,7 @@ private struct ModelSettingsPage: View {
 
                     LazyVGrid(columns: gridColumns, spacing: 20) {
                         ForEach(ASRProvider.allCases) { provider in
-                            ProviderServiceCard(
-                                title: provider.displayName,
-                                subtitle: provider.providerSummary,
-                                logoName: provider.logoAssetName,
-                                tag: provider.category.displayName,
-                                isSelected: draftSelectedASRProvider == provider,
-                                isConfigured: (asrDrafts[provider] ?? .empty).isConfigured(for: provider),
-                                onOpen: { presentedSheet = .asr(provider) }
-                            )
+                            asrProviderCard(for: provider)
                         }
                     }
                 }
@@ -190,13 +184,15 @@ private struct ModelSettingsPage: View {
 
                     LazyVGrid(columns: gridColumns, spacing: 20) {
                         ForEach(TextRefinementProvider.allCases) { provider in
+                            let isConfigured = (textDrafts[provider] ?? .empty).isConfigured
                             ProviderServiceCard(
                                 title: provider.displayName,
                                 subtitle: provider.providerSummary,
                                 logoName: provider.logoAssetName,
                                 tag: "云端",
                                 isSelected: draftSelectedTextProvider == provider,
-                                isConfigured: (textDrafts[provider] ?? .empty).isConfigured,
+                                isConfigured: isConfigured,
+                                statusText: isConfigured ? "已配置" : "未配置",
                                 onOpen: { presentedSheet = .text(provider) }
                             )
                         }
@@ -228,13 +224,13 @@ private struct ModelSettingsPage: View {
                 ASRProviderConfigSheet(
                     provider: provider,
                     config: asrDrafts[provider] ?? .empty,
-                    isSelected: draftSelectedASRProvider == provider,
-                    onSave: { config, setAsDefault in
+                    managedState: managedASRModels.state(for: provider),
+                    estimatedDownload: managedASRModels.estimatedDownload(for: provider),
+                    onInstall: { managedASRModels.install(provider: provider) },
+                    onUninstall: { managedASRModels.uninstall(provider: provider) },
+                    onSave: { config in
                         asrDrafts[provider] = config
                         settings.setASRConfig(config, for: provider)
-                        if setAsDefault {
-                            draftSelectedASRProvider = provider
-                        }
                         statusMessage = "已保存 \(provider.displayName) 配置。"
                     }
                 )
@@ -242,15 +238,11 @@ private struct ModelSettingsPage: View {
                 TextRefinementProviderConfigSheet(
                     provider: provider,
                     config: textDrafts[provider] ?? .empty,
-                    isSelected: draftSelectedTextProvider == provider,
                     isEnabled: draftTextRefinementEnabled,
                     llmService: llmService,
-                    onSave: { config, setAsDefault in
+                    onSave: { config in
                         textDrafts[provider] = config
                         settings.setTextRefinementConfig(config, for: provider)
-                        if setAsDefault {
-                            draftSelectedTextProvider = provider
-                        }
                         statusMessage = "已保存 \(provider.displayName) 配置。"
                     }
                 )
@@ -264,6 +256,33 @@ private struct ModelSettingsPage: View {
         draftTextRefinementEnabled = settings.textRefinementEnabled
         asrDrafts = Dictionary(uniqueKeysWithValues: ASRProvider.allCases.map { ($0, settings.asrConfig(for: $0)) })
         textDrafts = Dictionary(uniqueKeysWithValues: TextRefinementProvider.allCases.map { ($0, settings.textRefinementConfig(for: $0)) })
+    }
+
+    private func asrProviderCard(for provider: ASRProvider) -> some View {
+        let status = asrStatus(for: provider)
+
+        return ProviderServiceCard(
+            title: provider.displayName,
+            subtitle: provider.providerSummary,
+            logoName: provider.logoAssetName,
+            tag: provider.category.displayName,
+            isSelected: draftSelectedASRProvider == provider,
+            isConfigured: status.isConfigured,
+            statusText: status.text,
+            onOpen: { presentedSheet = .asr(provider) }
+        )
+    }
+
+    private func asrStatus(for provider: ASRProvider) -> (isConfigured: Bool, text: String) {
+        switch provider.category {
+        case .local:
+            let managedState = managedASRModels.state(for: provider)
+            return (managedState.isInstalled, managedState.statusText)
+        case .cloud:
+            let config = asrDrafts[provider] ?? .empty
+            let isConfigured = config.isConfigured(for: provider)
+            return (isConfigured, isConfigured ? "已配置" : "未配置")
+        }
     }
 }
 
@@ -285,16 +304,6 @@ private struct DefaultModelsOverviewCard: View {
 
                 Toggle("启用语音输入润色", isOn: $textRefinementEnabled)
                     .toggleStyle(.switch)
-                    .labelsHidden()
-
-                Text("全局生效")
-                    .font(.system(size: 12, weight: .medium))
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 6)
-                    .background(
-                        Capsule()
-                            .fill(Color.primary.opacity(0.05))
-                    )
             }
 
             HStack(alignment: .top, spacing: 18) {
@@ -306,7 +315,7 @@ private struct DefaultModelsOverviewCard: View {
                 )
 
                 DefaultModelSelectorColumn(
-                    title: "语音输入大模型",
+                    title: "语音输入模型",
                     description: selectedTextProvider.providerSummary,
                     modelDisplayName: selectedTextProvider.modelSummary(using: textConfig),
                     selection: $selectedTextProvider
@@ -336,28 +345,48 @@ private struct DefaultModelSelectorColumn<SelectionValue: Hashable & CaseIterabl
             Text(title)
                 .font(.system(size: 16, weight: .semibold))
 
-            Picker(title, selection: $selection) {
-                ForEach(Array(SelectionValue.allCases)) { option in
-                    Text(option.displayName).tag(option)
+            Menu {
+                ForEach(menuSections) { section in
+                    if let title = section.title {
+                        Section(title) {
+                            sectionButtons(for: section.options)
+                        }
+                    } else {
+                        sectionButtons(for: section.options)
+                    }
                 }
-            }
-            .pickerStyle(.menu)
-            .labelsHidden()
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, 16)
-            .padding(.vertical, 14)
-            .background(
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .fill(Color(nsColor: .textBackgroundColor))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .stroke(Color.primary.opacity(0.08), lineWidth: 1)
-            )
+            } label: {
+                HStack(spacing: 12) {
+                    Text(selection.pickerDisplayName)
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundStyle(.primary)
 
-            Text(modelDisplayName)
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(.primary)
+                    Spacer(minLength: 12)
+
+                    Image(systemName: "chevron.up.chevron.down")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 14)
+                .background(
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .fill(Color(nsColor: .textBackgroundColor))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .stroke(Color.primary.opacity(0.08), lineWidth: 1)
+                )
+            }
+            .menuStyle(.borderlessButton)
+            .fixedSize(horizontal: false, vertical: true)
+
+            if modelDisplayName != selection.pickerDisplayName {
+                Text(modelDisplayName)
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(.primary)
+            }
 
             Text(description)
                 .font(.system(size: 13))
@@ -366,14 +395,79 @@ private struct DefaultModelSelectorColumn<SelectionValue: Hashable & CaseIterabl
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
+
+    @ViewBuilder
+    private func sectionButtons(for options: [SelectionValue]) -> some View {
+        ForEach(options) { option in
+            Button {
+                selection = option
+            } label: {
+                if selection == option {
+                    Label(option.pickerDisplayName, systemImage: "checkmark")
+                } else {
+                    Text(option.pickerDisplayName)
+                }
+            }
+        }
+    }
+
+    private var menuSections: [ProviderMenuSection<SelectionValue>] {
+        let options = Array(SelectionValue.allCases)
+        var sections: [ProviderMenuSection<SelectionValue>] = []
+
+        for option in options {
+            if let index = sections.indices.last, sections[index].title == option.pickerSectionTitle {
+                sections[index].options.append(option)
+            } else {
+                sections.append(
+                    ProviderMenuSection(
+                        title: option.pickerSectionTitle,
+                        options: [option]
+                    )
+                )
+            }
+        }
+
+        return sections
+    }
 }
 
 private protocol ProviderPresentable {
     var displayName: String { get }
+    var pickerDisplayName: String { get }
+    var pickerSectionTitle: String? { get }
 }
 
-extension ASRProvider: ProviderPresentable {}
-extension TextRefinementProvider: ProviderPresentable {}
+private struct ProviderMenuSection<Option: Identifiable>: Identifiable {
+    let title: String?
+    var options: [Option]
+
+    var id: String { title ?? "__default__" }
+}
+
+extension ASRProvider: ProviderPresentable {
+    var pickerDisplayName: String {
+        switch self {
+        case .whisperCpp:
+            return "whisper.cpp"
+        case .senseVoice:
+            return "SenseVoice Small"
+        case .doubaoStreaming:
+            return "豆包语音识别 2.0"
+        case .qwenASR:
+            return "Qwen3 ASR Flash"
+        }
+    }
+
+    var pickerSectionTitle: String? {
+        category.displayName
+    }
+}
+
+extension TextRefinementProvider: ProviderPresentable {
+    var pickerDisplayName: String { displayName }
+    var pickerSectionTitle: String? { nil }
+}
 
 private struct SectionTitle: View {
     let title: String
@@ -391,6 +485,7 @@ private struct ProviderServiceCard: View {
     let tag: String
     let isSelected: Bool
     let isConfigured: Bool
+    let statusText: String?
     let onOpen: () -> Void
 
     var body: some View {
@@ -415,6 +510,12 @@ private struct ProviderServiceCard: View {
                             .font(.system(size: 13))
                             .foregroundStyle(.secondary)
                             .fixedSize(horizontal: false, vertical: true)
+
+                        if let statusText {
+                            Text(statusText)
+                                .font(.system(size: 12, weight: .medium))
+                                .foregroundStyle(.secondary)
+                        }
                     }
 
                     Spacer(minLength: 12)
@@ -472,13 +573,16 @@ private struct TagBadge: View {
 private struct ASRProviderConfigSheet: View {
     let provider: ASRProvider
     let config: ASRProviderConfig
-    let isSelected: Bool
-    let onSave: (ASRProviderConfig, Bool) -> Void
+    let managedState: ManagedASRInstallState
+    let estimatedDownload: String
+    let onInstall: () -> Void
+    let onUninstall: () -> Void
+    let onSave: (ASRProviderConfig) -> Void
 
     @Environment(\.dismiss) private var dismiss
 
+    @State private var showingInstallConfirmation = false
     @State private var draftConfig = ASRProviderConfig.empty
-    @State private var setAsDefault = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 22) {
@@ -489,22 +593,26 @@ private struct ASRProviderConfigSheet: View {
             )
 
             if provider.category == .local {
-                LocalProviderFields(config: $draftConfig)
+                ManagedLocalProviderFields(
+                    provider: provider,
+                    managedState: managedState,
+                    estimatedDownload: estimatedDownload,
+                    onInstall: { showingInstallConfirmation = true },
+                    onUninstall: onUninstall
+                )
             } else {
                 CloudProviderFields(
+                    provider: provider,
                     config: $draftConfig,
                     modelPlaceholder: provider.defaultModelPlaceholder
                 )
             }
 
-            Toggle("设为默认语音识别模型", isOn: $setAsDefault)
-                .toggleStyle(.checkbox)
-
             SheetFooter(
-                statusText: provider.category == .local ? "本地 provider 仅保存路径和参数，不会做可执行性校验。" : "云端 provider 仅保存连接参数，真实转写接入在后续版本完成。",
+                statusText: provider.category == .local ? "本地模型由应用托管下载和卸载，失败后自动回退系统识别。" : provider.cloudStatusText,
                 onCancel: { dismiss() },
                 onSave: {
-                    onSave(draftConfig, setAsDefault)
+                    onSave(draftConfig)
                     dismiss()
                 }
             )
@@ -513,7 +621,22 @@ private struct ASRProviderConfigSheet: View {
         .frame(width: 520)
         .onAppear {
             draftConfig = config
-            setAsDefault = isSelected
+            if provider == .qwenASR {
+                if draftConfig.baseURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    draftConfig.baseURL = "wss://dashscope.aliyuncs.com/api-ws/v1/realtime"
+                }
+                if draftConfig.model.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    draftConfig.model = "qwen3-asr-flash-realtime"
+                }
+            }
+        }
+        .alert("下载 \(provider.displayName)", isPresented: $showingInstallConfirmation) {
+            Button("取消", role: .cancel) {}
+            Button("确认下载") {
+                onInstall()
+            }
+        } message: {
+            Text(provider == .senseVoice ? "会在首次安装时下载 SenseVoice Small 的 MLX 模型文件。安装完成后只走本地常驻识别。" : "会在首次安装时下载模型和本地运行时，完成后即可直接使用。")
         }
     }
 }
@@ -521,15 +644,13 @@ private struct ASRProviderConfigSheet: View {
 private struct TextRefinementProviderConfigSheet: View {
     let provider: TextRefinementProvider
     let config: TextRefinementProviderConfig
-    let isSelected: Bool
     let isEnabled: Bool
     let llmService: LLMRefinementService
-    let onSave: (TextRefinementProviderConfig, Bool) -> Void
+    let onSave: (TextRefinementProviderConfig) -> Void
 
     @Environment(\.dismiss) private var dismiss
 
     @State private var draftConfig = TextRefinementProviderConfig.empty
-    @State private var setAsDefault = false
     @State private var statusMessage = ""
     @State private var isTesting = false
 
@@ -542,9 +663,6 @@ private struct TextRefinementProviderConfigSheet: View {
             )
 
             TextRefinementProviderFields(provider: provider, config: $draftConfig)
-
-            Toggle("设为默认语音输入模型", isOn: $setAsDefault)
-                .toggleStyle(.checkbox)
 
             HStack(spacing: 12) {
                 Button("测试连接") {
@@ -566,7 +684,7 @@ private struct TextRefinementProviderConfigSheet: View {
                 statusText: isEnabled ? "当前已启用语音输入润色，保存后会影响后续默认 provider。" : "当前未启用语音输入润色，保存配置后不会立即参与链路。",
                 onCancel: { dismiss() },
                 onSave: {
-                    onSave(draftConfig, setAsDefault)
+                    onSave(draftConfig)
                     dismiss()
                 }
             )
@@ -575,7 +693,6 @@ private struct TextRefinementProviderConfigSheet: View {
         .frame(width: 560)
         .onAppear {
             draftConfig = config
-            setAsDefault = isSelected
         }
     }
 
@@ -655,14 +772,9 @@ private struct ProviderLogoIcon: View {
     var size: CGFloat = 44
 
     var body: some View {
-        ZStack {
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(Color.primary.opacity(0.04))
-
-            BrandIconImage(resourceName: name)
-                .frame(width: size - 12, height: size - 12)
-        }
-        .frame(width: size, height: size)
+        BrandIconImage(resourceName: name)
+            .frame(width: size - 12, height: size - 12)
+            .frame(width: size, height: size)
     }
 }
 
@@ -707,48 +819,83 @@ private enum ResourceBundle {
     }
 }
 
-private struct LocalProviderFields: View {
-    @Binding var config: ASRProviderConfig
+private struct ManagedLocalProviderFields: View {
+    let provider: ASRProvider
+    let managedState: ManagedASRInstallState
+    let estimatedDownload: String
+    let onInstall: () -> Void
+    let onUninstall: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            SettingsFormField(title: "可执行文件路径") {
-                TextField("/usr/local/bin/whisper-cli", text: $config.executablePath)
-                    .textFieldStyle(.roundedBorder)
+            SettingsFormField(title: "安装状态") {
+                Text(managedState.statusText)
+                    .font(.system(size: 14))
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 10)
+                    .background(
+                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                            .fill(Color(nsColor: .textBackgroundColor))
+                    )
             }
 
-            SettingsFormField(title: "模型文件路径") {
-                TextField("/models/ggml-base.bin", text: $config.modelPath)
-                    .textFieldStyle(.roundedBorder)
+            SettingsFormField(title: "下载内容") {
+                Text(provider == .senseVoice ? "MLX 模型文件，\(estimatedDownload)" : "模型文件 + 本地运行时，\(estimatedDownload)")
+                    .font(.system(size: 13))
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
             }
 
-            SettingsFormField(title: "附加参数") {
-                TextField("--language zh --threads 4", text: $config.additionalArguments)
-                    .textFieldStyle(.roundedBorder)
+            HStack(spacing: 12) {
+                Button("下载模型", action: onInstall)
+                    .disabled({
+                        if case .installing = managedState {
+                            return true
+                        }
+                        return managedState.isInstalled
+                    }())
+
+                Button("卸载模型", action: onUninstall)
+                    .disabled(!managedState.isInstalled)
+
+                Spacer()
+
+                if case .installing = managedState {
+                    ProgressView()
+                        .controlSize(.small)
+                }
             }
         }
     }
 }
 
 private struct CloudProviderFields: View {
+    let provider: ASRProvider
     @Binding var config: ASRProviderConfig
     let modelPlaceholder: String
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             SettingsFormField(title: "API Base URL") {
-                TextField("https://api.example.com/v1", text: $config.baseURL)
+                TextField(provider.cloudBaseURLPlaceholder, text: $config.baseURL)
                     .textFieldStyle(.roundedBorder)
             }
 
             SettingsFormField(title: "API Key") {
-                SecureField("sk-...", text: $config.apiKey)
-                    .textFieldStyle(.roundedBorder)
+                APIKeyField(text: $config.apiKey)
             }
 
             SettingsFormField(title: "Model") {
                 TextField(modelPlaceholder, text: $config.model)
                     .textFieldStyle(.roundedBorder)
+            }
+
+            if provider == .qwenASR {
+                Text("北京区：wss://dashscope.aliyuncs.com/api-ws/v1/realtime\n国际区：wss://dashscope-intl.aliyuncs.com/api-ws/v1/realtime")
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
         }
     }
@@ -766,8 +913,7 @@ private struct TextRefinementProviderFields: View {
             }
 
             SettingsFormField(title: "API Key") {
-                SecureField("sk-...", text: $config.apiKey)
-                    .textFieldStyle(.roundedBorder)
+                APIKeyField(text: $config.apiKey)
             }
 
             SettingsFormField(title: "Model") {
@@ -796,6 +942,36 @@ private struct TextRefinementProviderFields: View {
             return "qwen-plus"
         case .volcengine:
             return "doubao-1.5-pro"
+        }
+    }
+}
+
+private struct APIKeyField: View {
+    @Binding var text: String
+    @State private var isRevealed = false
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Group {
+                if isRevealed {
+                    TextField("sk-...", text: $text)
+                } else {
+                    SecureField("sk-...", text: $text)
+                }
+            }
+            .textFieldStyle(.roundedBorder)
+
+            Button("粘贴") {
+                if let pasted = NSPasteboard.general.string(forType: .string) {
+                    text = pasted.trimmingCharacters(in: .whitespacesAndNewlines)
+                }
+            }
+            .buttonStyle(.borderless)
+
+            Button(isRevealed ? "隐藏" : "显示") {
+                isRevealed.toggle()
+            }
+            .buttonStyle(.borderless)
         }
     }
 }
@@ -1076,7 +1252,13 @@ enum SettingsPreviewData {
                         languageCode: SupportedLanguage.simplifiedChinese.rawValue,
                         recognizedText: "识别文本 \(dayOffset)-\(index)",
                         finalText: "这是第 \(index + 1) 条预览历史记录，用来展示 dashboard 首页里的完整历史与复制能力。",
-                        refinementApplied: index % 2 == 0
+                        refinementApplied: index % 2 == 0,
+                        asrProvider: index % 2 == 0 ? ASRProvider.senseVoice.rawValue : ASRProvider.doubaoStreaming.rawValue,
+                        asrSource: index % 2 == 0 ? "local" : "system-speech",
+                        recognitionTotalMs: 320 + (index * 180),
+                        recognitionEngineMs: 280 + (index * 160),
+                        recognitionFirstPartialMs: index % 2 == 0 ? 140 + (index * 40) : nil,
+                        recognitionPartialCount: index % 2 == 0 ? 3 + index : 0
                     ),
                     now: now
                 )
@@ -1095,11 +1277,11 @@ private extension ASRProvider {
         case .whisperCpp:
             return "本地运行，适合离线和可控部署。"
         case .senseVoice:
-            return "阿里系本地识别模型，偏向轻量和中文场景。"
+            return "Apple Silicon 本地常驻识别，偏向中文输入场景。"
         case .doubaoStreaming:
             return "流式识别优先，适合低延迟语音输入。"
         case .qwenASR:
-            return "云端 ASR 路线，便于后续接入统一平台。"
+            return "阿里云百炼实时语音识别，支持 partial/final 流式返回。"
         }
     }
 
@@ -1112,7 +1294,7 @@ private extension ASRProvider {
         case .doubaoStreaming:
             return "doubao"
         case .qwenASR:
-            return "qwen"
+            return "bailian"
         }
     }
 
@@ -1121,11 +1303,33 @@ private extension ASRProvider {
         case .whisperCpp:
             return "ggml-large-v3"
         case .senseVoice:
-            return "sensevoice-small"
+            return "SenseVoice Small"
         case .doubaoStreaming:
             return "doubao-speech-realtime"
         case .qwenASR:
-            return "qwen-asr"
+            return "qwen3-asr-flash-realtime"
+        }
+    }
+
+    var cloudBaseURLPlaceholder: String {
+        switch self {
+        case .doubaoStreaming:
+            return "wss://openspeech.bytedance.com/api/v3/realtime"
+        case .qwenASR:
+            return "wss://dashscope.aliyuncs.com/api-ws/v1/realtime"
+        case .whisperCpp, .senseVoice:
+            return ""
+        }
+    }
+
+    var cloudStatusText: String {
+        switch self {
+        case .qwenASR:
+            return "云端流式 provider 会直接建立阿里云实时 ASR WebSocket 会话。"
+        case .doubaoStreaming:
+            return "云端 provider 仅保存连接参数，真实转写接入在后续版本完成。"
+        case .whisperCpp, .senseVoice:
+            return "本地模型由应用托管下载和卸载，失败后自动回退系统识别。"
         }
     }
 
@@ -1180,7 +1384,8 @@ private extension TextRefinementProvider {
 #Preview("Settings Model") {
     ModelSettingsPage(
         settings: SettingsPreviewData.configuredSettings(),
-        llmService: LLMRefinementService()
+        llmService: LLMRefinementService(),
+        managedASRModels: ManagedASRModelStore()
     )
     .frame(width: 1120, height: 760)
 }
