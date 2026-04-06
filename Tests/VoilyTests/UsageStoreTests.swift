@@ -233,3 +233,90 @@ final class UsageStoreTests: XCTestCase {
         return calendar
     }
 }
+
+@MainActor
+final class AppSettingsGlossaryTests: XCTestCase {
+    func testLegacyGlossaryEntriesMigrateToStructuredCustomTerms() {
+        let defaults = makeDefaults()
+        defaults.set("OpenAI\n JSON \n\nOpenAI\nVoily", forKey: "glossaryEntries")
+
+        let settings = AppSettings(defaults: defaults)
+
+        XCTAssertEqual(settings.enabledGlossaryPresetIDs, [])
+        XCTAssertEqual(settings.customGlossaryTerms, ["OpenAI", "JSON", "Voily"])
+        XCTAssertEqual(settings.glossaryEntries, "OpenAI\nJSON\nVoily")
+    }
+
+    func testEffectiveGlossaryItemsDeduplicateAcrossCustomTermsAndPresets() {
+        let settings = AppSettings(defaults: makeDefaults())
+        settings.setGlossaryState(
+            enabledPresetIDs: [.internetDevelopment, .medical],
+            customTerms: ["Voily", "Python", "CT", "Voily"]
+        )
+
+        XCTAssertEqual(Array(settings.effectiveGlossaryItems.prefix(3)), ["Voily", "Python", "CT"])
+        XCTAssertEqual(settings.effectiveGlossaryItems.filter { $0 == "Python" }.count, 1)
+        XCTAssertEqual(settings.effectiveGlossaryItems.filter { $0 == "CT" }.count, 1)
+        XCTAssertTrue(settings.effectiveGlossaryItems.contains("OpenAI"))
+        XCTAssertTrue(settings.effectiveGlossaryItems.contains("病历"))
+    }
+
+    func testEnabledPresetsExposePresetTerms() {
+        let settings = AppSettings(defaults: makeDefaults())
+        settings.setGlossaryState(
+            enabledPresetIDs: [.internetDevelopment, .medical],
+            customTerms: []
+        )
+
+        XCTAssertEqual(
+            settings.effectiveGlossarySections.map(\.title),
+            ["互联网-开发", "医疗"]
+        )
+        XCTAssertTrue(settings.effectiveGlossaryItems.contains("SwiftUI"))
+        XCTAssertTrue(settings.effectiveGlossaryItems.contains("门诊"))
+    }
+
+    private func makeDefaults() -> UserDefaults {
+        let suiteName = "Voily.AppSettingsTests.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        return defaults
+    }
+}
+
+@MainActor
+final class LLMRefinementServiceTests: XCTestCase {
+    func testSystemPromptIncludesGlossarySectionsWhenAvailable() {
+        let settings = AppSettings(defaults: makeDefaults())
+        settings.setGlossaryState(
+            enabledPresetIDs: [.internetDevelopment],
+            customTerms: ["Voily", "DeepSeek"]
+        )
+
+        let prompt = LLMRefinementService.systemPrompt(
+            languageCode: "zh-Hans",
+            glossarySections: settings.effectiveGlossarySections
+        )
+
+        XCTAssertTrue(prompt.contains("词库参考"))
+        XCTAssertTrue(prompt.contains("自定义词条"))
+        XCTAssertTrue(prompt.contains("互联网-开发"))
+        XCTAssertTrue(prompt.contains("Voily"))
+        XCTAssertTrue(prompt.contains("OpenAI"))
+    }
+
+    func testSystemPromptOmitsGlossarySectionWhenNoGlossaryItemsExist() {
+        let prompt = LLMRefinementService.systemPrompt(languageCode: "zh-Hans", glossarySections: [])
+
+        XCTAssertFalse(prompt.contains("词库参考"))
+        XCTAssertFalse(prompt.contains("自定义词条"))
+        XCTAssertFalse(prompt.contains("互联网-开发"))
+    }
+
+    private func makeDefaults() -> UserDefaults {
+        let suiteName = "Voily.LLMRefinementServiceTests.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        return defaults
+    }
+}

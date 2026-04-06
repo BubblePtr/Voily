@@ -135,6 +135,173 @@ struct ModelSettingsSnapshot: Codable, Equatable {
     )
 }
 
+enum GlossaryPresetID: String, CaseIterable, Codable, Identifiable {
+    case internetDevelopment
+    case internetTesting
+    case internetProductManager
+    case medical
+    case legal
+
+    var id: String { rawValue }
+}
+
+struct GlossaryPresetDefinition: Identifiable, Equatable {
+    let id: GlossaryPresetID
+    let domainTitle: String
+    let sceneTitle: String?
+    let terms: [String]
+
+    var title: String {
+        sceneTitle ?? domainTitle
+    }
+
+    var fullTitle: String {
+        if let sceneTitle {
+            return "\(domainTitle)-\(sceneTitle)"
+        }
+        return domainTitle
+    }
+
+    var itemCount: Int {
+        terms.count
+    }
+
+    static let categories: [GlossaryPresetCategory] = [
+        GlossaryPresetCategory(
+            title: "互联网",
+            presets: [
+                GlossaryPresetDefinition(
+                    id: .internetDevelopment,
+                    domainTitle: "互联网",
+                    sceneTitle: "开发",
+                    terms: [
+                        "OpenAI",
+                        "ChatGPT",
+                        "API",
+                        "SDK",
+                        "JSON",
+                        "Python",
+                        "TypeScript",
+                        "SwiftUI",
+                        "Xcode",
+                        "GitHub",
+                        "iOS",
+                        "macOS",
+                    ]
+                ),
+                GlossaryPresetDefinition(
+                    id: .internetTesting,
+                    domainTitle: "互联网",
+                    sceneTitle: "测试",
+                    terms: [
+                        "QA",
+                        "Test Case",
+                        "Bug",
+                        "Regression",
+                        "Smoke Test",
+                        "Integration Test",
+                        "E2E",
+                        "Selenium",
+                        "Playwright",
+                        "Jira",
+                    ]
+                ),
+                GlossaryPresetDefinition(
+                    id: .internetProductManager,
+                    domainTitle: "互联网",
+                    sceneTitle: "产品经理",
+                    terms: [
+                        "PRD",
+                        "Roadmap",
+                        "Backlog",
+                        "MVP",
+                        "KPI",
+                        "OKR",
+                        "User Story",
+                        "Wireframe",
+                        "Prototype",
+                        "A/B Test",
+                    ]
+                ),
+            ]
+        ),
+        GlossaryPresetCategory(
+            title: "医疗",
+            presets: [
+                GlossaryPresetDefinition(
+                    id: .medical,
+                    domainTitle: "医疗",
+                    sceneTitle: nil,
+                    terms: [
+                        "门诊",
+                        "住院",
+                        "病历",
+                        "处方",
+                        "诊断",
+                        "CT",
+                        "MRI",
+                        "超声",
+                        "心电图",
+                        "检验科",
+                    ]
+                ),
+            ]
+        ),
+        GlossaryPresetCategory(
+            title: "法律",
+            presets: [
+                GlossaryPresetDefinition(
+                    id: .legal,
+                    domainTitle: "法律",
+                    sceneTitle: nil,
+                    terms: [
+                        "合同",
+                        "诉讼",
+                        "仲裁",
+                        "原告",
+                        "被告",
+                        "证据",
+                        "法务",
+                        "合规",
+                        "尽职调查",
+                        "知识产权",
+                    ]
+                ),
+            ]
+        ),
+    ]
+
+    static let all: [GlossaryPresetDefinition] = categories.flatMap(\.presets)
+
+    static func definition(for id: GlossaryPresetID) -> GlossaryPresetDefinition {
+        all.first(where: { $0.id == id }) ?? GlossaryPresetDefinition(
+            id: id,
+            domainTitle: "未知",
+            sceneTitle: nil,
+            terms: []
+        )
+    }
+}
+
+struct GlossaryPresetCategory: Identifiable, Equatable {
+    let title: String
+    let presets: [GlossaryPresetDefinition]
+
+    var id: String { title }
+}
+
+struct GlossarySection: Equatable {
+    let title: String
+    let items: [String]
+}
+
+struct GlossarySettingsSnapshot: Codable, Equatable {
+    var enabledPresetIDs: [GlossaryPresetID]
+    var customTerms: [String]
+
+    static let `default` = GlossarySettingsSnapshot(enabledPresetIDs: [], customTerms: [])
+}
+
 private extension String {
     var trimmed: String {
         trimmingCharacters(in: .whitespacesAndNewlines)
@@ -147,6 +314,7 @@ final class AppSettings {
     private enum Keys {
         static let selectedLanguageCode = "selectedLanguageCode"
         static let glossaryEntries = "glossaryEntries"
+        static let glossarySettingsSnapshot = "glossarySettingsSnapshot"
         static let modelSettingsSnapshot = "modelSettingsSnapshot"
 
         static let legacyLLMEnabled = "llmEnabled"
@@ -160,7 +328,19 @@ final class AppSettings {
     }
 
     var glossaryEntries: String {
-        didSet { defaults.set(glossaryEntries, forKey: Keys.glossaryEntries) }
+        didSet {
+            defaults.set(glossaryEntries, forKey: Keys.glossaryEntries)
+
+            guard !isSyncingLegacyGlossary else { return }
+
+            let normalizedTerms = Self.normalizeTerms(Self.parseLegacyGlossaryEntries(glossaryEntries))
+            guard normalizedTerms != glossaryState.customTerms else { return }
+
+            glossaryState = GlossarySettingsSnapshot(
+                enabledPresetIDs: glossaryState.enabledPresetIDs,
+                customTerms: normalizedTerms
+            )
+        }
     }
 
     var selectedASRProvider: ASRProvider {
@@ -183,14 +363,25 @@ final class AppSettings {
         didSet { persistSnapshot() }
     }
 
+    private var glossaryState: GlossarySettingsSnapshot {
+        didSet {
+            persistGlossaryState()
+            syncLegacyGlossaryEntries()
+        }
+    }
+
     private let defaults: UserDefaults
     private let encoder = JSONEncoder()
     private let decoder = JSONDecoder()
+    private var isSyncingLegacyGlossary = false
 
     init(defaults: UserDefaults = .standard) {
+        let legacyGlossaryEntries = defaults.string(forKey: Keys.glossaryEntries) ?? ""
         self.defaults = defaults
         self.selectedLanguageCode = defaults.string(forKey: Keys.selectedLanguageCode) ?? SupportedLanguage.simplifiedChinese.rawValue
-        self.glossaryEntries = defaults.string(forKey: Keys.glossaryEntries) ?? ""
+        self.glossaryEntries = legacyGlossaryEntries
+        self.glossaryState = Self.loadGlossarySnapshot(from: defaults)
+            ?? Self.makeLegacyGlossarySnapshot(entries: legacyGlossaryEntries)
 
         let snapshot = Self.normalizedSnapshot(Self.loadSnapshot(from: defaults) ?? Self.makeLegacySnapshot(from: defaults))
         self.selectedASRProvider = snapshot.selectedASRProvider
@@ -200,6 +391,8 @@ final class AppSettings {
         self.textConfigsByProvider = snapshot.textConfigsByProvider
 
         persistSnapshot()
+        persistGlossaryState()
+        syncLegacyGlossaryEntries()
     }
 
     var selectedLanguage: SupportedLanguage {
@@ -221,11 +414,56 @@ final class AppSettings {
         selectedTextProviderConfig.isConfigured
     }
 
+    var enabledGlossaryPresetIDs: [GlossaryPresetID] {
+        get { glossaryState.enabledPresetIDs }
+        set {
+            setGlossaryState(
+                enabledPresetIDs: newValue,
+                customTerms: glossaryState.customTerms
+            )
+        }
+    }
+
+    var customGlossaryTerms: [String] {
+        get { glossaryState.customTerms }
+        set {
+            setGlossaryState(
+                enabledPresetIDs: glossaryState.enabledPresetIDs,
+                customTerms: newValue
+            )
+        }
+    }
+
+    var effectiveGlossarySections: [GlossarySection] {
+        var seen = Set<String>()
+        var sections: [GlossarySection] = []
+
+        let customItems = glossaryState.customTerms.filter { seen.insert($0).inserted }
+        if !customItems.isEmpty {
+            sections.append(GlossarySection(title: "自定义词条", items: customItems))
+        }
+
+        for presetID in GlossaryPresetID.allCases where glossaryState.enabledPresetIDs.contains(presetID) {
+            let definition = GlossaryPresetDefinition.definition(for: presetID)
+            let uniqueItems = definition.terms
+                .map(\.trimmed)
+                .filter { !$0.isEmpty }
+                .filter { seen.insert($0).inserted }
+
+            if !uniqueItems.isEmpty {
+                sections.append(GlossarySection(title: definition.fullTitle, items: uniqueItems))
+            }
+        }
+
+        return sections
+    }
+
+    var effectiveGlossaryItems: [String] {
+        effectiveGlossarySections.flatMap(\.items)
+    }
+
     var glossaryItems: [String] {
-        glossaryEntries
-            .split(whereSeparator: \.isNewline)
-            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-            .filter { !$0.isEmpty }
+        effectiveGlossaryItems
     }
 
     func asrConfig(for provider: ASRProvider) -> ASRProviderConfig {
@@ -242,6 +480,50 @@ final class AppSettings {
 
     func setTextRefinementConfig(_ config: TextRefinementProviderConfig, for provider: TextRefinementProvider) {
         textConfigsByProvider[provider] = config
+    }
+
+    func setGlossaryState(enabledPresetIDs: [GlossaryPresetID], customTerms: [String]) {
+        glossaryState = Self.normalizedGlossaryState(
+            GlossarySettingsSnapshot(
+                enabledPresetIDs: enabledPresetIDs,
+                customTerms: customTerms
+            )
+        )
+    }
+
+    func toggleGlossaryPreset(_ presetID: GlossaryPresetID) {
+        var enabledPresetIDs = glossaryState.enabledPresetIDs
+        if let index = enabledPresetIDs.firstIndex(of: presetID) {
+            enabledPresetIDs.remove(at: index)
+        } else {
+            enabledPresetIDs.append(presetID)
+        }
+
+        setGlossaryState(enabledPresetIDs: enabledPresetIDs, customTerms: glossaryState.customTerms)
+    }
+
+    @discardableResult
+    func addCustomGlossaryTerm(_ term: String) -> Bool {
+        let normalized = term.trimmed
+        guard !normalized.isEmpty else { return false }
+        guard !glossaryState.customTerms.contains(normalized) else { return false }
+
+        setGlossaryState(
+            enabledPresetIDs: glossaryState.enabledPresetIDs,
+            customTerms: glossaryState.customTerms + [normalized]
+        )
+        return true
+    }
+
+    func removeCustomGlossaryTerm(_ term: String) {
+        setGlossaryState(
+            enabledPresetIDs: glossaryState.enabledPresetIDs,
+            customTerms: glossaryState.customTerms.filter { $0 != term }
+        )
+    }
+
+    func clearCustomGlossaryTerms() {
+        setGlossaryState(enabledPresetIDs: glossaryState.enabledPresetIDs, customTerms: [])
     }
 
     private func persistSnapshot() {
@@ -265,6 +547,23 @@ final class AppSettings {
         defaults.set(data, forKey: Keys.modelSettingsSnapshot)
     }
 
+    private func persistGlossaryState() {
+        guard let data = try? encoder.encode(glossaryState) else { return }
+        defaults.set(data, forKey: Keys.glossarySettingsSnapshot)
+    }
+
+    private func syncLegacyGlossaryEntries() {
+        let normalizedEntries = glossaryState.customTerms.joined(separator: "\n")
+        guard glossaryEntries != normalizedEntries else {
+            defaults.set(glossaryEntries, forKey: Keys.glossaryEntries)
+            return
+        }
+
+        isSyncingLegacyGlossary = true
+        glossaryEntries = normalizedEntries
+        isSyncingLegacyGlossary = false
+    }
+
     private static func loadSnapshot(from defaults: UserDefaults) -> ModelSettingsSnapshot? {
         guard let data = defaults.data(forKey: Keys.modelSettingsSnapshot) else {
             return nil
@@ -286,6 +585,19 @@ final class AppSettings {
         return normalizedSnapshot(snapshot)
     }
 
+    private static func loadGlossarySnapshot(from defaults: UserDefaults) -> GlossarySettingsSnapshot? {
+        guard let data = defaults.data(forKey: Keys.glossarySettingsSnapshot) else {
+            return nil
+        }
+
+        let decoder = JSONDecoder()
+        guard let snapshot = try? decoder.decode(GlossarySettingsSnapshot.self, from: data) else {
+            return nil
+        }
+
+        return normalizedGlossaryState(snapshot)
+    }
+
     private static func makeLegacySnapshot(from defaults: UserDefaults) -> ModelSettingsSnapshot {
         var snapshot = ModelSettingsSnapshot.default
         snapshot.textRefinementEnabled = defaults.object(forKey: Keys.legacyLLMEnabled) as? Bool ?? false
@@ -305,6 +617,13 @@ final class AppSettings {
         return snapshot
     }
 
+    private static func makeLegacyGlossarySnapshot(entries: String) -> GlossarySettingsSnapshot {
+        GlossarySettingsSnapshot(
+            enabledPresetIDs: [],
+            customTerms: normalizeTerms(parseLegacyGlossaryEntries(entries))
+        )
+    }
+
     private static func normalizedSnapshot(_ snapshot: ModelSettingsSnapshot) -> ModelSettingsSnapshot {
         var normalized = snapshot
         var qwenConfig = normalized.asrConfigsByProvider[.qwenASR] ?? .empty
@@ -316,5 +635,31 @@ final class AppSettings {
         }
         normalized.asrConfigsByProvider[.qwenASR] = qwenConfig
         return normalized
+    }
+
+    private static func normalizedGlossaryState(_ snapshot: GlossarySettingsSnapshot) -> GlossarySettingsSnapshot {
+        GlossarySettingsSnapshot(
+            enabledPresetIDs: GlossaryPresetID.allCases.filter { snapshot.enabledPresetIDs.contains($0) },
+            customTerms: normalizeTerms(snapshot.customTerms)
+        )
+    }
+
+    private static func parseLegacyGlossaryEntries(_ entries: String) -> [String] {
+        entries
+            .split(whereSeparator: \.isNewline)
+            .map(String.init)
+    }
+
+    private static func normalizeTerms(_ terms: [String]) -> [String] {
+        var seen = Set<String>()
+        var normalizedTerms: [String] = []
+
+        for term in terms.map(\.trimmed) where !term.isEmpty {
+            if seen.insert(term).inserted {
+                normalizedTerms.append(term)
+            }
+        }
+
+        return normalizedTerms
     }
 }

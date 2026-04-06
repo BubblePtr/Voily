@@ -5,6 +5,9 @@ import SwiftUI
 struct DashboardHomePage: View {
     let usageStore: UsageStore
 
+    @State private var showCopyToast = false
+    @State private var copyToastTask: Task<Void, Never>?
+
     private let historyColumns = [
         GridItem(.flexible(minimum: 420), spacing: 20, alignment: .top),
         GridItem(.flexible(minimum: 420), spacing: 20, alignment: .top),
@@ -43,11 +46,36 @@ struct DashboardHomePage: View {
                     )
                 }
 
-                HistoryListSection(usageStore: usageStore, sessions: usageStore.recentSessions)
+                HistoryListSection(
+                    usageStore: usageStore,
+                    sessions: usageStore.recentSessions,
+                    onCopySuccess: {
+                        copyToastTask?.cancel()
+                        withAnimation(.easeInOut(duration: 0.18)) {
+                            showCopyToast = true
+                        }
+
+                        copyToastTask = Task { @MainActor in
+                            try? await Task.sleep(for: .seconds(1.2))
+                            withAnimation(.easeInOut(duration: 0.18)) {
+                                showCopyToast = false
+                            }
+                        }
+                    }
+                )
             }
             .padding(28)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
+        .scrollIndicators(.hidden)
+        .overlay(alignment: .bottom) {
+            if showCopyToast {
+                CopyToastView()
+                    .padding(.bottom, 24)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
+        }
+        .animation(.easeInOut(duration: 0.18), value: showCopyToast)
     }
 
     private func formatDuration(_ value: Int) -> String {
@@ -280,6 +308,7 @@ private struct SparklineChart: View {
 private struct HistoryListSection: View {
     let usageStore: UsageStore
     let sessions: [HistorySessionRow]
+    let onCopySuccess: () -> Void
 
     var body: some View {
         SettingsCard(title: "历史记录", subtitle: "按时间倒序展示，支持复制最终结果文本") {
@@ -290,7 +319,11 @@ private struct HistoryListSection: View {
             } else {
                 VStack(spacing: 12) {
                     ForEach(sessions) { session in
-                        HistorySessionRowView(usageStore: usageStore, session: session)
+                        HistorySessionRowView(
+                            usageStore: usageStore,
+                            session: session,
+                            onCopySuccess: onCopySuccess
+                        )
                     }
                 }
             }
@@ -302,8 +335,7 @@ private struct HistoryListSection: View {
 private struct HistorySessionRowView: View {
     let usageStore: UsageStore
     let session: HistorySessionRow
-
-    @State private var showCopyToast = false
+    let onCopySuccess: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -357,15 +389,6 @@ private struct HistorySessionRowView: View {
             RoundedRectangle(cornerRadius: 18, style: .continuous)
                 .fill(Color.primary.opacity(0.03))
         )
-        .overlay(alignment: .topTrailing) {
-            if showCopyToast {
-                CopyToastView()
-                    .padding(.top, 12)
-                    .padding(.trailing, 12)
-                    .transition(.move(edge: .top).combined(with: .opacity))
-            }
-        }
-        .animation(.easeInOut(duration: 0.18), value: showCopyToast)
     }
 
     private func copyText() {
@@ -373,12 +396,7 @@ private struct HistorySessionRowView: View {
         let pasteboard = NSPasteboard.general
         pasteboard.clearContents()
         pasteboard.setString(text, forType: .string)
-        showCopyToast = true
-
-        Task { @MainActor in
-            try? await Task.sleep(for: .seconds(1))
-            showCopyToast = false
-        }
+        onCopySuccess()
     }
 
     private func timestamp(_ date: Date) -> String {
@@ -428,15 +446,22 @@ private struct HistorySessionRowView: View {
 @available(macOS 26.0, *)
 private struct CopyToastView: View {
     var body: some View {
-        Text("复制成功")
-            .font(.system(size: 12, weight: .semibold))
-            .foregroundStyle(.white)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
-            .background(
-                Capsule(style: .continuous)
-                    .fill(Color.black.opacity(0.82))
-            )
+        HStack(spacing: 10) {
+            Image(systemName: "checkmark.circle.fill")
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundStyle(.green)
+
+            Text("复制成功")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(.white)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .background(
+            Capsule(style: .continuous)
+                .fill(Color.black.opacity(0.86))
+        )
+        .shadow(color: Color.black.opacity(0.18), radius: 14, x: 0, y: 8)
     }
 }
 

@@ -201,7 +201,7 @@ actor QwenRealtimeASRService {
             do {
                 let message = try await webSocketTask.receive()
                 await self.handle(message)
-                await self.receiveNextMessage()
+                self.receiveNextMessage()
             } catch {
                 await self.handleReceiveFailure(error)
             }

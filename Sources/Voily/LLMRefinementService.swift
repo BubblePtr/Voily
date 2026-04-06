@@ -33,7 +33,13 @@ final class LLMRefinementService {
         let payload = ChatCompletionsRequest(
             model: config.model,
             messages: [
-                .init(role: "system", content: Self.systemPrompt(languageCode: request.languageCode)),
+                .init(
+                    role: "system",
+                    content: Self.systemPrompt(
+                        languageCode: request.languageCode,
+                        glossarySections: settings.effectiveGlossarySections
+                    )
+                ),
                 .init(role: "user", content: request.text),
             ],
             temperature: 0
@@ -59,8 +65,8 @@ final class LLMRefinementService {
         _ = try await refine(RefinementRequest(text: "测试 JSON 和 Python", languageCode: settings.selectedLanguageCode), settings: settings)
     }
 
-    private static func systemPrompt(languageCode: String) -> String {
-        """
+    static func systemPrompt(languageCode: String, glossarySections: [GlossarySection]) -> String {
+        let basePrompt = """
         你是一个极其保守的语音识别纠错器。当前语言环境是 \(languageCode)。
         你的唯一任务是修复明显的语音识别错误，例如：
         1. 中文谐音识别错误。
@@ -72,6 +78,25 @@ final class LLMRefinementService {
         - 不要删除任何看起来已经正确的内容。
         - 如果输入看起来正确，必须原样返回，保持字符顺序不变。
         - 只输出修正后的最终文本，不要附加解释或引号。
+        """
+
+        guard !glossarySections.isEmpty else {
+            return basePrompt
+        }
+
+        let glossaryText = glossarySections
+            .map { section in
+                "\(section.title)：\(section.items.joined(separator: "、"))"
+            }
+            .joined(separator: "\n")
+
+        return """
+        \(basePrompt)
+
+        词库参考：
+        - 若输入中出现疑似专有术语、行业术语、近音错词，应优先参考以下标准写法。
+        - 词库仅用于纠错参考，不代表可以改写原句或补充新内容。
+        \(glossaryText)
         """
     }
 }

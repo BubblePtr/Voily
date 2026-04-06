@@ -9,7 +9,7 @@ final class SettingsWindowController: NSWindowController {
         let window = NSWindow(contentViewController: hostingController)
         window.title = "Voily Settings"
         window.setContentSize(NSSize(width: 1120, height: 760))
-        window.minSize = NSSize(width: 980, height: 700)
+        window.minSize = NSSize(width: 1120, height: 760)
         window.styleMask = [.titled, .closable, .miniaturizable, .resizable]
         window.center()
         super.init(window: window)
@@ -39,9 +39,9 @@ private enum SettingsPage: String, CaseIterable, Identifiable, Hashable {
         case .home:
             return "首页"
         case .model:
-            return "模型配置"
+            return "模型"
         case .glossary:
-            return "词库配置"
+            return "词库"
         }
     }
 
@@ -157,7 +157,7 @@ private struct ModelSettingsPage: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 30) {
                 SettingsPageHeader(
-                    title: "模型配置",
+                    title: "模型",
                     subtitle: "按模型角色选择默认 provider，点击服务商卡片弹出详细配置。"
                 )
 
@@ -208,6 +208,7 @@ private struct ModelSettingsPage: View {
             .padding(28)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
+        .scrollIndicators(.hidden)
         .onAppear(perform: loadDrafts)
         .onChange(of: draftSelectedASRProvider) { _, newValue in
             settings.selectedASRProvider = newValue
@@ -509,7 +510,8 @@ private struct ProviderServiceCard: View {
                         Text(subtitle)
                             .font(.system(size: 13))
                             .foregroundStyle(.secondary)
-                            .fixedSize(horizontal: false, vertical: true)
+                            .lineLimit(1)
+                            .truncationMode(.tail)
 
                         if let statusText {
                             Text(statusText)
@@ -979,64 +981,123 @@ private struct APIKeyField: View {
 private struct GlossarySettingsPage: View {
     @Bindable var settings: AppSettings
 
-    @State private var draftEntries: String = ""
+    @State private var draftCustomTerm: String = ""
     @State private var statusMessage: String = ""
+
+    private let presetColumns = [
+        GridItem(.adaptive(minimum: 190, maximum: 260), spacing: 12, alignment: .top)
+    ]
+
+    private let tagColumns = [
+        GridItem(.adaptive(minimum: 140, maximum: 240), spacing: 10, alignment: .leading)
+    ]
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 24) {
                 SettingsPageHeader(
-                    title: "词库配置",
-                    subtitle: "维护常见专有名词。每行一个词条，后续可接入纠错链路。"
+                    title: "词库",
+                    subtitle: "选择默认术语包，并维护自定义词条。该词库会参与 LLM 文本润色。"
                 )
 
-                SettingsCard(title: "词条编辑", subtitle: "建议一行一个词条，方便后续处理") {
+                SettingsCard(title: "默认术语包", subtitle: "按行业和场景启用内置词库，点击即可切换") {
+                    VStack(alignment: .leading, spacing: 18) {
+                        ForEach(GlossaryPresetDefinition.categories) { category in
+                            VStack(alignment: .leading, spacing: 12) {
+                                SectionTitle(title: category.title)
+
+                                LazyVGrid(columns: presetColumns, spacing: 12) {
+                                    ForEach(category.presets) { preset in
+                                        GlossaryPresetToggleCard(
+                                            preset: preset,
+                                            isEnabled: settings.enabledGlossaryPresetIDs.contains(preset.id),
+                                            onToggle: { togglePreset(preset.id, name: preset.fullTitle) }
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                SettingsCard(title: "自定义词条", subtitle: "输入一个标准写法，回车或点击按钮即可添加") {
                     VStack(alignment: .leading, spacing: 14) {
-                        TextEditor(text: $draftEntries)
-                            .font(.system(size: 13))
-                            .frame(minHeight: 260)
-                            .padding(10)
-                            .background(
-                                RoundedRectangle(cornerRadius: 12)
-                                    .fill(Color(nsColor: .textBackgroundColor))
-                            )
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 12)
-                                    .stroke(Color.primary.opacity(0.08), lineWidth: 1)
-                            )
+                        HStack(spacing: 12) {
+                            TextField("例如：Whisper、DeepSeek、SwiftUI", text: $draftCustomTerm)
+                                .textFieldStyle(.roundedBorder)
+                                .onSubmit(addCustomTerm)
+
+                            Button("添加", action: addCustomTerm)
+                                .keyboardShortcut(.defaultAction)
+                                .disabled(draftCustomTerm.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                        }
+
+                        if settings.customGlossaryTerms.isEmpty {
+                            Text("还没有自定义词条。可以补充产品名、缩写、人名或团队内部固定术语。")
+                                .font(.system(size: 13))
+                                .foregroundStyle(.secondary)
+                        } else {
+                            LazyVGrid(columns: tagColumns, spacing: 10) {
+                                ForEach(settings.customGlossaryTerms, id: \.self) { term in
+                                    EditableGlossaryTag(text: term) {
+                                        settings.removeCustomGlossaryTerm(term)
+                                        statusMessage = "已删除自定义词条：\(term)"
+                                    }
+                                }
+                            }
+                        }
 
                         HStack(spacing: 12) {
-                            Button("保存词库") {
-                                save()
+                            Button("清空自定义词条") {
+                                settings.clearCustomGlossaryTerms()
+                                statusMessage = "自定义词条已清空。"
                             }
+                            .disabled(settings.customGlossaryTerms.isEmpty)
 
-                            Button("清空") {
-                                draftEntries = ""
-                                save(status: "词库已清空。")
-                            }
-
-                            Text(statusMessage.isEmpty ? "当前共 \(settings.glossaryItems.count) 条词条。" : statusMessage)
+                            Text(statusMessage.isEmpty ? "当前共 \(settings.customGlossaryTerms.count) 条自定义词条。" : statusMessage)
                                 .font(.system(size: 12))
                                 .foregroundStyle(.secondary)
                         }
                     }
                 }
 
-                SettingsCard(title: "预览", subtitle: "保存后会写入本地设置") {
-                    if settings.glossaryItems.isEmpty && draftEntries.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                        Text("还没有词条。可以先添加产品名、术语缩写或专有人名。")
+                SettingsCard(title: "最终生效词库", subtitle: "LLM 文本润色会参考这里的标准写法") {
+                    if settings.effectiveGlossarySections.isEmpty {
+                        Text("还没有启用任何术语包或自定义词条。")
                             .foregroundStyle(.secondary)
                     } else {
-                        LazyVStack(alignment: .leading, spacing: 8) {
-                            ForEach(previewItems.prefix(12), id: \.self) { item in
-                                Text(item)
-                                    .font(.system(size: 13, weight: .medium))
-                                    .padding(.horizontal, 10)
-                                    .padding(.vertical, 8)
-                                    .background(
-                                        Capsule()
-                                            .fill(Color.primary.opacity(0.06))
-                                    )
+                        VStack(alignment: .leading, spacing: 16) {
+                            HStack(spacing: 12) {
+                                TagBadge(text: "共 \(settings.effectiveGlossaryItems.count) 条")
+                                TagBadge(text: "默认包 \(settings.enabledGlossaryPresetIDs.count) 个")
+                                if !settings.customGlossaryTerms.isEmpty {
+                                    TagBadge(text: "自定义 \(settings.customGlossaryTerms.count) 条")
+                                }
+                            }
+
+                            ForEach(settings.effectiveGlossarySections, id: \.title) { section in
+                                VStack(alignment: .leading, spacing: 10) {
+                                    HStack(spacing: 8) {
+                                        Text(section.title)
+                                            .font(.system(size: 14, weight: .semibold))
+
+                                        Text("\(section.items.count) 条")
+                                            .font(.system(size: 12))
+                                            .foregroundStyle(.secondary)
+                                    }
+
+                                    LazyVGrid(columns: tagColumns, spacing: 10) {
+                                        ForEach(Array(section.items.prefix(8)), id: \.self) { item in
+                                            TagBadge(text: item)
+                                        }
+                                    }
+
+                                    if section.items.count > 8 {
+                                        Text("还有 \(section.items.count - 8) 条未展开")
+                                            .font(.system(size: 12))
+                                            .foregroundStyle(.secondary)
+                                    }
+                                }
                             }
                         }
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -1046,21 +1107,109 @@ private struct GlossarySettingsPage: View {
             .padding(28)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .onAppear {
-            draftEntries = settings.glossaryEntries
+        .scrollIndicators(.hidden)
+    }
+
+    private func togglePreset(_ presetID: GlossaryPresetID, name: String) {
+        let isCurrentlyEnabled = settings.enabledGlossaryPresetIDs.contains(presetID)
+        settings.toggleGlossaryPreset(presetID)
+        statusMessage = isCurrentlyEnabled ? "已停用术语包：\(name)" : "已启用术语包：\(name)"
+    }
+
+    private func addCustomTerm() {
+        let term = draftCustomTerm.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !term.isEmpty else { return }
+
+        if settings.addCustomGlossaryTerm(term) {
+            draftCustomTerm = ""
+            statusMessage = "已添加自定义词条：\(term)"
+        } else {
+            statusMessage = "词条已存在或内容为空。"
         }
     }
+}
 
-    private var previewItems: [String] {
-        draftEntries
-            .split(whereSeparator: \.isNewline)
-            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-            .filter { !$0.isEmpty }
+private struct GlossaryPresetToggleCard: View {
+    let preset: GlossaryPresetDefinition
+    let isEnabled: Bool
+    let onToggle: () -> Void
+
+    var body: some View {
+        Button(action: onToggle) {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(alignment: .top, spacing: 10) {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text(preset.title)
+                            .font(.system(size: 15, weight: .semibold))
+
+                        Text("\(preset.itemCount) 条标准写法")
+                            .font(.system(size: 12))
+                            .foregroundStyle(.secondary)
+                    }
+
+                    Spacer(minLength: 8)
+
+                    Image(systemName: isEnabled ? "checkmark.circle.fill" : "circle")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(isEnabled ? Color.accentColor : Color.secondary.opacity(0.5))
+                }
+
+                Text(preset.terms.prefix(3).joined(separator: "、"))
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .padding(16)
+            .frame(maxWidth: .infinity, minHeight: 104, alignment: .leading)
+            .background(
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .fill(isEnabled ? Color.accentColor.opacity(0.08) : Color(nsColor: .windowBackgroundColor))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .stroke(isEnabled ? Color.accentColor.opacity(0.35) : Color.primary.opacity(0.08), lineWidth: 1)
+            )
+        }
+        .buttonStyle(.plain)
     }
+}
 
-    private func save(status: String = "词库已保存。") {
-        settings.glossaryEntries = draftEntries
-        statusMessage = status
+private struct EditableGlossaryTag: View {
+    let text: String
+    let onRemove: () -> Void
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Text(text)
+                .font(.system(size: 13, weight: .medium))
+                .lineLimit(1)
+
+            Spacer(minLength: 0)
+
+            Button(action: onRemove) {
+                Image(systemName: "xmark")
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 18, height: 18)
+                    .background(
+                        Circle()
+                            .fill(Color.primary.opacity(0.08))
+                    )
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 9)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(Color.primary.opacity(0.05))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .stroke(Color.primary.opacity(0.06), lineWidth: 1)
+        )
     }
 }
 
@@ -1219,13 +1368,15 @@ enum SettingsPreviewData {
             ),
             for: .dashScope
         )
-        settings.glossaryEntries = """
-        OpenAI
-        Whisper
-        JSON
-        Python
-        Voily
-        """
+        settings.setGlossaryState(
+            enabledPresetIDs: [.internetDevelopment, .medical],
+            customTerms: [
+                "Voily",
+                "DeepSeek",
+                "SenseVoice",
+                "whisper.cpp",
+            ]
+        )
         return settings
     }
 
@@ -1275,13 +1426,13 @@ private extension ASRProvider {
     var providerSummary: String {
         switch self {
         case .whisperCpp:
-            return "本地运行，适合离线和可控部署。"
+            return "本地离线识别，部署可控。"
         case .senseVoice:
-            return "Apple Silicon 本地常驻识别，偏向中文输入场景。"
+            return "本地常驻识别，偏向中文输入。"
         case .doubaoStreaming:
-            return "流式识别优先，适合低延迟语音输入。"
+            return "流式识别优先，适合低延迟输入。"
         case .qwenASR:
-            return "阿里云百炼实时语音识别，支持 partial/final 流式返回。"
+            return "阿里云实时识别，支持流式返回。"
         }
     }
 
