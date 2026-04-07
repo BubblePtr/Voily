@@ -51,6 +51,36 @@ enum TextRefinementProvider: String, CaseIterable, Codable, Identifiable {
     }
 }
 
+enum DictationProcessingSkill: String, CaseIterable, Codable, Identifiable {
+    case removeFillers
+    case formalize
+    case orderedList
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .removeFillers:
+            return "去语气词"
+        case .formalize:
+            return "更正式"
+        case .orderedList:
+            return "整理成有序列表"
+        }
+    }
+
+    var summary: String {
+        switch self {
+        case .removeFillers:
+            return "删除明显语气词和停顿赘词，尽量不改句子结构。"
+        case .formalize:
+            return "将口述表达整理为中性书面语，不扩写、不总结。"
+        case .orderedList:
+            return "当内容包含 2 个及以上清晰事项时，整理为纯文本编号列表。"
+        }
+    }
+}
+
 enum ProviderCategory: String, Codable {
     case local
     case cloud
@@ -108,6 +138,7 @@ struct ModelSettingsSnapshot: Codable, Equatable {
     var selectedASRProvider: ASRProvider
     var selectedTextProvider: TextRefinementProvider
     var textRefinementEnabled: Bool
+    var enabledDictationSkills: [DictationProcessingSkill]
     var asrConfigsByProvider: [ASRProvider: ASRProviderConfig]
     var textConfigsByProvider: [TextRefinementProvider: TextRefinementProviderConfig]
 
@@ -115,6 +146,7 @@ struct ModelSettingsSnapshot: Codable, Equatable {
         selectedASRProvider: .whisperCpp,
         selectedTextProvider: .deepSeek,
         textRefinementEnabled: false,
+        enabledDictationSkills: [],
         asrConfigsByProvider: {
             var configs: [ASRProvider: ASRProviderConfig] = Dictionary(
                 uniqueKeysWithValues: ASRProvider.allCases.map { ($0, ASRProviderConfig.empty) }
@@ -133,6 +165,41 @@ struct ModelSettingsSnapshot: Codable, Equatable {
             uniqueKeysWithValues: TextRefinementProvider.allCases.map { ($0, .empty) }
         )
     )
+
+    private enum CodingKeys: String, CodingKey {
+        case selectedASRProvider
+        case selectedTextProvider
+        case textRefinementEnabled
+        case enabledDictationSkills
+        case asrConfigsByProvider
+        case textConfigsByProvider
+    }
+
+    init(
+        selectedASRProvider: ASRProvider,
+        selectedTextProvider: TextRefinementProvider,
+        textRefinementEnabled: Bool,
+        enabledDictationSkills: [DictationProcessingSkill],
+        asrConfigsByProvider: [ASRProvider: ASRProviderConfig],
+        textConfigsByProvider: [TextRefinementProvider: TextRefinementProviderConfig]
+    ) {
+        self.selectedASRProvider = selectedASRProvider
+        self.selectedTextProvider = selectedTextProvider
+        self.textRefinementEnabled = textRefinementEnabled
+        self.enabledDictationSkills = enabledDictationSkills
+        self.asrConfigsByProvider = asrConfigsByProvider
+        self.textConfigsByProvider = textConfigsByProvider
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        selectedASRProvider = try container.decode(ASRProvider.self, forKey: .selectedASRProvider)
+        selectedTextProvider = try container.decode(TextRefinementProvider.self, forKey: .selectedTextProvider)
+        textRefinementEnabled = try container.decode(Bool.self, forKey: .textRefinementEnabled)
+        enabledDictationSkills = try container.decodeIfPresent([DictationProcessingSkill].self, forKey: .enabledDictationSkills) ?? []
+        asrConfigsByProvider = try container.decode([ASRProvider: ASRProviderConfig].self, forKey: .asrConfigsByProvider)
+        textConfigsByProvider = try container.decode([TextRefinementProvider: TextRefinementProviderConfig].self, forKey: .textConfigsByProvider)
+    }
 }
 
 enum GlossaryPresetID: String, CaseIterable, Codable, Identifiable {
@@ -355,6 +422,17 @@ final class AppSettings {
         didSet { persistSnapshot() }
     }
 
+    var enabledDictationSkills: [DictationProcessingSkill] {
+        didSet {
+            let normalized = Self.normalizedDictationSkills(enabledDictationSkills)
+            if normalized != enabledDictationSkills {
+                enabledDictationSkills = normalized
+                return
+            }
+            persistSnapshot()
+        }
+    }
+
     var asrConfigsByProvider: [ASRProvider: ASRProviderConfig] {
         didSet { persistSnapshot() }
     }
@@ -387,6 +465,7 @@ final class AppSettings {
         self.selectedASRProvider = snapshot.selectedASRProvider
         self.selectedTextProvider = snapshot.selectedTextProvider
         self.textRefinementEnabled = snapshot.textRefinementEnabled
+        self.enabledDictationSkills = snapshot.enabledDictationSkills
         self.asrConfigsByProvider = snapshot.asrConfigsByProvider
         self.textConfigsByProvider = snapshot.textConfigsByProvider
 
@@ -482,6 +561,20 @@ final class AppSettings {
         textConfigsByProvider[provider] = config
     }
 
+    func setEnabledDictationSkills(_ skills: [DictationProcessingSkill]) {
+        enabledDictationSkills = Self.normalizedDictationSkills(skills)
+    }
+
+    func toggleDictationSkill(_ skill: DictationProcessingSkill) {
+        var nextSkills = enabledDictationSkills
+        if let index = nextSkills.firstIndex(of: skill) {
+            nextSkills.remove(at: index)
+        } else {
+            nextSkills.append(skill)
+        }
+        setEnabledDictationSkills(nextSkills)
+    }
+
     func setGlossaryState(enabledPresetIDs: [GlossaryPresetID], customTerms: [String]) {
         glossaryState = Self.normalizedGlossaryState(
             GlossarySettingsSnapshot(
@@ -531,6 +624,7 @@ final class AppSettings {
             selectedASRProvider: selectedASRProvider,
             selectedTextProvider: selectedTextProvider,
             textRefinementEnabled: textRefinementEnabled,
+            enabledDictationSkills: enabledDictationSkills,
             asrConfigsByProvider: Dictionary(
                 uniqueKeysWithValues: ASRProvider.allCases.map { provider in
                     (provider, asrConfigsByProvider[provider] ?? .empty)
@@ -626,6 +720,7 @@ final class AppSettings {
 
     private static func normalizedSnapshot(_ snapshot: ModelSettingsSnapshot) -> ModelSettingsSnapshot {
         var normalized = snapshot
+        normalized.enabledDictationSkills = normalizedDictationSkills(snapshot.enabledDictationSkills)
         var qwenConfig = normalized.asrConfigsByProvider[.qwenASR] ?? .empty
         if qwenConfig.baseURL.trimmed.isEmpty {
             qwenConfig.baseURL = "wss://dashscope.aliyuncs.com/api-ws/v1/realtime"
@@ -635,6 +730,11 @@ final class AppSettings {
         }
         normalized.asrConfigsByProvider[.qwenASR] = qwenConfig
         return normalized
+    }
+
+    private static func normalizedDictationSkills(_ skills: [DictationProcessingSkill]) -> [DictationProcessingSkill] {
+        let uniqueSkills = Set(skills)
+        return DictationProcessingSkill.allCases.filter { uniqueSkills.contains($0) }
     }
 
     private static func normalizedGlossaryState(_ snapshot: GlossarySettingsSnapshot) -> GlossarySettingsSnapshot {

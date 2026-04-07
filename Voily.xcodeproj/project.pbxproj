@@ -30,6 +30,7 @@
 		A00100160000000000000000 /* AppIntents.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A00200190000000000000000 /* AppIntents.framework */; };
 		A00100170000000000000000 /* LocalASRService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A002001A0000000000000000 /* LocalASRService.swift */; };
 		A00100180000000000000000 /* LocalASRServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A002001B0000000000000000 /* LocalASRServiceTests.swift */; };
+		A001001C0000000000000000 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A002001F0000000000000000 /* Assets.xcassets */; };
 			A00100190000000000000000 /* ManagedASRModelStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A002001C0000000000000000 /* ManagedASRModelStore.swift */; };
 			A001001A0000000000000000 /* SenseVoiceResidentService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A002001D0000000000000000 /* SenseVoiceResidentService.swift */; };
 			A001001B0000000000000000 /* QwenRealtimeASRService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A002001E0000000000000000 /* QwenRealtimeASRService.swift */; };
@@ -75,6 +76,7 @@
 			A002001C0000000000000000 /* ManagedASRModelStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ManagedASRModelStore.swift; sourceTree = "<group>"; };
 			A002001D0000000000000000 /* SenseVoiceResidentService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SenseVoiceResidentService.swift; sourceTree = "<group>"; };
 			A002001E0000000000000000 /* QwenRealtimeASRService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QwenRealtimeASRService.swift; sourceTree = "<group>"; };
+		A002001F0000000000000000 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Resources/Assets.xcassets; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -102,6 +104,7 @@
 			children = (
 				A00400020000000000000000 /* Sources/Voily */,
 				A00400050000000000000000 /* Tests/VoilyTests */,
+				A002001F0000000000000000 /* Assets.xcassets */,
 				A00400030000000000000000 /* Config */,
 				A00400040000000000000000 /* Products */,
 			);
@@ -247,6 +250,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A001001C0000000000000000 /* Assets.xcassets in Resources */,
 				A00100110000000000000000 /* BrandIcons in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -353,6 +357,7 @@
 		A00700030000000000000000 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 9KZ32XLVQW;
@@ -377,6 +382,7 @@
 		A00700040000000000000000 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 9KZ32XLVQW;

@@ -276,11 +276,62 @@ final class AppSettingsGlossaryTests: XCTestCase {
         XCTAssertTrue(settings.effectiveGlossaryItems.contains("门诊"))
     }
 
+    func testLegacyModelSnapshotWithoutDictationSkillsMigratesToEmptySkillList() throws {
+        let defaults = makeDefaults()
+        defaults.set(try legacyModelSnapshotData(), forKey: "modelSettingsSnapshot")
+
+        let settings = AppSettings(defaults: defaults)
+
+        XCTAssertEqual(settings.selectedASRProvider, .whisperCpp)
+        XCTAssertEqual(settings.selectedTextProvider, .deepSeek)
+        XCTAssertEqual(settings.enabledDictationSkills, [])
+    }
+
+    func testEnabledDictationSkillsPersistInStableOrder() {
+        let defaults = makeDefaults()
+        let settings = AppSettings(defaults: defaults)
+
+        settings.setEnabledDictationSkills([.orderedList, .formalize, .removeFillers, .formalize])
+
+        XCTAssertEqual(settings.enabledDictationSkills, [.removeFillers, .formalize, .orderedList])
+
+        let reloaded = AppSettings(defaults: defaults)
+        XCTAssertEqual(reloaded.enabledDictationSkills, [.removeFillers, .formalize, .orderedList])
+    }
+
     private func makeDefaults() -> UserDefaults {
         let suiteName = "Voily.AppSettingsTests.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!
         defaults.removePersistentDomain(forName: suiteName)
         return defaults
+    }
+
+    private func legacyModelSnapshotData() throws -> Data {
+        let json = """
+        {
+          "selectedASRProvider": "whisperCpp",
+          "selectedTextProvider": "deepSeek",
+          "textRefinementEnabled": true,
+          "asrConfigsByProvider": {
+            "whisperCpp": {
+              "executablePath": "",
+              "modelPath": "",
+              "additionalArguments": "",
+              "baseURL": "",
+              "apiKey": "",
+              "model": ""
+            }
+          },
+          "textConfigsByProvider": {
+            "deepSeek": {
+              "baseURL": "https://api.deepseek.com/v1",
+              "apiKey": "sk-legacy",
+              "model": "deepseek-chat"
+            }
+          }
+        }
+        """
+        return try XCTUnwrap(json.data(using: .utf8))
     }
 }
 
@@ -297,7 +348,7 @@ final class LLMRefinementServiceTests: XCTestCase {
             for: TextProcessingRequest(
                 text: "测试 JSON 和 Python",
                 languageCode: "zh-Hans",
-                mode: .proofread
+                mode: .dictation(skills: [])
             ),
             glossarySections: settings.effectiveGlossarySections
         )
@@ -314,7 +365,7 @@ final class LLMRefinementServiceTests: XCTestCase {
             for: TextProcessingRequest(
                 text: "测试 JSON 和 Python",
                 languageCode: "zh-Hans",
-                mode: .proofread
+                mode: .dictation(skills: [])
             ),
             glossarySections: []
         )
@@ -322,6 +373,27 @@ final class LLMRefinementServiceTests: XCTestCase {
         XCTAssertFalse(prompt.contains("词库参考"))
         XCTAssertFalse(prompt.contains("自定义词条"))
         XCTAssertFalse(prompt.contains("互联网-开发"))
+        XCTAssertFalse(prompt.contains("仅在启用下列技能时"))
+    }
+
+    func testDictationPromptIncludesSkillsInStableExecutionOrder() throws {
+        let prompt = LLMRefinementService.systemPrompt(
+            for: TextProcessingRequest(
+                text: "嗯这个就是我们先做登录，然后那个支付后面再补",
+                languageCode: "zh-Hans",
+                mode: .dictation(skills: [.orderedList, .removeFillers, .formalize, .removeFillers])
+            ),
+            glossarySections: []
+        )
+
+        let removeRange = try XCTUnwrap(prompt.range(of: "第 2 步：去掉明显语气词"))
+        let formalizeRange = try XCTUnwrap(prompt.range(of: "第 3 步：把口述表达整理为中性、简洁、正式的书面语"))
+        let orderedListRange = try XCTUnwrap(prompt.range(of: "第 4 步：如果内容中存在 2 个及以上清晰的事项、观点或步骤"))
+
+        XCTAssertLessThan(removeRange.lowerBound, formalizeRange.lowerBound)
+        XCTAssertLessThan(formalizeRange.lowerBound, orderedListRange.lowerBound)
+        XCTAssertTrue(prompt.contains("如果只有一个清晰事项或不适合拆项，则保持段落文本"))
+        XCTAssertFalse(prompt.contains("第 5 步"))
     }
 
     func testTranslationPromptForcesEnglishOnlyOutput() {
@@ -338,6 +410,7 @@ final class LLMRefinementServiceTests: XCTestCase {
         XCTAssertTrue(prompt.contains("不要输出中文"))
         XCTAssertFalse(prompt.contains("词库参考"))
         XCTAssertFalse(prompt.contains("Voily"))
+        XCTAssertFalse(prompt.contains("第 1 步：基础纠错"))
     }
 
     private func makeDefaults() -> UserDefaults {

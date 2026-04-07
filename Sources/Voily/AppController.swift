@@ -139,8 +139,19 @@ final class AppController: NSObject {
     }
 
     private func configureStatusItem() {
-        let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-        item.button?.title = "Voily"
+        let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
+        if let button = item.button {
+            if let image = NSImage(named: "MenuBarIconTemplate") {
+                image.isTemplate = true
+                image.size = NSSize(width: 18, height: 18)
+                button.image = image
+                button.imagePosition = .imageOnly
+                button.title = ""
+            } else {
+                button.title = "Voily"
+            }
+            button.toolTip = "Voily"
+        }
         item.menu = makeMenu()
         statusItem = item
     }
@@ -194,7 +205,7 @@ final class AppController: NSObject {
     private func makeTextRefinementMenu() -> NSMenu {
         let menu = NSMenu()
 
-        let toggle = NSMenuItem(title: "Enable Proofread", action: #selector(toggleLLM), keyEquivalent: "")
+        let toggle = NSMenuItem(title: "Enable Dictation Processing", action: #selector(toggleLLM), keyEquivalent: "")
         toggle.target = self
         toggle.state = settings.textRefinementEnabled ? .on : .off
         textRefinementMenuItem = toggle
@@ -393,12 +404,12 @@ final class AppController: NSObject {
                         TextProcessingRequest(
                             text: recognizedText,
                             languageCode: activeInputLanguageCode,
-                            mode: .proofread
+                            mode: .dictation(skills: settings.enabledDictationSkills)
                         ),
                         settings: settings
                     )
                 } catch {
-                    NSLog("LLM proofread failed: \(error.localizedDescription)")
+                    NSLog("LLM dictation processing failed: \(error.localizedDescription)")
                     finalText = recognizedText
                 }
                 didApplyTextProcessing = true

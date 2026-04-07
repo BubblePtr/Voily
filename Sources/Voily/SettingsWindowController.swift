@@ -142,6 +142,7 @@ private struct ModelSettingsPage: View {
     @State private var draftSelectedASRProvider: ASRProvider = .whisperCpp
     @State private var draftSelectedTextProvider: TextRefinementProvider = .deepSeek
     @State private var draftTextRefinementEnabled = false
+    @State private var draftEnabledDictationSkills: [DictationProcessingSkill] = []
     @State private var asrDrafts: [ASRProvider: ASRProviderConfig] = [:]
     @State private var textDrafts: [TextRefinementProvider: TextRefinementProviderConfig] = [:]
     @State private var statusMessage = ""
@@ -199,6 +200,11 @@ private struct ModelSettingsPage: View {
                     }
                 }
 
+                DictationSkillsCard(
+                    enabledSkills: $draftEnabledDictationSkills,
+                    isTextRefinementEnabled: draftTextRefinementEnabled
+                )
+
                 if !statusMessage.isEmpty {
                     Text(statusMessage)
                         .font(.system(size: 12))
@@ -218,6 +224,9 @@ private struct ModelSettingsPage: View {
         }
         .onChange(of: draftTextRefinementEnabled) { _, newValue in
             settings.textRefinementEnabled = newValue
+        }
+        .onChange(of: draftEnabledDictationSkills) { _, newValue in
+            settings.setEnabledDictationSkills(newValue)
         }
         .sheet(item: $presentedSheet) { sheet in
             switch sheet.kind {
@@ -255,6 +264,7 @@ private struct ModelSettingsPage: View {
         draftSelectedASRProvider = settings.selectedASRProvider
         draftSelectedTextProvider = settings.selectedTextProvider
         draftTextRefinementEnabled = settings.textRefinementEnabled
+        draftEnabledDictationSkills = settings.enabledDictationSkills
         asrDrafts = Dictionary(uniqueKeysWithValues: ASRProvider.allCases.map { ($0, settings.asrConfig(for: $0)) })
         textDrafts = Dictionary(uniqueKeysWithValues: TextRefinementProvider.allCases.map { ($0, settings.textRefinementConfig(for: $0)) })
     }
@@ -331,6 +341,57 @@ private struct DefaultModelsOverviewCard: View {
         .overlay(
             RoundedRectangle(cornerRadius: 28, style: .continuous)
                 .stroke(Color.primary.opacity(0.08), lineWidth: 1)
+        )
+    }
+}
+
+private struct DictationSkillsCard: View {
+    @Binding var enabledSkills: [DictationProcessingSkill]
+    let isTextRefinementEnabled: Bool
+
+    var body: some View {
+        SettingsCard(
+            title: "文本处理技能",
+            subtitle: "仅作用于普通听写。基础纠错始终启用，下面这些技能可按需叠加。"
+        ) {
+            VStack(alignment: .leading, spacing: 14) {
+                ForEach(DictationProcessingSkill.allCases) { skill in
+                    Toggle(isOn: binding(for: skill)) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(skill.displayName)
+                                .font(.system(size: 14, weight: .semibold))
+
+                            Text(skill.summary)
+                                .font(.system(size: 12))
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .toggleStyle(.switch)
+                }
+
+                Text(
+                    isTextRefinementEnabled
+                        ? "当前配置会在普通听写时生效。\"整理成有序列表\" 只会在内容存在 2 个及以上清晰事项时触发。"
+                        : "当前未启用普通听写纠错。技能配置会保留，待开启后在普通听写中生效。"
+                )
+                .font(.system(size: 12))
+                .foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    private func binding(for skill: DictationProcessingSkill) -> Binding<Bool> {
+        Binding(
+            get: { enabledSkills.contains(skill) },
+            set: { isEnabled in
+                var next = Set(enabledSkills)
+                if isEnabled {
+                    next.insert(skill)
+                } else {
+                    next.remove(skill)
+                }
+                enabledSkills = DictationProcessingSkill.allCases.filter { next.contains($0) }
+            }
         )
     }
 }
@@ -1319,6 +1380,7 @@ enum SettingsPreviewData {
         settings.selectedASRProvider = .doubaoStreaming
         settings.selectedTextProvider = .deepSeek
         settings.textRefinementEnabled = true
+        settings.setEnabledDictationSkills([.removeFillers, .formalize])
         settings.setASRConfig(
             ASRProviderConfig(
                 executablePath: "",
