@@ -1,15 +1,115 @@
 import AppKit
 import Carbon.HIToolbox
+import QuartzCore
+
+enum FnGestureAction: Equatable {
+    case startDictation
+    case finishDictation
+    case startQuickTranslation
+}
+
+struct FnShortcutStateMachine {
+    enum State: Equatable {
+        case idle
+        case firstPressing(startedAt: TimeInterval)
+        case waitingForSecondPress(releasedAt: TimeInterval)
+        case dictating
+    }
+
+    let longPressThreshold: TimeInterval
+    let doubleTapWindow: TimeInterval
+
+    private(set) var state: State = .idle
+
+    init(longPressThreshold: TimeInterval = 0.18, doubleTapWindow: TimeInterval = 0.3) {
+        self.longPressThreshold = longPressThreshold
+        self.doubleTapWindow = doubleTapWindow
+    }
+
+    var pendingLongPressFireAt: TimeInterval? {
+        guard case let .firstPressing(startedAt) = state else { return nil }
+        return startedAt + longPressThreshold
+    }
+
+    var pendingDoubleTapExpiryAt: TimeInterval? {
+        guard case let .waitingForSecondPress(releasedAt) = state else { return nil }
+        return releasedAt + doubleTapWindow
+    }
+
+    mutating func handleKeyDown(at time: TimeInterval) -> [FnGestureAction] {
+        switch state {
+        case .idle:
+            state = .firstPressing(startedAt: time)
+            return []
+        case let .waitingForSecondPress(releasedAt):
+            if time - releasedAt <= doubleTapWindow {
+                state = .idle
+                return [.startQuickTranslation]
+            }
+
+            state = .firstPressing(startedAt: time)
+            return []
+        case .firstPressing, .dictating:
+            return []
+        }
+    }
+
+    mutating func handleKeyUp(at time: TimeInterval) -> [FnGestureAction] {
+        switch state {
+        case .idle:
+            return []
+        case let .firstPressing(startedAt):
+            if time - startedAt >= longPressThreshold {
+                state = .idle
+                return [.startDictation, .finishDictation]
+            }
+
+            state = .waitingForSecondPress(releasedAt: time)
+            return []
+        case .waitingForSecondPress:
+            return []
+        case .dictating:
+            state = .idle
+            return [.finishDictation]
+        }
+    }
+
+    mutating func handleLongPressTimer(at time: TimeInterval) -> [FnGestureAction] {
+        guard case let .firstPressing(startedAt) = state, time - startedAt >= longPressThreshold else {
+            return []
+        }
+
+        state = .dictating
+        return [.startDictation]
+    }
+
+    mutating func handleDoubleTapTimer(at time: TimeInterval) -> [FnGestureAction] {
+        guard case let .waitingForSecondPress(releasedAt) = state, time - releasedAt >= doubleTapWindow else {
+            return []
+        }
+
+        state = .idle
+        return []
+    }
+
+    mutating func reset() {
+        state = .idle
+    }
+}
 
 final class FnKeyMonitor {
     private static let systemDefinedRawValue: UInt32 = 14
 
-    var onPress: (() -> Void)?
-    var onRelease: (() -> Void)?
+    var onDictationStart: (() -> Void)?
+    var onDictationFinish: (() -> Void)?
+    var onQuickTranslation: (() -> Void)?
 
     private var eventTap: CFMachPort?
     private var runLoopSource: CFRunLoopSource?
     private var isFnPressed = false
+    private var stateMachine = FnShortcutStateMachine()
+    private var longPressWorkItem: DispatchWorkItem?
+    private var doubleTapWorkItem: DispatchWorkItem?
 
     func start() {
         guard eventTap == nil else { return }
@@ -59,6 +159,8 @@ final class FnKeyMonitor {
             CFMachPortInvalidate(eventTap)
         }
 
+        cancelTimers()
+        stateMachine.reset()
         runLoopSource = nil
         eventTap = nil
         isFnPressed = false
@@ -92,18 +194,7 @@ final class FnKeyMonitor {
 
         let pressed = event.flags.contains(.maskSecondaryFn)
         debugLog("FnKeyMonitor flagsChanged fn pressed=\(pressed)")
-        if pressed != isFnPressed {
-            isFnPressed = pressed
-
-            if pressed {
-                debugLog("FnKeyMonitor onPress from flagsChanged")
-                onPress?()
-            } else {
-                debugLog("FnKeyMonitor onRelease from flagsChanged")
-                onRelease?()
-            }
-        }
-
+        handlePhysicalPressChange(pressed)
         return nil
     }
 
@@ -123,21 +214,82 @@ final class FnKeyMonitor {
 
         switch state {
         case 0x0A:
-            if !isFnPressed {
-                isFnPressed = true
-                debugLog("FnKeyMonitor onPress from systemDefined")
-                onPress?()
-            }
+            handlePhysicalPressChange(true)
             return nil
         case 0x0B:
-            if isFnPressed {
-                isFnPressed = false
-                debugLog("FnKeyMonitor onRelease from systemDefined")
-                onRelease?()
-            }
+            handlePhysicalPressChange(false)
             return nil
         default:
             return Unmanaged.passUnretained(event)
+        }
+    }
+
+    private func handlePhysicalPressChange(_ pressed: Bool) {
+        guard pressed != isFnPressed else {
+            return
+        }
+
+        isFnPressed = pressed
+        let now = CACurrentMediaTime()
+        let actions = if pressed {
+            stateMachine.handleKeyDown(at: now)
+        } else {
+            stateMachine.handleKeyUp(at: now)
+        }
+
+        syncTimers()
+        dispatch(actions)
+    }
+
+    private func syncTimers() {
+        longPressWorkItem?.cancel()
+        longPressWorkItem = nil
+
+        if let fireAt = stateMachine.pendingLongPressFireAt {
+            let workItem = DispatchWorkItem { [weak self] in
+                guard let self else { return }
+                let actions = self.stateMachine.handleLongPressTimer(at: CACurrentMediaTime())
+                self.syncTimers()
+                self.dispatch(actions)
+            }
+            longPressWorkItem = workItem
+            DispatchQueue.main.asyncAfter(deadline: .now() + max(0, fireAt - CACurrentMediaTime()), execute: workItem)
+        }
+
+        doubleTapWorkItem?.cancel()
+        doubleTapWorkItem = nil
+
+        if let fireAt = stateMachine.pendingDoubleTapExpiryAt {
+            let workItem = DispatchWorkItem { [weak self] in
+                guard let self else { return }
+                _ = self.stateMachine.handleDoubleTapTimer(at: CACurrentMediaTime())
+                self.syncTimers()
+            }
+            doubleTapWorkItem = workItem
+            DispatchQueue.main.asyncAfter(deadline: .now() + max(0, fireAt - CACurrentMediaTime()), execute: workItem)
+        }
+    }
+
+    private func cancelTimers() {
+        longPressWorkItem?.cancel()
+        longPressWorkItem = nil
+        doubleTapWorkItem?.cancel()
+        doubleTapWorkItem = nil
+    }
+
+    private func dispatch(_ actions: [FnGestureAction]) {
+        for action in actions {
+            switch action {
+            case .startDictation:
+                debugLog("FnKeyMonitor start dictation")
+                onDictationStart?()
+            case .finishDictation:
+                debugLog("FnKeyMonitor finish dictation")
+                onDictationFinish?()
+            case .startQuickTranslation:
+                debugLog("FnKeyMonitor start quick translation")
+                onQuickTranslation?()
+            }
         }
     }
 }

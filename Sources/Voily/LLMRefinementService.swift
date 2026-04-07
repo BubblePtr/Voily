@@ -1,8 +1,18 @@
 import Foundation
 
-struct RefinementRequest {
+enum TranslationOutputStyle: Equatable {
+    case natural
+}
+
+enum TextProcessingMode: Equatable {
+    case proofread
+    case translateZhToEn(style: TranslationOutputStyle)
+}
+
+struct TextProcessingRequest: Equatable {
     let text: String
     let languageCode: String
+    let mode: TextProcessingMode
 }
 
 final class LLMRefinementService {
@@ -12,7 +22,7 @@ final class LLMRefinementService {
     }
 
     @MainActor
-    func refine(_ request: RefinementRequest, settings: AppSettings) async throws -> String {
+    func process(_ request: TextProcessingRequest, settings: AppSettings) async throws -> String {
         let config = settings.selectedTextProviderConfig
         let trimmedBaseURL = config.baseURL.trimmingCharacters(in: .whitespacesAndNewlines)
         guard let baseURL = URL(string: trimmedBaseURL) else {
@@ -35,10 +45,7 @@ final class LLMRefinementService {
             messages: [
                 .init(
                     role: "system",
-                    content: Self.systemPrompt(
-                        languageCode: request.languageCode,
-                        glossarySections: settings.effectiveGlossarySections
-                    )
+                    content: Self.systemPrompt(for: request, glossarySections: settings.effectiveGlossarySections)
                 ),
                 .init(role: "user", content: request.text),
             ],
@@ -62,10 +69,26 @@ final class LLMRefinementService {
 
     @MainActor
     func testConnection(settings: AppSettings) async throws {
-        _ = try await refine(RefinementRequest(text: "测试 JSON 和 Python", languageCode: settings.selectedLanguageCode), settings: settings)
+        _ = try await process(
+            TextProcessingRequest(
+                text: "测试 JSON 和 Python",
+                languageCode: settings.selectedLanguageCode,
+                mode: .proofread
+            ),
+            settings: settings
+        )
     }
 
-    static func systemPrompt(languageCode: String, glossarySections: [GlossarySection]) -> String {
+    static func systemPrompt(for request: TextProcessingRequest, glossarySections: [GlossarySection]) -> String {
+        switch request.mode {
+        case .proofread:
+            return proofreadPrompt(languageCode: request.languageCode, glossarySections: glossarySections)
+        case let .translateZhToEn(style):
+            return translationPrompt(languageCode: request.languageCode, style: style)
+        }
+    }
+
+    private static func proofreadPrompt(languageCode: String, glossarySections: [GlossarySection]) -> String {
         let basePrompt = """
         你是一个极其保守的语音识别纠错器。当前语言环境是 \(languageCode)。
         你的唯一任务是修复明显的语音识别错误，例如：
@@ -97,6 +120,28 @@ final class LLMRefinementService {
         - 若输入中出现疑似专有术语、行业术语、近音错词，应优先参考以下标准写法。
         - 词库仅用于纠错参考，不代表可以改写原句或补充新内容。
         \(glossaryText)
+        """
+    }
+
+    private static func translationPrompt(languageCode: String, style: TranslationOutputStyle) -> String {
+        let styleInstruction: String
+        switch style {
+        case .natural:
+            styleInstruction = "输出自然、简洁、可直接发送的英文，允许做轻微调整让表达自然，但不要扩写。"
+        }
+
+        return """
+        你是一个语音输入翻译器。输入内容来自中文口述识别，当前输入语言环境是 \(languageCode)。
+        你的唯一任务是把用户输入翻译成英文。
+
+        严格规则：
+        - 只输出英文最终结果。
+        - 不要输出中文。
+        - 不要输出双语内容。
+        - 不要附加解释、注释、前缀、标题或引号。
+        - 保留原意，不要总结，不要遗漏关键信息。
+        - 如果口述内容不完整，尽量按原意输出最直接的英文，不要自行补充背景。
+        - \(styleInstruction)
         """
     }
 }

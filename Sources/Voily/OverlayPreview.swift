@@ -95,7 +95,7 @@ private struct OverlayPreviewFrame: View {
                 previewTime: previewTime
             )
             .frame(
-                width: overlayWidth(for: OverlayRootView.displayText(for: state)),
+                width: overlayWidth(for: state),
                 height: overlayHeight
             )
         }

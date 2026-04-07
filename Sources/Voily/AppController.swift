@@ -32,6 +32,29 @@ private struct RecognitionOutcome {
     let partialCount: Int
 }
 
+private enum CaptureSessionMode: Equatable {
+    case dictation
+    case quickTranslationZhToEn
+
+    var inputLanguageCode: String {
+        switch self {
+        case .dictation:
+            return ""
+        case .quickTranslationZhToEn:
+            return SupportedLanguage.simplifiedChinese.rawValue
+        }
+    }
+
+    var debugName: String {
+        switch self {
+        case .dictation:
+            return "dictation"
+        case .quickTranslationZhToEn:
+            return "quick-translation-zh-en"
+        }
+    }
+}
+
 @available(macOS 26.0, *)
 @MainActor
 final class AppController: NSObject {
@@ -60,9 +83,11 @@ final class AppController: NSObject {
     private var languageMenuItems: [SupportedLanguage: NSMenuItem] = [:]
     private var textRefinementMenuItem: NSMenuItem?
     private var currentPhase: OverlayPhase = .idle
+    private var currentOverlayControls: OverlayControls = .none
     private var currentText = ""
     private var smoothedRMS: Float = 0
     private var currentSessionStartedAt: Date?
+    private var currentSessionMode: CaptureSessionMode?
     private var localAudioWriter: TemporaryAudioCaptureWriter?
     private var currentResidentSession: SenseVoiceResidentSession?
     private var partialPollingTask: Task<Void, Never>?
@@ -75,6 +100,7 @@ final class AppController: NSObject {
     func start() {
         debugLog("AppController.start()")
         configureStatusItem()
+        configureOverlayActions()
         permissionCoordinator.requestStartupPermissions()
         configureAccessibilityFeatures()
     }
@@ -92,6 +118,8 @@ final class AppController: NSObject {
             try? await qwenRealtimeASRService.cancelSession()
             await senseVoiceResidentService.stop()
         }
+        currentSessionMode = nil
+        currentOverlayControls = .none
     }
 
     private func configureAccessibilityFeatures() {
@@ -124,9 +152,13 @@ final class AppController: NSObject {
         languageItem.submenu = makeLanguageMenu()
         menu.addItem(languageItem)
 
-        let textRefinementItem = NSMenuItem(title: "Text Refinement", action: nil, keyEquivalent: "")
+        let textRefinementItem = NSMenuItem(title: "Text Processing", action: nil, keyEquivalent: "")
         textRefinementItem.submenu = makeTextRefinementMenu()
         menu.addItem(textRefinementItem)
+
+        let hintItem = NSMenuItem(title: "Hold Fn to Dictate · Double Fn to Translate", action: nil, keyEquivalent: "")
+        hintItem.isEnabled = false
+        menu.addItem(hintItem)
 
         menu.addItem(.separator())
 
@@ -162,7 +194,7 @@ final class AppController: NSObject {
     private func makeTextRefinementMenu() -> NSMenu {
         let menu = NSMenu()
 
-        let toggle = NSMenuItem(title: "Enable Refinement", action: #selector(toggleLLM), keyEquivalent: "")
+        let toggle = NSMenuItem(title: "Enable Proofread", action: #selector(toggleLLM), keyEquivalent: "")
         toggle.target = self
         toggle.state = settings.textRefinementEnabled ? .on : .off
         textRefinementMenuItem = toggle
@@ -175,19 +207,40 @@ final class AppController: NSObject {
         return menu
     }
 
-    private func configureFnMonitoring() {
-        debugLog("configureFnMonitoring()")
-        fnKeyMonitor.onPress = { [weak self] in
-            debugLog("Fn onPress callback")
+    private func configureOverlayActions() {
+        overlayController.onConfirm = { [weak self] in
             Task { @MainActor in
-                await self?.beginRecording()
+                await self?.confirmQuickTranslationRecording()
             }
         }
 
-        fnKeyMonitor.onRelease = { [weak self] in
-            debugLog("Fn onRelease callback")
+        overlayController.onCancel = { [weak self] in
+            Task { @MainActor in
+                await self?.cancelCurrentSession()
+            }
+        }
+    }
+
+    private func configureFnMonitoring() {
+        debugLog("configureFnMonitoring()")
+        fnKeyMonitor.onDictationStart = { [weak self] in
+            debugLog("Fn dictation start callback")
+            Task { @MainActor in
+                await self?.beginRecording(mode: .dictation)
+            }
+        }
+
+        fnKeyMonitor.onDictationFinish = { [weak self] in
+            debugLog("Fn dictation finish callback")
             Task { @MainActor in
                 await self?.finishRecording()
+            }
+        }
+
+        fnKeyMonitor.onQuickTranslation = { [weak self] in
+            debugLog("Fn quick translation callback")
+            Task { @MainActor in
+                await self?.beginRecording(mode: .quickTranslationZhToEn)
             }
         }
 
@@ -198,7 +251,8 @@ final class AppController: NSObject {
         debugLog("setOverlay phase=\(phase) textLength=\(text.count) rms=\(String(format: "%.3f", rmsLevel))")
         currentText = text
         currentPhase = phase
-        overlayController.show(state: OverlayState(text: text, rmsLevel: rmsLevel, phase: phase))
+        currentOverlayControls = overlayControls(for: phase)
+        overlayController.show(state: OverlayState(text: text, rmsLevel: rmsLevel, phase: phase, controls: currentOverlayControls))
     }
 
     private func updateRMS(_ newLevel: Float) {
@@ -208,13 +262,26 @@ final class AppController: NSObject {
         smoothedRMS = smoothedRMS + ((newLevel - smoothedRMS) * coefficient)
 
         if currentPhase == .recording || currentPhase == .recordingPartial || currentPhase == .transcribing {
-            overlayController.show(state: OverlayState(text: currentText, rmsLevel: smoothedRMS, phase: currentPhase))
+            overlayController.show(
+                state: OverlayState(
+                    text: currentText,
+                    rmsLevel: smoothedRMS,
+                    phase: currentPhase,
+                    controls: currentOverlayControls
+                )
+            )
         }
     }
 
-    private func beginRecording() async {
+    private func beginRecording(mode: CaptureSessionMode) async {
         guard currentPhase == .idle else { return }
-        debugLog("beginRecording()")
+        debugLog("beginRecording mode=\(mode.debugName)")
+        if mode == .quickTranslationZhToEn, !settings.isTextRefinementConfigured {
+            await showTransientMessage("Set up a text model in Settings first.")
+            return
+        }
+
+        currentSessionMode = mode
         currentText = ""
         smoothedRMS = 0
         currentSessionStartedAt = Date()
@@ -240,7 +307,7 @@ final class AppController: NSObject {
                     try await startQwenRealtimeSession()
                 } else {
                     do {
-                        try speechService.start(localeIdentifier: settings.selectedLanguageCode) { _ in }
+                        try speechService.start(localeIdentifier: activeInputLanguageCode) { _ in }
                         currentSpeechCaptureEnabled = true
                     } catch {
                         debugLog("System Speech fallback unavailable for local provider=\(selectedASRProvider.rawValue) error=\(error.localizedDescription)")
@@ -251,11 +318,9 @@ final class AppController: NSObject {
                     try await startQwenRealtimeSession()
                 } else if selectedASRProvider.category == .cloud {
                     debugLog("Cloud ASR provider not implemented provider=\(selectedASRProvider.rawValue) fallback=true")
-                    try speechService.start(localeIdentifier: settings.selectedLanguageCode) { [weak self] text in
+                    try speechService.start(localeIdentifier: activeInputLanguageCode) { [weak self] text in
                         guard let self else { return }
-                        self.currentText = text
-                        self.currentPhase = .recording
-                        self.overlayController.show(state: OverlayState(text: text, rmsLevel: self.smoothedRMS, phase: .recording))
+                        self.setOverlay(text: text, rmsLevel: self.smoothedRMS, phase: .recording)
                     }
                     currentSpeechCaptureEnabled = true
                 }
@@ -287,6 +352,8 @@ final class AppController: NSObject {
             partialPollingTask?.cancel()
             partialPollingTask = nil
             currentPendingRealtimeAppendCount = 0
+            currentSessionMode = nil
+            currentOverlayControls = .none
             overlayController.hide()
             currentPhase = .idle
             currentSessionStartedAt = nil
@@ -295,12 +362,12 @@ final class AppController: NSObject {
 
     private func finishRecording() async {
         guard currentPhase == .recording || currentPhase == .recordingPartial else { return }
-        debugLog("finishRecording()")
+        guard let sessionMode = currentSessionMode else { return }
+        debugLog("finishRecording mode=\(sessionMode.debugName)")
 
         partialPollingTask?.cancel()
         partialPollingTask = nil
-        currentPhase = .transcribing
-        overlayController.show(state: OverlayState(text: currentText, rmsLevel: smoothedRMS, phase: .transcribing))
+        setOverlay(text: currentText, rmsLevel: smoothedRMS, phase: .transcribing)
         audioCaptureService.stop()
         await waitForPendingRealtimeAppends()
 
@@ -310,48 +377,64 @@ final class AppController: NSObject {
         let endedAt = Date()
 
         guard !recognizedText.isEmpty else {
-            if let currentResidentSession {
-                Task {
-                    await self.senseVoiceResidentService.cancelSession(currentResidentSession)
-                }
-            }
-            currentResidentSession = nil
-            currentSpeechCaptureEnabled = false
-            currentFirstPartialMs = nil
-            currentPartialCount = 0
-            currentPendingRealtimeAppendCount = 0
-            overlayController.hide()
-            currentPhase = .idle
-            currentSessionStartedAt = nil
+            await cleanupCurrentSession(hideOverlay: true)
             return
         }
 
         let finalText: String
-        if settings.textRefinementEnabled && settings.isTextRefinementConfigured {
-            currentPhase = .refining
-            overlayController.show(state: OverlayState(text: recognizedText, rmsLevel: 0, phase: .refining))
+        let didApplyTextProcessing: Bool
+        switch sessionMode {
+        case .dictation:
+            if settings.textRefinementEnabled && settings.isTextRefinementConfigured {
+                setOverlay(text: recognizedText, rmsLevel: 0, phase: .refining)
+
+                do {
+                    finalText = try await llmRefinementService.process(
+                        TextProcessingRequest(
+                            text: recognizedText,
+                            languageCode: activeInputLanguageCode,
+                            mode: .proofread
+                        ),
+                        settings: settings
+                    )
+                } catch {
+                    NSLog("LLM proofread failed: \(error.localizedDescription)")
+                    finalText = recognizedText
+                }
+                didApplyTextProcessing = true
+            } else {
+                finalText = recognizedText
+                didApplyTextProcessing = false
+            }
+        case .quickTranslationZhToEn:
+            setOverlay(text: "", rmsLevel: 0, phase: .translating)
 
             do {
-                finalText = try await llmRefinementService.refine(
-                    RefinementRequest(text: recognizedText, languageCode: settings.selectedLanguageCode),
+                finalText = try await llmRefinementService.process(
+                    TextProcessingRequest(
+                        text: recognizedText,
+                        languageCode: SupportedLanguage.simplifiedChinese.rawValue,
+                        mode: .translateZhToEn(style: .natural)
+                    ),
                     settings: settings
                 )
+                didApplyTextProcessing = true
             } catch {
-                NSLog("LLM refinement failed: \(error.localizedDescription)")
-                finalText = recognizedText
+                NSLog("LLM translation failed: \(error.localizedDescription)")
+                await showTransientMessage("Translation failed. Try again.")
+                await cleanupCurrentSession(hideOverlay: true)
+                return
             }
-        } else {
-            finalText = recognizedText
         }
 
         let sessionID = usageStore.recordSession(
             VoiceInputSessionDraft(
                 startedAt: currentSessionStartedAt ?? endedAt,
                 endedAt: endedAt,
-                languageCode: settings.selectedLanguageCode,
+                languageCode: activeInputLanguageCode,
                 recognizedText: recognizedText,
                 finalText: finalText,
-                refinementApplied: settings.textRefinementEnabled && settings.isTextRefinementConfigured,
+                refinementApplied: didApplyTextProcessing,
                 asrProvider: recognitionOutcome.provider.rawValue,
                 asrSource: recognitionOutcome.source,
                 recognitionTotalMs: recognitionOutcome.totalDurationMs,
@@ -361,8 +444,7 @@ final class AppController: NSObject {
             )
         )
 
-        currentPhase = .injecting
-        overlayController.show(state: OverlayState(text: finalText, rmsLevel: 0, phase: .injecting))
+        setOverlay(text: finalText, rmsLevel: 0, phase: .injecting)
         let injectionResult = await textInjectionService.inject(text: finalText)
         if let sessionID {
             usageStore.markInjectionResult(sessionID: sessionID, succeeded: injectionResult == .success)
@@ -375,14 +457,79 @@ final class AppController: NSObject {
         }
 
         try? await Task.sleep(for: .milliseconds(150))
-        overlayController.hide()
-        currentPhase = .idle
-        currentSessionStartedAt = nil
+        await cleanupCurrentSession(hideOverlay: true)
+    }
+
+    private var activeInputLanguageCode: String {
+        switch currentSessionMode {
+        case .dictation, .none:
+            return settings.selectedLanguageCode
+        case .quickTranslationZhToEn:
+            return SupportedLanguage.simplifiedChinese.rawValue
+        }
+    }
+
+    private func overlayControls(for phase: OverlayPhase) -> OverlayControls {
+        guard currentSessionMode == .quickTranslationZhToEn else {
+            return .none
+        }
+
+        switch phase {
+        case .recording, .recordingPartial:
+            return .confirmCancel
+        default:
+            return .none
+        }
+    }
+
+    private func confirmQuickTranslationRecording() async {
+        guard currentSessionMode == .quickTranslationZhToEn else { return }
+        await finishRecording()
+    }
+
+    private func cancelCurrentSession() async {
+        guard currentSessionMode == .quickTranslationZhToEn else { return }
+        debugLog("cancelCurrentSession()")
+        audioCaptureService.stop()
+        await cleanupCurrentSession(hideOverlay: true)
+    }
+
+    private func cleanupCurrentSession(hideOverlay: Bool) async {
+        speechService.cancel()
+        localAudioWriter?.cancel()
+        localAudioWriter = nil
+        partialPollingTask?.cancel()
+        partialPollingTask = nil
+
+        if let currentResidentSession {
+            await senseVoiceResidentService.cancelSession(currentResidentSession)
+        }
         currentResidentSession = nil
+        try? await qwenRealtimeASRService.cancelSession()
+
+        currentSessionMode = nil
         currentSpeechCaptureEnabled = false
         currentFirstPartialMs = nil
         currentPartialCount = 0
         currentPendingRealtimeAppendCount = 0
+        currentOverlayControls = .none
+        currentText = ""
+        currentPhase = .idle
+        currentSessionStartedAt = nil
+        smoothedRMS = 0
+        partialPollingInFlight = false
+
+        if hideOverlay {
+            overlayController.hide()
+        }
+    }
+
+    private func showTransientMessage(_ text: String) async {
+        overlayController.show(state: OverlayState(text: text, rmsLevel: 0, phase: .translating, controls: .none))
+        try? await Task.sleep(for: .milliseconds(1100))
+        if currentPhase == .idle {
+            overlayController.hide()
+        }
     }
 
     private func recognizeText() async -> RecognitionOutcome {
@@ -540,7 +687,7 @@ final class AppController: NSObject {
             provider: provider,
             config: managedASRModels.managedConfig(for: provider) ?? settings.selectedASRConfig,
             audioFileURL: audioFileURL,
-            languageCode: settings.selectedLanguageCode
+            languageCode: activeInputLanguageCode
         )
     }
 
@@ -590,7 +737,7 @@ final class AppController: NSObject {
             if currentResidentSession == nil {
                 currentResidentSession = try await senseVoiceResidentService.startSession(
                     sampleRate: sampleRate,
-                    languageCode: settings.selectedLanguageCode
+                    languageCode: activeInputLanguageCode
                 )
                 debugLog("SenseVoice resident session started")
             }
@@ -608,7 +755,7 @@ final class AppController: NSObject {
     private func startQwenRealtimeSession() async throws {
         try await qwenRealtimeASRService.startSession(
             config: settings.selectedASRConfig,
-            languageCode: settings.selectedLanguageCode
+            languageCode: activeInputLanguageCode
         ) { [weak self] partialText in
             Task { @MainActor in
                 self?.handleQwenPartialText(partialText)
@@ -642,7 +789,7 @@ final class AppController: NSObject {
             currentFirstPartialMs = Int(Date().timeIntervalSince(currentSessionStartedAt) * 1000)
         }
         currentPartialCount += 1
-        overlayController.show(state: OverlayState(text: trimmed, rmsLevel: smoothedRMS, phase: .recordingPartial))
+        setOverlay(text: trimmed, rmsLevel: smoothedRMS, phase: .recordingPartial)
     }
 
     private func pollSenseVoicePartialIfNeeded() async {
@@ -669,7 +816,7 @@ final class AppController: NSObject {
                 currentFirstPartialMs = elapsedMs
             }
             currentPartialCount += 1
-            overlayController.show(state: OverlayState(text: partialText, rmsLevel: smoothedRMS, phase: .recordingPartial))
+            setOverlay(text: partialText, rmsLevel: smoothedRMS, phase: .recordingPartial)
         } catch {
             debugLog("SenseVoice resident partial failed error=\(error.localizedDescription)")
         }

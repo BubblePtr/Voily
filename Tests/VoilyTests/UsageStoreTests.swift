@@ -294,7 +294,11 @@ final class LLMRefinementServiceTests: XCTestCase {
         )
 
         let prompt = LLMRefinementService.systemPrompt(
-            languageCode: "zh-Hans",
+            for: TextProcessingRequest(
+                text: "测试 JSON 和 Python",
+                languageCode: "zh-Hans",
+                mode: .proofread
+            ),
             glossarySections: settings.effectiveGlossarySections
         )
 
@@ -306,11 +310,34 @@ final class LLMRefinementServiceTests: XCTestCase {
     }
 
     func testSystemPromptOmitsGlossarySectionWhenNoGlossaryItemsExist() {
-        let prompt = LLMRefinementService.systemPrompt(languageCode: "zh-Hans", glossarySections: [])
+        let prompt = LLMRefinementService.systemPrompt(
+            for: TextProcessingRequest(
+                text: "测试 JSON 和 Python",
+                languageCode: "zh-Hans",
+                mode: .proofread
+            ),
+            glossarySections: []
+        )
 
         XCTAssertFalse(prompt.contains("词库参考"))
         XCTAssertFalse(prompt.contains("自定义词条"))
         XCTAssertFalse(prompt.contains("互联网-开发"))
+    }
+
+    func testTranslationPromptForcesEnglishOnlyOutput() {
+        let prompt = LLMRefinementService.systemPrompt(
+            for: TextProcessingRequest(
+                text: "把这个版本今天发给客户",
+                languageCode: "zh-CN",
+                mode: .translateZhToEn(style: .natural)
+            ),
+            glossarySections: [GlossarySection(title: "自定义词条", items: ["Voily"])]
+        )
+
+        XCTAssertTrue(prompt.contains("只输出英文最终结果"))
+        XCTAssertTrue(prompt.contains("不要输出中文"))
+        XCTAssertFalse(prompt.contains("词库参考"))
+        XCTAssertFalse(prompt.contains("Voily"))
     }
 
     private func makeDefaults() -> UserDefaults {

@@ -99,7 +99,7 @@ struct TranscriptAccumulator {
         if rhsScalar.isASCII,
            CharacterSet.alphanumerics.contains(rhsScalar),
            lhsScalar.isASCII,
-           (CharacterSet.alphanumerics.contains(lhsScalar) || ",.;:!?".unicodeScalars.contains(lhsScalar))
+           CharacterSet.alphanumerics.contains(lhsScalar)
         {
             return " "
         }

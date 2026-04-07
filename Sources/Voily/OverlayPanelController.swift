@@ -4,18 +4,22 @@ import Observation
 
 let overlayHeight: CGFloat = 52
 private let overlayMinimumWidth: CGFloat = 160
-private let overlayMaximumWidth: CGFloat = 420
+private let overlayMaximumWidth: CGFloat = 540
 private let overlayHorizontalPadding: CGFloat = 18
 private let overlayWaveformWidth: CGFloat = 46
 private let overlayWaveformSpacing: CGFloat = 12
+private let overlayActionButtonsWidth: CGFloat = 88
 
-func overlayWidth(for text: String) -> CGFloat {
+@MainActor
+func overlayWidth(for state: OverlayState) -> CGFloat {
     let attributes: [NSAttributedString.Key: Any] = [
         .font: NSFont.systemFont(ofSize: 16, weight: .medium),
     ]
 
+    let text = OverlayRootView.displayText(for: state)
     let textWidth = (text as NSString).size(withAttributes: attributes).width
-    let chromeWidth = (overlayHorizontalPadding * 2) + overlayWaveformWidth + overlayWaveformSpacing + 26
+    let controlsWidth = state.controls == .confirmCancel ? overlayActionButtonsWidth : 0
+    let chromeWidth = (overlayHorizontalPadding * 2) + overlayWaveformWidth + overlayWaveformSpacing + 26 + controlsWidth
     return min(max(textWidth + chromeWidth, overlayMinimumWidth), overlayMaximumWidth)
 }
 
@@ -26,6 +30,14 @@ final class OverlayPanelController {
     private let panel: NSPanel
     private let hostView: NSHostingView<OverlayRootView>
     private var hideTask: Task<Void, Never>?
+
+    var onConfirm: (() -> Void)? {
+        didSet { model.onConfirm = onConfirm }
+    }
+
+    var onCancel: (() -> Void)? {
+        didSet { model.onCancel = onCancel }
+    }
 
     init() {
         let rootView = OverlayRootView(model: model)
@@ -55,6 +67,7 @@ final class OverlayPanelController {
         let targetFrame = frame(for: state)
         let needsFrameUpdate = !panel.frame.equalTo(targetFrame)
         model.state = state
+        panel.ignoresMouseEvents = state.controls == .none
 
         if !panel.isVisible {
             panel.alphaValue = 0
@@ -96,13 +109,14 @@ final class OverlayPanelController {
                     self.panel.orderOut(nil)
                     self.panel.alphaValue = 1
                     self.model.state = .idle
+                    self.panel.ignoresMouseEvents = true
                 }
             }
         }
     }
 
     private func frame(for state: OverlayState) -> NSRect {
-        let width = overlayWidth(for: OverlayRootView.displayText(for: state))
+        let width = overlayWidth(for: state)
         let visibleFrame = NSScreen.main?.visibleFrame ?? .zero
         let originX = visibleFrame.midX - (width / 2)
         let originY = visibleFrame.minY + 28
@@ -114,6 +128,16 @@ final class OverlayPanelController {
 @Observable
 final class OverlayViewModel {
     var state: OverlayState = .idle
+    var onConfirm: (() -> Void)?
+    var onCancel: (() -> Void)?
+
+    func confirm() {
+        onConfirm?()
+    }
+
+    func cancel() {
+        onCancel?()
+    }
 }
 
 private final class TransparentContainerView: NSView {
@@ -162,6 +186,13 @@ struct OverlayRootView: View {
 
                 SlidingPreviewText(text: displayText, isPartial: model.state.phase == .recordingPartial)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+
+                if model.state.controls == .confirmCancel {
+                    OverlayActionButtons(
+                        onConfirm: model.confirm,
+                        onCancel: model.cancel
+                    )
+                }
             }
             .padding(.horizontal, overlayHorizontalPadding)
             .frame(height: overlayHeight)
@@ -192,16 +223,58 @@ struct OverlayRootView: View {
         case .idle:
             return ""
         case .recording:
-            return state.text.isEmpty ? "Listening…" : state.text
+            if state.text.isEmpty {
+                return state.controls == .confirmCancel ? "Speak in Chinese…" : "Listening…"
+            }
+            return state.text
         case .recordingPartial:
-            return state.text.isEmpty ? "Listening…" : state.text
+            if state.text.isEmpty {
+                return state.controls == .confirmCancel ? "Speak in Chinese…" : "Listening…"
+            }
+            return state.text
         case .transcribing:
             return state.text.isEmpty ? "Transcribing…" : state.text
         case .refining:
             return "Refining..."
+        case .translating:
+            return state.text.isEmpty ? "Translating..." : state.text
         case .injecting:
             return state.text.isEmpty ? "Injecting…" : state.text
         }
+    }
+}
+
+@available(macOS 26.0, *)
+private struct OverlayActionButtons: View {
+    let onConfirm: () -> Void
+    let onCancel: () -> Void
+
+    var body: some View {
+        HStack(spacing: 8) {
+            actionButton(systemName: "xmark", action: onCancel)
+                .accessibilityLabel("Discard translation")
+
+            actionButton(systemName: "checkmark", action: onConfirm)
+                .accessibilityLabel("Finish recording")
+        }
+    }
+
+    private func actionButton(systemName: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: systemName)
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(.white.opacity(0.95))
+                .frame(width: 28, height: 28)
+                .background(
+                    Circle()
+                        .fill(.white.opacity(0.12))
+                )
+                .overlay(
+                    Circle()
+                        .stroke(.white.opacity(0.14), lineWidth: 1)
+                )
+        }
+        .buttonStyle(.plain)
     }
 }
 
@@ -495,7 +568,7 @@ private struct OverlayPreviewScene: View {
 
             OverlayRootView(model: model)
                 .frame(
-                    width: overlayWidth(for: OverlayRootView.displayText(for: model.state)),
+                    width: overlayWidth(for: model.state),
                     height: overlayHeight
                 )
         }

@@ -103,7 +103,7 @@ private struct SettingsSidebar: View {
             VStack(alignment: .leading, spacing: 6) {
                 Text("Voily")
                     .font(.system(size: 22, weight: .semibold))
-                Text("语音输入与纠错")
+                Text("语音输入与文本处理")
                     .font(.system(size: 12, weight: .medium))
                     .foregroundStyle(.secondary)
             }
@@ -158,7 +158,7 @@ private struct ModelSettingsPage: View {
             VStack(alignment: .leading, spacing: 30) {
                 SettingsPageHeader(
                     title: "模型",
-                    subtitle: "按模型角色选择默认 provider，点击服务商卡片弹出详细配置。"
+                    subtitle: "按模型角色选择默认 provider。按住 Fn 为普通听写，双击 Fn 为快捷翻译。"
                 )
 
                 DefaultModelsOverviewCard(
@@ -303,7 +303,7 @@ private struct DefaultModelsOverviewCard: View {
 
                 Spacer()
 
-                Toggle("启用语音输入润色", isOn: $textRefinementEnabled)
+                Toggle("启用普通听写纠错", isOn: $textRefinementEnabled)
                     .toggleStyle(.switch)
             }
 
@@ -316,7 +316,7 @@ private struct DefaultModelsOverviewCard: View {
                 )
 
                 DefaultModelSelectorColumn(
-                    title: "语音输入模型",
+                    title: "文本处理模型",
                     description: selectedTextProvider.providerSummary,
                     modelDisplayName: selectedTextProvider.modelSummary(using: textConfig),
                     selection: $selectedTextProvider
@@ -683,7 +683,7 @@ private struct TextRefinementProviderConfigSheet: View {
             }
 
             SheetFooter(
-                statusText: isEnabled ? "当前已启用语音输入润色，保存后会影响后续默认 provider。" : "当前未启用语音输入润色，保存配置后不会立即参与链路。",
+                statusText: isEnabled ? "当前已启用普通听写纠错，保存后会影响后续默认 provider。" : "当前未启用普通听写纠错，保存配置后不会立即参与链路。",
                 onCancel: { dismiss() },
                 onSave: {
                     onSave(draftConfig)
@@ -718,7 +718,7 @@ private struct TextRefinementProviderConfigSheet: View {
 
             do {
                 try await llmService.testConnection(settings: tempSettings)
-                statusMessage = "连接成功，可以用于语音输入润色。"
+                statusMessage = "连接成功，可以用于文本处理。"
             } catch {
                 statusMessage = "测试失败：\(error.localizedDescription)"
             }
