@@ -3,14 +3,13 @@ import SwiftUI
 
 private enum OverlayPreviewScript {
     static let recordingSamples: [String] = [
-        "现在来测试一下我自己的这个语音输入法",
-        "现在来测试一下我自己的这个语音输入法，感觉其实还不错",
-        "现在来测试一下我自己的这个语音输入法，感觉其实还不错，然后我再来看一下它滑动窗口有效果吧",
-        "现在来测试一下我自己的这个语音输入法，感觉其实还不错，然后我再来看一下它滑动窗口有效果吧，感觉还是有点钝的",
-        "现在来测试一下我自己的这个语音输入法，感觉其实还不错，然后我再来看一下它滑动窗口有效果吧，感觉还是有点钝的，就是不太平滑这个滑动窗口的效果"
+        "少年的肩膀",
+        "少年的肩膀，就该这样才对",
+        "少年的肩膀，就该这样才对，应挑起清风明月",
+        "少年的肩膀，就该这样才对，应挑起清风明月，杨柳依依和草长莺飞",
     ]
 
-    static let finalText = "现在来测试一下我自己的这个语音输入法，感觉其实还不错，然后我再来看一下它滑动窗口有效果吧，感觉还是有点钝的，就是不太平滑这个滑动窗口的效果。"
+    static let finalText = "少年的肩膀，就该这样才对，应挑起清风明月，杨柳依依和草长莺飞。"
 
     static func state(at time: TimeInterval) -> OverlayState {
         let cycle = time.truncatingRemainder(dividingBy: 9.6)
