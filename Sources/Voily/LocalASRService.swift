@@ -123,12 +123,6 @@ struct LocalASRService: Sendable {
         let userArguments = tokenize(arguments: config.additionalArguments)
         let arguments: [String]
         switch provider {
-        case .whisperCpp:
-            arguments = [
-                "-m", modelPath,
-                "-f", audioFileURL.path,
-                "-l", whisperLanguageCode(for: languageCode),
-            ] + userArguments
         case .senseVoice:
             let defaultArguments = defaultSenseVoiceArguments(appending: userArguments)
             arguments = [
@@ -190,7 +184,7 @@ struct LocalASRService: Sendable {
         return tokens
     }
 
-    private static func whisperLanguageCode(for languageCode: String) -> String {
+    private static func senseVoiceLanguageCode(for languageCode: String) -> String {
         if languageCode.hasPrefix("zh") {
             return "zh"
         }
@@ -201,10 +195,6 @@ struct LocalASRService: Sendable {
             return "ko"
         }
         return "en"
-    }
-
-    private static func senseVoiceLanguageCode(for languageCode: String) -> String {
-        whisperLanguageCode(for: languageCode)
     }
 
     private static func quoted(_ argument: String) -> String {
@@ -230,10 +220,6 @@ struct LocalASRService: Sendable {
 
     private static func extractTranscript(stdout: String, stderr: String, provider: ASRProvider) -> String? {
         switch provider {
-        case .whisperCpp:
-            let lines = transcriptLines(from: stdout, fallback: stderr)
-            guard !lines.isEmpty else { return nil }
-            return lines.joined(separator: " ")
         case .senseVoice:
             let lines = senseVoiceTranscriptLines(stdout: stdout, stderr: stderr)
             guard !lines.isEmpty else { return nil }
@@ -241,20 +227,6 @@ struct LocalASRService: Sendable {
         case .doubaoStreaming, .qwenASR:
             return nil
         }
-    }
-
-    private static func transcriptLines(from primary: String, fallback: String) -> [String] {
-        let primaryOutput = primary.trimmingCharacters(in: .whitespacesAndNewlines)
-        let fallbackOutput = fallback.trimmingCharacters(in: .whitespacesAndNewlines)
-        let rawOutput = primaryOutput.isEmpty ? fallbackOutput : primaryOutput
-        guard !rawOutput.isEmpty else {
-            return []
-        }
-
-        return rawOutput
-            .split(whereSeparator: \.isNewline)
-            .map { sanitizeTranscriptLine(String($0)) }
-            .filter { !$0.isEmpty }
     }
 
     private static func senseVoiceTranscriptLines(stdout: String, stderr: String) -> [String] {

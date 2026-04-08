@@ -139,7 +139,7 @@ private struct ModelSettingsPage: View {
     let llmService: LLMRefinementService
     @Bindable var managedASRModels: ManagedASRModelStore
 
-    @State private var draftSelectedASRProvider: ASRProvider = .whisperCpp
+    @State private var draftSelectedASRProvider: ASRProvider = .senseVoice
     @State private var draftSelectedTextProvider: TextRefinementProvider = .deepSeek
     @State private var draftTextRefinementEnabled = false
     @State private var draftEnabledDictationSkills: [DictationProcessingSkill] = []
@@ -510,8 +510,6 @@ private struct ProviderMenuSection<Option: Identifiable>: Identifiable {
 extension ASRProvider: ProviderPresentable {
     var pickerDisplayName: String {
         switch self {
-        case .whisperCpp:
-            return "whisper.cpp"
         case .senseVoice:
             return "SenseVoice Small"
         case .doubaoStreaming:
@@ -672,7 +670,7 @@ private struct ASRProviderConfigSheet: View {
             }
 
             SheetFooter(
-                statusText: provider.category == .local ? "本地模型由应用托管下载和卸载，失败后自动回退系统识别。" : provider.cloudStatusText,
+                statusText: provider.category == .local ? "本地模型由应用托管下载和卸载。" : provider.cloudStatusText,
                 onCancel: { dismiss() },
                 onSave: {
                     onSave(draftConfig)
@@ -699,7 +697,7 @@ private struct ASRProviderConfigSheet: View {
                 onInstall()
             }
         } message: {
-            Text(provider == .senseVoice ? "会在首次安装时下载 SenseVoice Small 的 MLX 模型文件。安装完成后只走本地常驻识别。" : "会在首次安装时下载模型和本地运行时，完成后即可直接使用。")
+            Text("会在首次安装时下载 SenseVoice Small 的 MLX 模型文件。安装完成后只走本地常驻识别。")
         }
     }
 }
@@ -904,7 +902,7 @@ private struct ManagedLocalProviderFields: View {
             }
 
             SettingsFormField(title: "下载内容") {
-                Text(provider == .senseVoice ? "MLX 模型文件，\(estimatedDownload)" : "模型文件 + 本地运行时，\(estimatedDownload)")
+                Text("\(provider.displayName) 的 MLX 模型文件，\(estimatedDownload)")
                     .font(.system(size: 13))
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -1394,17 +1392,6 @@ enum SettingsPreviewData {
         )
         settings.setASRConfig(
             ASRProviderConfig(
-                executablePath: "/opt/homebrew/bin/whisper-cli",
-                modelPath: "/models/ggml-base.bin",
-                additionalArguments: "--language zh",
-                baseURL: "",
-                apiKey: "",
-                model: ""
-            ),
-            for: .whisperCpp
-        )
-        settings.setASRConfig(
-            ASRProviderConfig(
                 executablePath: "/opt/models/sensevoice",
                 modelPath: "/opt/models/sensevoice-small",
                 additionalArguments: "--vad true",
@@ -1436,7 +1423,6 @@ enum SettingsPreviewData {
                 "Voily",
                 "DeepSeek",
                 "SenseVoice",
-                "whisper.cpp",
             ]
         )
         return settings
@@ -1487,8 +1473,6 @@ enum SettingsPreviewData {
 private extension ASRProvider {
     var providerSummary: String {
         switch self {
-        case .whisperCpp:
-            return "本地离线识别，部署可控。"
         case .senseVoice:
             return "本地常驻识别，偏向中文输入。"
         case .doubaoStreaming:
@@ -1500,8 +1484,6 @@ private extension ASRProvider {
 
     var logoAssetName: String {
         switch self {
-        case .whisperCpp:
-            return "openai"
         case .senseVoice:
             return "bailian"
         case .doubaoStreaming:
@@ -1513,8 +1495,6 @@ private extension ASRProvider {
 
     var defaultModelPlaceholder: String {
         switch self {
-        case .whisperCpp:
-            return "ggml-large-v3"
         case .senseVoice:
             return "SenseVoice Small"
         case .doubaoStreaming:
@@ -1530,7 +1510,7 @@ private extension ASRProvider {
             return "wss://openspeech.bytedance.com/api/v3/realtime"
         case .qwenASR:
             return "wss://dashscope.aliyuncs.com/api-ws/v1/realtime"
-        case .whisperCpp, .senseVoice:
+        case .senseVoice:
             return ""
         }
     }
@@ -1541,8 +1521,8 @@ private extension ASRProvider {
             return "云端流式 provider 会直接建立阿里云实时 ASR WebSocket 会话。"
         case .doubaoStreaming:
             return "云端 provider 仅保存连接参数，真实转写接入在后续版本完成。"
-        case .whisperCpp, .senseVoice:
-            return "本地模型由应用托管下载和卸载，失败后自动回退系统识别。"
+        case .senseVoice:
+            return "本地模型由应用托管下载和卸载。"
         }
     }
 

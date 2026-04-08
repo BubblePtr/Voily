@@ -282,7 +282,7 @@ final class AppSettingsGlossaryTests: XCTestCase {
 
         let settings = AppSettings(defaults: defaults)
 
-        XCTAssertEqual(settings.selectedASRProvider, .whisperCpp)
+        XCTAssertEqual(settings.selectedASRProvider, .senseVoice)
         XCTAssertEqual(settings.selectedTextProvider, .deepSeek)
         XCTAssertEqual(settings.enabledDictationSkills, [])
     }

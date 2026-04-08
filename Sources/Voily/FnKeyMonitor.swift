@@ -97,23 +97,77 @@ struct FnShortcutStateMachine {
     }
 }
 
-final class FnKeyMonitor {
+final class FnKeyMonitor: @unchecked Sendable {
     private static let systemDefinedRawValue: UInt32 = 14
 
-    var onDictationStart: (() -> Void)?
-    var onDictationFinish: (() -> Void)?
-    var onQuickTranslation: (() -> Void)?
+    var onDictationStart: (@Sendable () -> Void)?
+    var onDictationFinish: (@Sendable () -> Void)?
+    var onQuickTranslation: (@Sendable () -> Void)?
 
+    private let stateQueue = DispatchQueue(label: "Voily.FnKeyMonitor.State")
     private var eventTap: CFMachPort?
     private var runLoopSource: CFRunLoopSource?
+    private var tapThread: Thread?
+    private var tapRunLoop: CFRunLoop?
     private var isFnPressed = false
     private var stateMachine = FnShortcutStateMachine()
     private var longPressWorkItem: DispatchWorkItem?
     private var doubleTapWorkItem: DispatchWorkItem?
 
     func start() {
-        guard eventTap == nil else { return }
+        guard tapThread == nil else { return }
         debugLog("FnKeyMonitor.start()")
+
+        let ready = DispatchSemaphore(value: 0)
+        let thread = Thread { [weak self] in
+            guard let self else {
+                ready.signal()
+                return
+            }
+
+            self.tapRunLoop = CFRunLoopGetCurrent()
+            self.setupEventTap()
+            ready.signal()
+
+            guard self.eventTap != nil else {
+                self.tapRunLoop = nil
+                self.tapThread = nil
+                return
+            }
+
+            CFRunLoopRun()
+        }
+        thread.name = "Voily.FnKeyMonitor"
+        tapThread = thread
+        thread.start()
+        ready.wait()
+    }
+
+    func stop() {
+        debugLog("FnKeyMonitor.stop()")
+        stateQueue.sync {
+            cancelTimers()
+            stateMachine.reset()
+            isFnPressed = false
+        }
+
+        guard let tapRunLoop else {
+            tapThread = nil
+            return
+        }
+
+        CFRunLoopPerformBlock(tapRunLoop, CFRunLoopMode.commonModes.rawValue) { [weak self] in
+            guard let self else { return }
+            self.invalidateEventTap()
+            self.tapRunLoop = nil
+            self.tapThread = nil
+            CFRunLoopStop(tapRunLoop)
+        }
+        CFRunLoopWakeUp(tapRunLoop)
+    }
+
+    private func setupEventTap() {
+        guard eventTap == nil else { return }
 
         let mask = (1 << CGEventType.flagsChanged.rawValue) | (1 << Self.systemDefinedRawValue)
         let callback: CGEventTapCallBack = { proxy, type, event, refcon in
@@ -141,29 +195,23 @@ final class FnKeyMonitor {
         eventTap = tap
         runLoopSource = CFMachPortCreateRunLoopSource(kCFAllocatorDefault, tap, 0)
 
-        if let runLoopSource {
-            CFRunLoopAddSource(CFRunLoopGetMain(), runLoopSource, .commonModes)
+        if let runLoopSource, let tapRunLoop {
+            CFRunLoopAddSource(tapRunLoop, runLoopSource, .commonModes)
         }
 
         CGEvent.tapEnable(tap: tap, enable: true)
         debugLog("FnKeyMonitor event tap enabled")
     }
 
-    func stop() {
-        debugLog("FnKeyMonitor.stop()")
-        if let runLoopSource {
-            CFRunLoopRemoveSource(CFRunLoopGetMain(), runLoopSource, .commonModes)
+    private func invalidateEventTap() {
+        if let runLoopSource, let tapRunLoop {
+            CFRunLoopRemoveSource(tapRunLoop, runLoopSource, .commonModes)
         }
-
         if let eventTap {
             CFMachPortInvalidate(eventTap)
         }
-
-        cancelTimers()
-        stateMachine.reset()
         runLoopSource = nil
         eventTap = nil
-        isFnPressed = false
     }
 
     private func handle(proxy: CGEventTapProxy, type: CGEventType, event: CGEvent) -> Unmanaged<CGEvent>? {
@@ -193,8 +241,9 @@ final class FnKeyMonitor {
         }
 
         let pressed = event.flags.contains(.maskSecondaryFn)
-        debugLog("FnKeyMonitor flagsChanged fn pressed=\(pressed)")
-        handlePhysicalPressChange(pressed)
+        stateQueue.sync {
+            handlePhysicalPressChange(pressed)
+        }
         return nil
     }
 
@@ -210,14 +259,16 @@ final class FnKeyMonitor {
             return Unmanaged.passUnretained(event)
         }
 
-        debugLog("FnKeyMonitor systemDefined fn state=0x\(String(state, radix: 16))")
-
         switch state {
         case 0x0A:
-            handlePhysicalPressChange(true)
+            stateQueue.sync {
+                handlePhysicalPressChange(true)
+            }
             return nil
         case 0x0B:
-            handlePhysicalPressChange(false)
+            stateQueue.sync {
+                handlePhysicalPressChange(false)
+            }
             return nil
         default:
             return Unmanaged.passUnretained(event)
@@ -253,7 +304,7 @@ final class FnKeyMonitor {
                 self.dispatch(actions)
             }
             longPressWorkItem = workItem
-            DispatchQueue.main.asyncAfter(deadline: .now() + max(0, fireAt - CACurrentMediaTime()), execute: workItem)
+            stateQueue.asyncAfter(deadline: .now() + max(0, fireAt - CACurrentMediaTime()), execute: workItem)
         }
 
         doubleTapWorkItem?.cancel()
@@ -266,7 +317,7 @@ final class FnKeyMonitor {
                 self.syncTimers()
             }
             doubleTapWorkItem = workItem
-            DispatchQueue.main.asyncAfter(deadline: .now() + max(0, fireAt - CACurrentMediaTime()), execute: workItem)
+            stateQueue.asyncAfter(deadline: .now() + max(0, fireAt - CACurrentMediaTime()), execute: workItem)
         }
     }
 
@@ -279,16 +330,21 @@ final class FnKeyMonitor {
 
     private func dispatch(_ actions: [FnGestureAction]) {
         for action in actions {
+            let callback: (@Sendable () -> Void)?
             switch action {
             case .startDictation:
                 debugLog("FnKeyMonitor start dictation")
-                onDictationStart?()
+                callback = onDictationStart
             case .finishDictation:
                 debugLog("FnKeyMonitor finish dictation")
-                onDictationFinish?()
+                callback = onDictationFinish
             case .startQuickTranslation:
                 debugLog("FnKeyMonitor start quick translation")
-                onQuickTranslation?()
+                callback = onQuickTranslation
+            }
+
+            DispatchQueue.main.async {
+                callback?()
             }
         }
     }

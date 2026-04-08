@@ -3,23 +3,23 @@ import AVFoundation
 import Speech
 import ApplicationServices
 
+@MainActor
 final class PermissionCoordinator {
     private var accessibilityPollTimer: Timer?
     private var onAccessibilityGranted: (@MainActor () -> Void)?
 
     init() {}
 
-    deinit {
-        accessibilityPollTimer?.invalidate()
-    }
-
-    func requestStartupPermissions() {
-        AVCaptureDevice.requestAccess(for: .audio) { _ in }
-        SFSpeechRecognizer.requestAuthorization { _ in }
-    }
-
     var isAccessibilityTrusted: Bool {
         AXIsProcessTrusted()
+    }
+
+    var isMicrophoneAuthorized: Bool {
+        AVCaptureDevice.authorizationStatus(for: .audio) == .authorized
+    }
+
+    var isSpeechRecognitionAuthorized: Bool {
+        SFSpeechRecognizer.authorizationStatus() == .authorized
     }
 
     func promptForAccessibilityIfNeeded(force: Bool = false) {
@@ -55,5 +55,39 @@ final class PermissionCoordinator {
         let callback = onAccessibilityGranted
         onAccessibilityGranted = nil
         callback?()
+    }
+
+    func requestMicrophoneIfNeeded() async -> Bool {
+        switch AVCaptureDevice.authorizationStatus(for: .audio) {
+        case .authorized:
+            return true
+        case .notDetermined:
+            return await withCheckedContinuation { continuation in
+                AVCaptureDevice.requestAccess(for: .audio) { granted in
+                    continuation.resume(returning: granted)
+                }
+            }
+        case .denied, .restricted:
+            return false
+        @unknown default:
+            return false
+        }
+    }
+
+    func requestSpeechRecognitionIfNeeded() async -> Bool {
+        switch SFSpeechRecognizer.authorizationStatus() {
+        case .authorized:
+            return true
+        case .notDetermined:
+            return await withCheckedContinuation { continuation in
+                SFSpeechRecognizer.requestAuthorization { status in
+                    continuation.resume(returning: status == .authorized)
+                }
+            }
+        case .denied, .restricted:
+            return false
+        @unknown default:
+            return false
+        }
     }
 }

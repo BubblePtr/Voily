@@ -52,6 +52,7 @@ final class ManagedASRModelStore {
 
     init(fileManager: FileManager = .default) {
         self.fileManager = fileManager
+        removeLegacyWhisperInstallIfNeeded()
         refreshStates()
     }
 
@@ -188,30 +189,27 @@ final class ManagedASRModelStore {
     }
 
     private func installRoot(for provider: ASRProvider) -> URL {
+        installRoot(rawValue: provider.rawValue)
+    }
+
+    private func installRoot(rawValue: String) -> URL {
         let baseURL = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
         return baseURL
             .appending(path: "Voily")
             .appending(path: "LocalModels")
-            .appending(path: provider.rawValue)
+            .appending(path: rawValue)
+    }
+
+    private func removeLegacyWhisperInstallIfNeeded() {
+        let legacyInstallRoot = installRoot(rawValue: "whisperCpp")
+        guard fileManager.fileExists(atPath: legacyInstallRoot.path) else {
+            return
+        }
+        try? fileManager.removeItem(at: legacyInstallRoot)
     }
 
     private static func spec(for provider: ASRProvider) -> ManagedASRInstallSpec? {
         switch provider {
-        case .whisperCpp:
-            return ManagedASRInstallSpec(
-                provider: provider,
-                runtimePackageURL: "https://downloads.voily.app/local-asr/whisper-cpp/macos-arm64/whisper-cpp-runtime.zip",
-                runtimeArchiveName: "whisper-cpp-runtime.zip",
-                executableRelativePath: "runtime/whisper-cli",
-                modelFiles: [
-                    ManagedASRDownloadFile(
-                        sourceURL: "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.bin?download=true",
-                        relativePath: "model/ggml-base.bin"
-                    )
-                ],
-                defaultArguments: "--no-timestamps",
-                estimatedDownload: "约 150 MB"
-            )
         case .senseVoice:
             return ManagedASRInstallSpec(
                 provider: provider,

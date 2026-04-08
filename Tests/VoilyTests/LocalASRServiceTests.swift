@@ -22,32 +22,6 @@ final class LocalASRServiceTests: XCTestCase {
         XCTAssertEqual(accumulator.finalText, "hello world")
     }
 
-    func testWhisperCommandUsesWhisperArguments() throws {
-        let executablePath = try makeExecutable()
-        let audioURL = URL(fileURLWithPath: "/tmp/sample.wav")
-        let config = ASRProviderConfig(
-            executablePath: executablePath,
-            modelPath: "/models/ggml-base.bin",
-            additionalArguments: "--threads 4 --prompt \"hello world\"",
-            baseURL: "",
-            apiKey: "",
-            model: ""
-        )
-
-        let command = try LocalASRService.makeCommand(
-            provider: .whisperCpp,
-            config: config,
-            audioFileURL: audioURL,
-            languageCode: "zh-Hans"
-        )
-
-        XCTAssertEqual(command.executablePath, executablePath)
-        XCTAssertEqual(
-            command.arguments,
-            ["-m", "/models/ggml-base.bin", "-f", "/tmp/sample.wav", "-l", "zh", "--threads", "4", "--prompt", "hello world"]
-        )
-    }
-
     func testSenseVoiceCommandUsesSenseVoiceArguments() throws {
         let executablePath = try makeExecutable()
         let audioURL = URL(fileURLWithPath: "/tmp/sample.wav")
@@ -86,7 +60,7 @@ final class LocalASRServiceTests: XCTestCase {
 
         XCTAssertThrowsError(
             try LocalASRService.makeCommand(
-                provider: .whisperCpp,
+                provider: .senseVoice,
                 config: config,
                 audioFileURL: URL(fileURLWithPath: "/tmp/sample.wav"),
                 languageCode: "zh-Hans"

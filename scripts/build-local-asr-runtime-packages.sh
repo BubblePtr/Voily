@@ -19,18 +19,9 @@ require_tool() {
 prepare_sources() {
   mkdir -p "$SRC_ROOT"
 
-  if [[ ! -d "$SRC_ROOT/whisper.cpp/.git" ]]; then
-    git clone https://github.com/ggml-org/whisper.cpp.git "$SRC_ROOT/whisper.cpp"
-  fi
-
   if [[ ! -d "$SRC_ROOT/SenseVoice.cpp/.git" ]]; then
     git clone --recursive https://github.com/lovemefan/SenseVoice.cpp.git "$SRC_ROOT/SenseVoice.cpp"
   fi
-}
-
-build_whisper() {
-  cmake -S "$SRC_ROOT/whisper.cpp" -B "$BUILD_ROOT/whisper.cpp" -DGGML_METAL=ON -DGGML_BLAS=ON
-  cmake --build "$BUILD_ROOT/whisper.cpp" -j "$JOBS"
 }
 
 build_sensevoice() {
@@ -59,37 +50,6 @@ set_local_runtime_rpaths() {
   local runtime_path="$2"
   strip_rpaths "$binary"
   install_name_tool -add_rpath "$runtime_path" "$binary"
-}
-
-copy_whisper_runtime() {
-  local stage_dir="$1"
-  local runtime_dir="$stage_dir/runtime"
-  reset_dir "$runtime_dir"
-
-  cp "$BUILD_ROOT/whisper.cpp/bin/whisper-cli" "$runtime_dir/"
-  cp -R "$BUILD_ROOT/whisper.cpp/src/libwhisper.1.8.4.dylib" "$runtime_dir/"
-  cp -R "$BUILD_ROOT/whisper.cpp/src/libwhisper.1.dylib" "$runtime_dir/"
-  cp -R "$BUILD_ROOT/whisper.cpp/src/libwhisper.dylib" "$runtime_dir/"
-  cp -R "$BUILD_ROOT/whisper.cpp/ggml/src/libggml.0.9.8.dylib" "$runtime_dir/"
-  cp -R "$BUILD_ROOT/whisper.cpp/ggml/src/libggml.0.dylib" "$runtime_dir/"
-  cp -R "$BUILD_ROOT/whisper.cpp/ggml/src/libggml.dylib" "$runtime_dir/"
-  cp -R "$BUILD_ROOT/whisper.cpp/ggml/src/libggml-base.0.9.8.dylib" "$runtime_dir/"
-  cp -R "$BUILD_ROOT/whisper.cpp/ggml/src/libggml-base.0.dylib" "$runtime_dir/"
-  cp -R "$BUILD_ROOT/whisper.cpp/ggml/src/libggml-base.dylib" "$runtime_dir/"
-  cp -R "$BUILD_ROOT/whisper.cpp/ggml/src/libggml-cpu.0.9.8.dylib" "$runtime_dir/"
-  cp -R "$BUILD_ROOT/whisper.cpp/ggml/src/libggml-cpu.0.dylib" "$runtime_dir/"
-  cp -R "$BUILD_ROOT/whisper.cpp/ggml/src/libggml-cpu.dylib" "$runtime_dir/"
-  cp -R "$BUILD_ROOT/whisper.cpp/ggml/src/ggml-blas/libggml-blas.0.9.8.dylib" "$runtime_dir/"
-  cp -R "$BUILD_ROOT/whisper.cpp/ggml/src/ggml-blas/libggml-blas.0.dylib" "$runtime_dir/"
-  cp -R "$BUILD_ROOT/whisper.cpp/ggml/src/ggml-blas/libggml-blas.dylib" "$runtime_dir/"
-  cp -R "$BUILD_ROOT/whisper.cpp/ggml/src/ggml-metal/libggml-metal.0.9.8.dylib" "$runtime_dir/"
-  cp -R "$BUILD_ROOT/whisper.cpp/ggml/src/ggml-metal/libggml-metal.0.dylib" "$runtime_dir/"
-  cp -R "$BUILD_ROOT/whisper.cpp/ggml/src/ggml-metal/libggml-metal.dylib" "$runtime_dir/"
-
-  set_local_runtime_rpaths "$runtime_dir/whisper-cli" "@executable_path"
-  for dylib in "$runtime_dir"/*.dylib; do
-    set_local_runtime_rpaths "$dylib" "@loader_path"
-  done
 }
 
 copy_sensevoice_runtime() {
@@ -130,20 +90,11 @@ sha_value() {
 
 write_manifest() {
   local manifest_path="$DIST_ROOT/manifest.local.json"
-  local whisper_sha
   local sensevoice_sha
-  whisper_sha="$(sha_value "$DIST_ROOT/whisper-cpp/macos-arm64/whisper-cpp-runtime.zip.sha256")"
   sensevoice_sha="$(sha_value "$DIST_ROOT/sensevoice/macos-arm64/sensevoice-runtime.zip.sha256")"
 
   cat > "$manifest_path" <<EOF
 {
-  "whisperCpp": {
-    "runtimePackageURL": "https://downloads.example.com/local-asr/whisper-cpp/macos-arm64/whisper-cpp-runtime.zip",
-    "runtimeSHA256": "$whisper_sha",
-    "executableRelativePath": "runtime/whisper-cli",
-    "modelDownloadURL": "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.bin?download=true",
-    "modelRelativePath": "models/ggml-base.bin"
-  },
   "senseVoice": {
     "runtimePackageURL": "https://downloads.example.com/local-asr/sensevoice/macos-arm64/sensevoice-runtime.zip",
     "runtimeSHA256": "$sensevoice_sha",
@@ -164,10 +115,6 @@ package_runtime() {
   reset_dir "$stage_dir"
 
   case "$provider" in
-    whisper-cpp)
-      copy_whisper_runtime "$stage_dir"
-      zip_stage "$stage_dir" "$arch_dir/whisper-cpp-runtime.zip"
-      ;;
     sensevoice)
       copy_sensevoice_runtime "$stage_dir"
       zip_stage "$stage_dir" "$arch_dir/sensevoice-runtime.zip"
@@ -188,9 +135,7 @@ main() {
 
   mkdir -p "$BUILD_ROOT" "$DIST_ROOT"
   prepare_sources
-  build_whisper
   build_sensevoice
-  package_runtime whisper-cpp
   package_runtime sensevoice
   write_manifest
 

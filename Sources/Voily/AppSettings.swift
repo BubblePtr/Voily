@@ -2,7 +2,6 @@ import Foundation
 import Observation
 
 enum ASRProvider: String, CaseIterable, Codable, Identifiable {
-    case whisperCpp
     case senseVoice
     case doubaoStreaming
     case qwenASR
@@ -11,8 +10,6 @@ enum ASRProvider: String, CaseIterable, Codable, Identifiable {
 
     var displayName: String {
         switch self {
-        case .whisperCpp:
-            return "whisper.cpp"
         case .senseVoice:
             return "SenseVoice Small"
         case .doubaoStreaming:
@@ -24,7 +21,7 @@ enum ASRProvider: String, CaseIterable, Codable, Identifiable {
 
     var category: ProviderCategory {
         switch self {
-        case .whisperCpp, .senseVoice:
+        case .senseVoice:
             return .local
         case .doubaoStreaming, .qwenASR:
             return .cloud
@@ -143,7 +140,7 @@ struct ModelSettingsSnapshot: Codable, Equatable {
     var textConfigsByProvider: [TextRefinementProvider: TextRefinementProviderConfig]
 
     static let `default` = ModelSettingsSnapshot(
-        selectedASRProvider: .whisperCpp,
+        selectedASRProvider: .senseVoice,
         selectedTextProvider: .deepSeek,
         textRefinementEnabled: false,
         enabledDictationSkills: [],
@@ -193,12 +190,33 @@ struct ModelSettingsSnapshot: Codable, Equatable {
 
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
-        selectedASRProvider = try container.decode(ASRProvider.self, forKey: .selectedASRProvider)
-        selectedTextProvider = try container.decode(TextRefinementProvider.self, forKey: .selectedTextProvider)
+        let selectedASRRawValue = try container.decodeIfPresent(String.self, forKey: .selectedASRProvider)
+        selectedASRProvider = Self.migratedSelectedASRProvider(from: selectedASRRawValue)
+        selectedTextProvider = try container.decodeIfPresent(TextRefinementProvider.self, forKey: .selectedTextProvider) ?? .deepSeek
         textRefinementEnabled = try container.decode(Bool.self, forKey: .textRefinementEnabled)
         enabledDictationSkills = try container.decodeIfPresent([DictationProcessingSkill].self, forKey: .enabledDictationSkills) ?? []
-        asrConfigsByProvider = try container.decode([ASRProvider: ASRProviderConfig].self, forKey: .asrConfigsByProvider)
-        textConfigsByProvider = try container.decode([TextRefinementProvider: TextRefinementProviderConfig].self, forKey: .textConfigsByProvider)
+        let rawASRConfigs = try container.decodeIfPresent([String: ASRProviderConfig].self, forKey: .asrConfigsByProvider) ?? [:]
+        asrConfigsByProvider = rawASRConfigs.reduce(into: [:]) { partialResult, entry in
+            guard let provider = Self.supportedASRProvider(for: entry.key) else {
+                return
+            }
+            partialResult[provider] = entry.value
+        }
+        textConfigsByProvider = try container.decodeIfPresent([TextRefinementProvider: TextRefinementProviderConfig].self, forKey: .textConfigsByProvider) ?? [:]
+    }
+
+    private static func migratedSelectedASRProvider(from rawValue: String?) -> ASRProvider {
+        guard let rawValue else {
+            return .senseVoice
+        }
+        if rawValue == "whisperCpp" {
+            return .senseVoice
+        }
+        return supportedASRProvider(for: rawValue) ?? .senseVoice
+    }
+
+    private static func supportedASRProvider(for rawValue: String) -> ASRProvider? {
+        ASRProvider(rawValue: rawValue)
     }
 }
 

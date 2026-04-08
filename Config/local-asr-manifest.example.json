@@ -1,11 +1,4 @@
 {
-  "whisperCpp": {
-    "runtimePackageURL": "https://downloads.example.com/local-asr/whisper-cpp/macos-arm64/whisper-cpp-runtime.zip",
-    "runtimeSHA256": "REPLACE_WITH_SHA256",
-    "executableRelativePath": "runtime/whisper-cli",
-    "modelDownloadURL": "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.bin?download=true",
-    "modelRelativePath": "models/ggml-base.bin"
-  },
   "senseVoice": {
     "runtimePackageURL": "https://downloads.example.com/local-asr/sensevoice/macos-arm64/sensevoice-runtime.zip",
     "runtimeSHA256": "REPLACE_WITH_SHA256",

@@ -64,7 +64,6 @@ final class AppController: NSObject {
     private let fnKeyMonitor = FnKeyMonitor()
     private let audioCaptureService = AudioCaptureService()
     private let speechService = SpeechTranscriptionService()
-    private let localASRService = LocalASRService()
     private let senseVoiceResidentService = SenseVoiceResidentService()
     private let qwenRealtimeASRService = QwenRealtimeASRService()
     private let managedASRModels = ManagedASRModelStore()
@@ -101,7 +100,6 @@ final class AppController: NSObject {
         debugLog("AppController.start()")
         configureStatusItem()
         configureOverlayActions()
-        permissionCoordinator.requestStartupPermissions()
         configureAccessibilityFeatures()
     }
 
@@ -292,6 +290,10 @@ final class AppController: NSObject {
             return
         }
 
+        guard await ensureRecordingPermissions(for: settings.selectedASRProvider) else {
+            return
+        }
+
         currentSessionMode = mode
         currentText = ""
         smoothedRMS = 0
@@ -311,19 +313,7 @@ final class AppController: NSObject {
             if selectedASRProvider.category == .local {
                 debugLog("Recording with local ASR provider=\(selectedASRProvider.rawValue)")
                 localAudioWriter = TemporaryAudioCaptureWriter()
-
-                if selectedASRProvider == .senseVoice {
-                    startSenseVoicePartialPolling()
-                } else if selectedASRProvider == .qwenASR {
-                    try await startQwenRealtimeSession()
-                } else {
-                    do {
-                        try speechService.start(localeIdentifier: activeInputLanguageCode) { _ in }
-                        currentSpeechCaptureEnabled = true
-                    } catch {
-                        debugLog("System Speech fallback unavailable for local provider=\(selectedASRProvider.rawValue) error=\(error.localizedDescription)")
-                    }
-                }
+                startSenseVoicePartialPolling()
             } else {
                 if selectedASRProvider == .qwenASR {
                     try await startQwenRealtimeSession()
@@ -543,6 +533,26 @@ final class AppController: NSObject {
         }
     }
 
+    private func ensureRecordingPermissions(for provider: ASRProvider) async -> Bool {
+        let microphoneAuthorized = await permissionCoordinator.requestMicrophoneIfNeeded()
+        guard microphoneAuthorized else {
+            await showTransientMessage("Allow microphone access to start recording.")
+            return false
+        }
+
+        guard provider == .doubaoStreaming else {
+            return true
+        }
+
+        let speechAuthorized = await permissionCoordinator.requestSpeechRecognitionIfNeeded()
+        guard speechAuthorized else {
+            await showTransientMessage("Allow Speech Recognition to use the system transcription fallback.")
+            return false
+        }
+
+        return true
+    }
+
     private func recognizeText() async -> RecognitionOutcome {
         let provider = settings.selectedASRProvider
         debugLog("ASR selection provider=\(provider.rawValue)")
@@ -550,17 +560,6 @@ final class AppController: NSObject {
 
         switch provider.category {
         case .local:
-            let fallbackTask: Task<(text: String, durationMs: Int), Never>? = if provider == .senseVoice {
-                nil
-            } else {
-                Task { [speechService] in
-                    let fallbackStartedAt = Date()
-                    let text = await speechService.finish().trimmingCharacters(in: .whitespacesAndNewlines)
-                    let fallbackDurationMs = Int(Date().timeIntervalSince(fallbackStartedAt) * 1000)
-                    return (text: text, durationMs: fallbackDurationMs)
-                }
-            }
-
             defer {
                 localAudioWriter?.cancel()
                 localAudioWriter = nil
@@ -577,10 +576,7 @@ final class AppController: NSObject {
                 defer { try? FileManager.default.removeItem(at: audioFileURL) }
 
                 let localTranscriptionStartedAt = Date()
-                let result = try await transcribeLocally(
-                    provider: provider,
-                    audioFileURL: audioFileURL
-                )
+                let result = try await transcribeLocally(audioFileURL: audioFileURL)
                 let localTranscriptionDurationMs = Int(Date().timeIntervalSince(localTranscriptionStartedAt) * 1000)
                 let totalDurationMs = Int(Date().timeIntervalSince(recognitionStartedAt) * 1000)
                 let text = result.text.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -597,35 +593,18 @@ final class AppController: NSObject {
                     partialCount: currentPartialCount
                 )
             } catch {
-                if provider == .senseVoice {
-                    let totalDurationMs = Int(Date().timeIntervalSince(recognitionStartedAt) * 1000)
-                    debugLog(
-                        "ASR finished provider=\(provider.rawValue) source=local-failed totalMs=\(totalDurationMs) reason=\(error.localizedDescription)"
-                    )
-                    return RecognitionOutcome(
-                        text: "",
-                        provider: provider,
-                        source: "local-failed",
-                        totalDurationMs: totalDurationMs,
-                        engineDurationMs: nil,
-                        firstPartialMs: currentFirstPartialMs,
-                        partialCount: currentPartialCount
-                    )
-                }
-
-                let fallbackResult = await fallbackTask!.value
                 let totalDurationMs = Int(Date().timeIntervalSince(recognitionStartedAt) * 1000)
                 debugLog(
-                    "ASR finished provider=\(provider.rawValue) source=speech-fallback totalMs=\(totalDurationMs) fallbackMs=\(fallbackResult.durationMs) textLength=\(fallbackResult.text.count) reason=\(error.localizedDescription)"
+                    "ASR finished provider=\(provider.rawValue) source=local-failed totalMs=\(totalDurationMs) reason=\(error.localizedDescription)"
                 )
                 return RecognitionOutcome(
-                    text: fallbackResult.text,
+                    text: "",
                     provider: provider,
-                    source: "speech-fallback",
+                    source: "local-failed",
                     totalDurationMs: totalDurationMs,
-                    engineDurationMs: fallbackResult.durationMs,
-                    firstPartialMs: nil,
-                    partialCount: 0
+                    engineDurationMs: nil,
+                    firstPartialMs: currentFirstPartialMs,
+                    partialCount: currentPartialCount
                 )
             }
         case .cloud:
@@ -684,22 +663,13 @@ final class AppController: NSObject {
         }
     }
 
-    private func transcribeLocally(provider: ASRProvider, audioFileURL: URL) async throws -> LocalASRTranscriptionResult {
-        if provider == .senseVoice {
-            guard let currentResidentSession else {
-                throw SenseVoiceResidentServiceError.serverUnavailable
-            }
-            let result = try await senseVoiceResidentService.finalizeSession(currentResidentSession)
-            debugLog("SenseVoice resident succeeded durationMs=\(Int(result.duration * 1000))")
-            return result
+    private func transcribeLocally(audioFileURL _: URL) async throws -> LocalASRTranscriptionResult {
+        guard let currentResidentSession else {
+            throw SenseVoiceResidentServiceError.serverUnavailable
         }
-
-        return try await localASRService.transcribe(
-            provider: provider,
-            config: managedASRModels.managedConfig(for: provider) ?? settings.selectedASRConfig,
-            audioFileURL: audioFileURL,
-            languageCode: activeInputLanguageCode
-        )
+        let result = try await senseVoiceResidentService.finalizeSession(currentResidentSession)
+        debugLog("SenseVoice resident succeeded durationMs=\(Int(result.duration * 1000))")
+        return result
     }
 
     private func handleCapturedBuffer(_ buffer: AVAudioPCMBuffer) {
