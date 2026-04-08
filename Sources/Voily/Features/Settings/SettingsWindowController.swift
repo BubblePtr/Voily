@@ -7,9 +7,13 @@ final class SettingsWindowController: NSWindowController {
         let view = SettingsRootView(settings: settings, usageStore: usageStore, llmService: llmService, managedASRModels: managedASRModels)
         let hostingController = NSHostingController(rootView: view)
         let window = NSWindow(contentViewController: hostingController)
-        window.title = "Voily Settings"
-        window.setContentSize(NSSize(width: 1120, height: 760))
-        window.minSize = NSSize(width: 1120, height: 760)
+        let minimumContentSize = NSSize(width: 1120, height: 760)
+
+        window.title = ""
+        window.titleVisibility = .hidden
+        window.setContentSize(minimumContentSize)
+        window.contentMinSize = minimumContentSize
+        window.minSize = window.frameRect(forContentRect: NSRect(origin: .zero, size: minimumContentSize)).size
         window.styleMask = [.titled, .closable, .miniaturizable, .resizable]
         window.center()
         super.init(window: window)
@@ -31,6 +35,7 @@ private enum SettingsPage: String, CaseIterable, Identifiable, Hashable {
     case home
     case model
     case glossary
+    case settings
 
     var id: String { rawValue }
 
@@ -42,6 +47,8 @@ private enum SettingsPage: String, CaseIterable, Identifiable, Hashable {
             return "模型"
         case .glossary:
             return "词库"
+        case .settings:
+            return "设置"
         }
     }
 
@@ -53,6 +60,8 @@ private enum SettingsPage: String, CaseIterable, Identifiable, Hashable {
             return "cpu"
         case .glossary:
             return "text.book.closed"
+        case .settings:
+            return "gearshape"
         }
     }
 }
@@ -64,11 +73,12 @@ private struct SettingsRootView: View {
     let managedASRModels: ManagedASRModelStore
 
     @State private var selection: SettingsPage? = .home
+    @State private var columnVisibility: NavigationSplitViewVisibility = .all
 
     var body: some View {
-        NavigationSplitView {
+        NavigationSplitView(columnVisibility: $columnVisibility) {
             SettingsSidebar(selection: $selection)
-                .navigationSplitViewColumnWidth(min: 220, ideal: 240, max: 260)
+                .navigationSplitViewColumnWidth(min: 220, ideal: 220, max: 220)
         } detail: {
             Group {
                 switch selection ?? .home {
@@ -78,41 +88,93 @@ private struct SettingsRootView: View {
                     ModelSettingsPage(settings: settings, llmService: llmService, managedASRModels: managedASRModels)
                 case .glossary:
                     GlossarySettingsPage(settings: settings)
+                case .settings:
+                    GeneralSettingsPage(settings: settings)
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(Color(nsColor: .windowBackgroundColor))
         }
+        .toolbar {
+            ToolbarItem(placement: .navigation) {
+                Button(action: toggleSidebar) {
+                    Label(sidebarToggleTitle, systemImage: "sidebar.left")
+                }
+                .help(sidebarToggleTitle)
+            }
+        }
+    }
+
+    private var sidebarToggleTitle: String {
+        columnVisibility == .detailOnly ? "显示侧边栏" : "隐藏侧边栏"
+    }
+
+    private func toggleSidebar() {
+        columnVisibility = columnVisibility == .detailOnly ? .all : .detailOnly
     }
 }
 
 private struct SettingsSidebar: View {
     @Binding var selection: SettingsPage?
+    private let backgroundColor = Color(nsColor: .windowBackgroundColor)
 
     var body: some View {
-        List(SettingsPage.allCases, selection: $selection) { page in
-            NavigationLink(value: page) {
-                Label(page.title, systemImage: page.systemImage)
-                    .font(.system(size: 14, weight: .medium))
-                    .padding(.vertical, 6)
+        VStack(spacing: 0) {
+            SidebarHeader()
+
+            List(SettingsPage.allCases, selection: $selection) { page in
+                NavigationLink(value: page) {
+                    Label(page.title, systemImage: page.systemImage)
+                        .font(.system(size: 14, weight: .medium))
+                        .padding(.vertical, 6)
+                }
+                .tag(page)
             }
-            .tag(page)
+            .listStyle(.sidebar)
+            .scrollContentBackground(.hidden)
+            .background(backgroundColor)
         }
-        .listStyle(.sidebar)
-        .safeAreaInset(edge: .top) {
-            VStack(alignment: .leading, spacing: 6) {
-                Text("Voily")
-                    .font(.system(size: 22, weight: .semibold))
-                Text("语音输入与文本处理")
-                    .font(.system(size: 12, weight: .medium))
+        .background(backgroundColor)
+    }
+}
+
+private struct SidebarHeader: View {
+    private let backgroundColor = Color(nsColor: .windowBackgroundColor)
+
+    var body: some View {
+        HStack(spacing: 12) {
+            SidebarAppIcon()
+                .frame(width: 44, height: 44)
+
+            Text("Voily")
+                .font(.system(size: 22, weight: .semibold))
+                .foregroundStyle(.primary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 16)
+        .padding(.top, 20)
+        .padding(.bottom, 16)
+        .background(backgroundColor)
+    }
+}
+
+private struct SidebarAppIcon: View {
+    var body: some View {
+        Group {
+            if let image = NSApp.applicationIconImage {
+                Image(nsImage: image)
+                    .resizable()
+                    .interpolation(.high)
+                    .aspectRatio(contentMode: .fit)
+            } else {
+                Image(systemName: "app.fill")
+                    .resizable()
+                    .scaledToFit()
                     .foregroundStyle(.secondary)
+                    .padding(6)
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, 16)
-            .padding(.top, 20)
-            .padding(.bottom, 14)
-            .background(.regularMaterial)
         }
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
 }
 
@@ -1184,6 +1246,75 @@ private struct GlossarySettingsPage: View {
             statusMessage = "已添加自定义词条：\(term)"
         } else {
             statusMessage = "词条已存在或内容为空。"
+        }
+    }
+}
+
+private struct GeneralSettingsPage: View {
+    @Bindable var settings: AppSettings
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 24) {
+                SettingsPageHeader(
+                    title: "设置",
+                    subtitle: "在这里管理输入语言和 app 的通用行为说明。模型、文本处理和词库配置分别保留在各自页面。"
+                )
+
+                SettingsCard(title: "输入语言", subtitle: "普通听写默认使用这里选择的语言") {
+                    VStack(alignment: .leading, spacing: 14) {
+                        Picker("输入语言", selection: $settings.selectedLanguage) {
+                            ForEach(SupportedLanguage.allCases) { language in
+                                Text(language.displayName).tag(language)
+                            }
+                        }
+                        .pickerStyle(.menu)
+                        .labelsHidden()
+
+                        Text("双击 Fn 的快捷翻译仍固定使用简体中文作为输入语言。")
+                            .font(.system(size: 12))
+                            .foregroundStyle(.secondary)
+                    }
+                }
+
+                SettingsCard(title: "通用说明", subtitle: "menu bar 入口已经简化，配置统一移动到 settings") {
+                    VStack(alignment: .leading, spacing: 12) {
+                        GeneralSettingNoteRow(
+                            title: "打开方式",
+                            detail: "点击 menu bar 中的 Voily 可以随时回到当前设置窗口。"
+                        )
+
+                        GeneralSettingNoteRow(
+                            title: "快捷操作",
+                            detail: "按住 Fn 开始普通听写，双击 Fn 触发快捷翻译。"
+                        )
+
+                        GeneralSettingNoteRow(
+                            title: "配置归位",
+                            detail: "语言在本页管理，模型与文本处理在“模型”页管理，术语相关内容在“词库”页管理。"
+                        )
+                    }
+                }
+            }
+            .padding(28)
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .scrollIndicators(.hidden)
+    }
+}
+
+private struct GeneralSettingNoteRow: View {
+    let title: String
+    let detail: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(title)
+                .font(.system(size: 14, weight: .semibold))
+
+            Text(detail)
+                .font(.system(size: 13))
+                .foregroundStyle(.secondary)
         }
     }
 }

@@ -31,9 +31,12 @@
 		A00100170000000000000000 /* LocalASRService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A002001A0000000000000000 /* LocalASRService.swift */; };
 		A00100180000000000000000 /* LocalASRServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A002001B0000000000000000 /* LocalASRServiceTests.swift */; };
 		A001001C0000000000000000 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A002001F0000000000000000 /* Assets.xcassets */; };
-			A00100190000000000000000 /* ManagedASRModelStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A002001C0000000000000000 /* ManagedASRModelStore.swift */; };
-			A001001A0000000000000000 /* SenseVoiceResidentService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A002001D0000000000000000 /* SenseVoiceResidentService.swift */; };
-			A001001B0000000000000000 /* QwenRealtimeASRService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A002001E0000000000000000 /* QwenRealtimeASRService.swift */; };
+		A00100190000000000000000 /* ManagedASRModelStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A002001C0000000000000000 /* ManagedASRModelStore.swift */; };
+		A001001A0000000000000000 /* SenseVoiceResidentService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A002001D0000000000000000 /* SenseVoiceResidentService.swift */; };
+		A001001B0000000000000000 /* QwenRealtimeASRService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A002001E0000000000000000 /* QwenRealtimeASRService.swift */; };
+		A001001D0000000000000000 /* AppSettingsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00200200000000000000000 /* AppSettingsTests.swift */; };
+		A001001E0000000000000000 /* LLMRefinementServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00200210000000000000000 /* LLMRefinementServiceTests.swift */; };
+		A001001F0000000000000000 /* AppSettingsPersistenceIntegrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00200220000000000000000 /* AppSettingsPersistenceIntegrationTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -72,11 +75,14 @@
 		A00200180000000000000000 /* XCTest.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = XCTest.framework; path = System/Library/Frameworks/XCTest.framework; sourceTree = SDKROOT; };
 		A00200190000000000000000 /* AppIntents.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AppIntents.framework; path = System/Library/Frameworks/AppIntents.framework; sourceTree = SDKROOT; };
 		A002001A0000000000000000 /* LocalASRService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalASRService.swift; sourceTree = "<group>"; };
-			A002001B0000000000000000 /* LocalASRServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalASRServiceTests.swift; sourceTree = "<group>"; };
-			A002001C0000000000000000 /* ManagedASRModelStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ManagedASRModelStore.swift; sourceTree = "<group>"; };
-			A002001D0000000000000000 /* SenseVoiceResidentService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SenseVoiceResidentService.swift; sourceTree = "<group>"; };
-			A002001E0000000000000000 /* QwenRealtimeASRService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QwenRealtimeASRService.swift; sourceTree = "<group>"; };
+		A002001B0000000000000000 /* LocalASRServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalASRServiceTests.swift; sourceTree = "<group>"; };
+		A002001C0000000000000000 /* ManagedASRModelStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ManagedASRModelStore.swift; sourceTree = "<group>"; };
+		A002001D0000000000000000 /* SenseVoiceResidentService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SenseVoiceResidentService.swift; sourceTree = "<group>"; };
+		A002001E0000000000000000 /* QwenRealtimeASRService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QwenRealtimeASRService.swift; sourceTree = "<group>"; };
 		A002001F0000000000000000 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Resources/Assets.xcassets; sourceTree = SOURCE_ROOT; };
+		A00200200000000000000000 /* AppSettingsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppSettingsTests.swift; sourceTree = "<group>"; };
+		A00200210000000000000000 /* LLMRefinementServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LLMRefinementServiceTests.swift; sourceTree = "<group>"; };
+		A00200220000000000000000 /* AppSettingsPersistenceIntegrationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppSettingsPersistenceIntegrationTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -114,30 +120,102 @@
 			isa = PBXGroup;
 			children = (
 				A00200130000000000000000 /* BrandIcons */,
-				A00200010000000000000000 /* AppController.swift */,
-				A00200020000000000000000 /* AppDelegate.swift */,
-				A00200030000000000000000 /* AppSettings.swift */,
-				A00200040000000000000000 /* AudioCaptureService.swift */,
-				A00200050000000000000000 /* FnKeyMonitor.swift */,
-				A00200060000000000000000 /* LLMRefinementService.swift */,
-				A002001A0000000000000000 /* LocalASRService.swift */,
-				A002001C0000000000000000 /* ManagedASRModelStore.swift */,
-				A00200070000000000000000 /* OverlayPanelController.swift */,
-				A00200120000000000000000 /* OverlayPreview.swift */,
-				A00200080000000000000000 /* OverlayState.swift */,
-					A00200090000000000000000 /* PermissionCoordinator.swift */,
-					A002001E0000000000000000 /* QwenRealtimeASRService.swift */,
-					A002001D0000000000000000 /* SenseVoiceResidentService.swift */,
-					A00200140000000000000000 /* DashboardHomePage.swift */,
-				A002000A0000000000000000 /* SettingsWindowController.swift */,
-				A002000B0000000000000000 /* SpeechTranscriptionService.swift */,
-				A002000C0000000000000000 /* SupportedLanguage.swift */,
-				A002000D0000000000000000 /* TextInjectionService.swift */,
-				A00200150000000000000000 /* UsageStore.swift */,
-				A002000E0000000000000000 /* VoilyMain.swift */,
+				A00400060000000000000000 /* App */,
+				A00400070000000000000000 /* Configuration */,
+				A00400080000000000000000 /* Features */,
+				A004000B0000000000000000 /* Services */,
+				A004000E0000000000000000 /* Storage */,
 			);
 			path = Sources/Voily;
 			sourceTree = SOURCE_ROOT;
+		};
+		A00400060000000000000000 /* App */ = {
+			isa = PBXGroup;
+			children = (
+				A00200010000000000000000 /* AppController.swift */,
+				A00200020000000000000000 /* AppDelegate.swift */,
+				A00200050000000000000000 /* FnKeyMonitor.swift */,
+				A00200090000000000000000 /* PermissionCoordinator.swift */,
+				A002000E0000000000000000 /* VoilyMain.swift */,
+			);
+			path = App;
+			sourceTree = "<group>";
+		};
+		A00400070000000000000000 /* Configuration */ = {
+			isa = PBXGroup;
+			children = (
+				A00200030000000000000000 /* AppSettings.swift */,
+				A002000C0000000000000000 /* SupportedLanguage.swift */,
+			);
+			path = Configuration;
+			sourceTree = "<group>";
+		};
+		A00400080000000000000000 /* Features */ = {
+			isa = PBXGroup;
+			children = (
+				A00400090000000000000000 /* Overlay */,
+				A004000A0000000000000000 /* Settings */,
+			);
+			path = Features;
+			sourceTree = "<group>";
+		};
+		A00400090000000000000000 /* Overlay */ = {
+			isa = PBXGroup;
+			children = (
+				A00200070000000000000000 /* OverlayPanelController.swift */,
+				A00200120000000000000000 /* OverlayPreview.swift */,
+				A00200080000000000000000 /* OverlayState.swift */,
+			);
+			path = Overlay;
+			sourceTree = "<group>";
+		};
+		A004000A0000000000000000 /* Settings */ = {
+			isa = PBXGroup;
+			children = (
+				A00200140000000000000000 /* DashboardHomePage.swift */,
+				A002000A0000000000000000 /* SettingsWindowController.swift */,
+			);
+			path = Settings;
+			sourceTree = "<group>";
+		};
+		A004000B0000000000000000 /* Services */ = {
+			isa = PBXGroup;
+			children = (
+				A004000C0000000000000000 /* Audio */,
+				A004000D0000000000000000 /* Text */,
+			);
+			path = Services;
+			sourceTree = "<group>";
+		};
+		A004000C0000000000000000 /* Audio */ = {
+			isa = PBXGroup;
+			children = (
+				A00200040000000000000000 /* AudioCaptureService.swift */,
+				A002001A0000000000000000 /* LocalASRService.swift */,
+				A002001C0000000000000000 /* ManagedASRModelStore.swift */,
+				A002001E0000000000000000 /* QwenRealtimeASRService.swift */,
+				A002001D0000000000000000 /* SenseVoiceResidentService.swift */,
+				A002000B0000000000000000 /* SpeechTranscriptionService.swift */,
+			);
+			path = Audio;
+			sourceTree = "<group>";
+		};
+		A004000D0000000000000000 /* Text */ = {
+			isa = PBXGroup;
+			children = (
+				A00200060000000000000000 /* LLMRefinementService.swift */,
+				A002000D0000000000000000 /* TextInjectionService.swift */,
+			);
+			path = Text;
+			sourceTree = "<group>";
+		};
+		A004000E0000000000000000 /* Storage */ = {
+			isa = PBXGroup;
+			children = (
+				A00200150000000000000000 /* UsageStore.swift */,
+			);
+			path = Storage;
+			sourceTree = "<group>";
 		};
 		A00400030000000000000000 /* Config */ = {
 			isa = PBXGroup;
@@ -159,11 +237,46 @@
 		A00400050000000000000000 /* Tests/VoilyTests */ = {
 			isa = PBXGroup;
 			children = (
-				A002001B0000000000000000 /* LocalASRServiceTests.swift */,
-				A00200160000000000000000 /* UsageStoreTests.swift */,
+				A004000F0000000000000000 /* Audio */,
+				A00400100000000000000000 /* Configuration */,
+				A00400110000000000000000 /* Services */,
+				A00400120000000000000000 /* Storage */,
 			);
 			path = Tests/VoilyTests;
 			sourceTree = SOURCE_ROOT;
+		};
+		A004000F0000000000000000 /* Audio */ = {
+			isa = PBXGroup;
+			children = (
+				A002001B0000000000000000 /* LocalASRServiceTests.swift */,
+			);
+			path = Audio;
+			sourceTree = "<group>";
+		};
+		A00400100000000000000000 /* Configuration */ = {
+			isa = PBXGroup;
+			children = (
+				A00200200000000000000000 /* AppSettingsTests.swift */,
+				A00200220000000000000000 /* AppSettingsPersistenceIntegrationTests.swift */,
+			);
+			path = Configuration;
+			sourceTree = "<group>";
+		};
+		A00400110000000000000000 /* Services */ = {
+			isa = PBXGroup;
+			children = (
+				A00200210000000000000000 /* LLMRefinementServiceTests.swift */,
+			);
+			path = Services;
+			sourceTree = "<group>";
+		};
+		A00400120000000000000000 /* Storage */ = {
+			isa = PBXGroup;
+			children = (
+				A00200160000000000000000 /* UsageStoreTests.swift */,
+			);
+			path = Storage;
+			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
 
@@ -290,6 +403,9 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A001001D0000000000000000 /* AppSettingsTests.swift in Sources */,
+				A001001F0000000000000000 /* AppSettingsPersistenceIntegrationTests.swift in Sources */,
+				A001001E0000000000000000 /* LLMRefinementServiceTests.swift in Sources */,
 				A00100180000000000000000 /* LocalASRServiceTests.swift in Sources */,
 				A00100140000000000000000 /* UsageStoreTests.swift in Sources */,
 			);

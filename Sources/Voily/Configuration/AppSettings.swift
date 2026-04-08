@@ -109,6 +109,41 @@ struct ASRProviderConfig: Codable, Equatable {
         model: ""
     )
 
+    private enum CodingKeys: String, CodingKey {
+        case executablePath
+        case modelPath
+        case additionalArguments
+        case baseURL
+        case apiKey
+        case model
+    }
+
+    init(
+        executablePath: String,
+        modelPath: String,
+        additionalArguments: String,
+        baseURL: String,
+        apiKey: String,
+        model: String
+    ) {
+        self.executablePath = executablePath
+        self.modelPath = modelPath
+        self.additionalArguments = additionalArguments
+        self.baseURL = baseURL
+        self.apiKey = apiKey
+        self.model = model
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        executablePath = try container.decodeIfPresent(String.self, forKey: .executablePath) ?? ""
+        modelPath = try container.decodeIfPresent(String.self, forKey: .modelPath) ?? ""
+        additionalArguments = try container.decodeIfPresent(String.self, forKey: .additionalArguments) ?? ""
+        baseURL = try container.decodeIfPresent(String.self, forKey: .baseURL) ?? ""
+        apiKey = try container.decodeIfPresent(String.self, forKey: .apiKey) ?? ""
+        model = try container.decodeIfPresent(String.self, forKey: .model) ?? ""
+    }
+
     func isConfigured(for provider: ASRProvider) -> Bool {
         switch provider.category {
         case .local:
@@ -195,14 +230,35 @@ struct ModelSettingsSnapshot: Codable, Equatable {
         selectedTextProvider = try container.decodeIfPresent(TextRefinementProvider.self, forKey: .selectedTextProvider) ?? .deepSeek
         textRefinementEnabled = try container.decode(Bool.self, forKey: .textRefinementEnabled)
         enabledDictationSkills = try container.decodeIfPresent([DictationProcessingSkill].self, forKey: .enabledDictationSkills) ?? []
-        let rawASRConfigs = try container.decodeIfPresent([String: ASRProviderConfig].self, forKey: .asrConfigsByProvider) ?? [:]
+        let rawASRConfigs: [ASRProvider: ASRProviderConfig] = try Self.decodeRawConfigMap(
+            from: container,
+            forKey: .asrConfigsByProvider,
+            supportedKey: Self.supportedASRProvider(for:)
+        )
         asrConfigsByProvider = rawASRConfigs.reduce(into: [:]) { partialResult, entry in
-            guard let provider = Self.supportedASRProvider(for: entry.key) else {
-                return
-            }
-            partialResult[provider] = entry.value
+            partialResult[entry.key] = entry.value
         }
-        textConfigsByProvider = try container.decodeIfPresent([TextRefinementProvider: TextRefinementProviderConfig].self, forKey: .textConfigsByProvider) ?? [:]
+        textConfigsByProvider = try Self.decodeRawConfigMap(
+            from: container,
+            forKey: .textConfigsByProvider,
+            supportedKey: TextRefinementProvider.init(rawValue:)
+        )
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(selectedASRProvider.rawValue, forKey: .selectedASRProvider)
+        try container.encode(selectedTextProvider, forKey: .selectedTextProvider)
+        try container.encode(textRefinementEnabled, forKey: .textRefinementEnabled)
+        try container.encode(enabledDictationSkills, forKey: .enabledDictationSkills)
+        try container.encode(
+            Dictionary(uniqueKeysWithValues: asrConfigsByProvider.map { ($0.key.rawValue, $0.value) }),
+            forKey: .asrConfigsByProvider
+        )
+        try container.encode(
+            Dictionary(uniqueKeysWithValues: textConfigsByProvider.map { ($0.key.rawValue, $0.value) }),
+            forKey: .textConfigsByProvider
+        )
     }
 
     private static func migratedSelectedASRProvider(from rawValue: String?) -> ASRProvider {
@@ -217,6 +273,35 @@ struct ModelSettingsSnapshot: Codable, Equatable {
 
     private static func supportedASRProvider(for rawValue: String) -> ASRProvider? {
         ASRProvider(rawValue: rawValue)
+    }
+
+    private static func decodeRawConfigMap<Key: Hashable, Value: Decodable>(
+        from container: KeyedDecodingContainer<CodingKeys>,
+        forKey codingKey: CodingKeys,
+        supportedKey: (String) -> Key?
+    ) throws -> [Key: Value] {
+        if let rawDictionary = try? container.decode([String: Value].self, forKey: codingKey) {
+            return rawDictionary.reduce(into: [:]) { partialResult, entry in
+                guard let key = supportedKey(entry.key) else { return }
+                partialResult[key] = entry.value
+            }
+        }
+
+        guard container.contains(codingKey) else {
+            return [:]
+        }
+
+        var rawPairs = try container.nestedUnkeyedContainer(forKey: codingKey)
+        var decoded: [Key: Value] = [:]
+
+        while !rawPairs.isAtEnd {
+            let rawKey = try rawPairs.decode(String.self)
+            let value = try rawPairs.decode(Value.self)
+            guard let key = supportedKey(rawKey) else { continue }
+            decoded[key] = value
+        }
+
+        return decoded
     }
 }
 
@@ -409,12 +494,16 @@ final class AppSettings {
     }
 
     var selectedLanguageCode: String {
-        didSet { defaults.set(selectedLanguageCode, forKey: Keys.selectedLanguageCode) }
+        didSet {
+            defaults.set(selectedLanguageCode, forKey: Keys.selectedLanguageCode)
+            flushDefaults()
+        }
     }
 
     var glossaryEntries: String {
         didSet {
             defaults.set(glossaryEntries, forKey: Keys.glossaryEntries)
+            flushDefaults()
 
             guard !isSyncingLegacyGlossary else { return }
 
@@ -657,23 +746,31 @@ final class AppSettings {
 
         guard let data = try? encoder.encode(snapshot) else { return }
         defaults.set(data, forKey: Keys.modelSettingsSnapshot)
+        flushDefaults()
     }
 
     private func persistGlossaryState() {
         guard let data = try? encoder.encode(glossaryState) else { return }
         defaults.set(data, forKey: Keys.glossarySettingsSnapshot)
+        flushDefaults()
     }
 
     private func syncLegacyGlossaryEntries() {
         let normalizedEntries = glossaryState.customTerms.joined(separator: "\n")
         guard glossaryEntries != normalizedEntries else {
             defaults.set(glossaryEntries, forKey: Keys.glossaryEntries)
+            flushDefaults()
             return
         }
 
         isSyncingLegacyGlossary = true
         glossaryEntries = normalizedEntries
         isSyncingLegacyGlossary = false
+    }
+
+    private func flushDefaults() {
+        // Xcode stop/re-run can terminate the app before UserDefaults async writes hit disk.
+        defaults.synchronize()
     }
 
     private static func loadSnapshot(from defaults: UserDefaults) -> ModelSettingsSnapshot? {

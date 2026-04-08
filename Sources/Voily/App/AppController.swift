@@ -1,6 +1,8 @@
 import AppKit
 import AVFoundation
+import Charts
 import Foundation
+import SwiftUI
 
 func isRunningInXcodePreview() -> Bool {
     ProcessInfo.processInfo.environment["XCODE_RUNNING_FOR_PREVIEWS"] == "1"
@@ -79,8 +81,9 @@ final class AppController: NSObject {
     )
 
     private var statusItem: NSStatusItem?
-    private var languageMenuItems: [SupportedLanguage: NSMenuItem] = [:]
-    private var textRefinementMenuItem: NSMenuItem?
+    private var statusMenu: NSMenu?
+    private var dashboardMenuItem: NSMenuItem?
+    private var dashboardHostingView: NSHostingView<MenuDashboardMenuItemView>?
     private var currentPhase: OverlayPhase = .idle
     private var currentOverlayControls: OverlayControls = .none
     private var currentText = ""
@@ -150,70 +153,51 @@ final class AppController: NSObject {
             }
             button.toolTip = "Voily"
         }
-        item.menu = makeMenu()
+        let menu = makeMenu()
+        item.menu = menu
         statusItem = item
+        statusMenu = menu
     }
 
     private func makeMenu() -> NSMenu {
         let menu = NSMenu()
+        menu.delegate = self
 
-        let languageItem = NSMenuItem(title: "Language", action: nil, keyEquivalent: "")
-        languageItem.submenu = makeLanguageMenu()
-        menu.addItem(languageItem)
-
-        let textRefinementItem = NSMenuItem(title: "Text Processing", action: nil, keyEquivalent: "")
-        textRefinementItem.submenu = makeTextRefinementMenu()
-        menu.addItem(textRefinementItem)
-
-        let hintItem = NSMenuItem(title: "Hold Fn to Dictate · Double Fn to Translate", action: nil, keyEquivalent: "")
-        hintItem.isEnabled = false
-        menu.addItem(hintItem)
+        let dashboardItem = NSMenuItem()
+        dashboardItem.view = makeDashboardMenuView()
+        dashboardItem.isEnabled = false
+        menu.addItem(dashboardItem)
+        dashboardMenuItem = dashboardItem
 
         menu.addItem(.separator())
 
-        let settingsItem = NSMenuItem(title: "Settings", action: #selector(openSettings), keyEquivalent: ",")
-        settingsItem.target = self
-        menu.addItem(settingsItem)
+        let voilyItem = NSMenuItem(title: "显示 Voily", action: #selector(openSettings), keyEquivalent: "")
+        voilyItem.target = self
+        menu.addItem(voilyItem)
 
-        menu.addItem(.separator())
-
-        let quitItem = NSMenuItem(title: "Quit Voily", action: #selector(quit), keyEquivalent: "q")
+        let quitItem = NSMenuItem(title: "Quit", action: #selector(quit), keyEquivalent: "q")
         quitItem.target = self
         menu.addItem(quitItem)
 
         return menu
     }
 
-    private func makeLanguageMenu() -> NSMenu {
-        let menu = NSMenu()
-        languageMenuItems.removeAll()
-
-        for language in SupportedLanguage.allCases {
-            let item = NSMenuItem(title: language.displayName, action: #selector(selectLanguage(_:)), keyEquivalent: "")
-            item.target = self
-            item.representedObject = language.rawValue
-            item.state = settings.selectedLanguage == language ? .on : .off
-            languageMenuItems[language] = item
-            menu.addItem(item)
-        }
-
-        return menu
+    private func makeDashboardMenuView() -> NSView {
+        let view = MenuDashboardMenuItemView(summary: usageStore.todaySummary, summaries: usageStore.weeklySummaries)
+        let hostingView = NSHostingView(rootView: view)
+        hostingView.frame = NSRect(x: 0, y: 0, width: 188, height: 102)
+        hostingView.setFrameSize(NSSize(width: 188, height: 102))
+        dashboardHostingView = hostingView
+        return hostingView
     }
 
-    private func makeTextRefinementMenu() -> NSMenu {
-        let menu = NSMenu()
+    private func refreshDashboardMenuItem() {
+        usageStore.refresh()
 
-        let toggle = NSMenuItem(title: "Enable Dictation Processing", action: #selector(toggleLLM), keyEquivalent: "")
-        toggle.target = self
-        toggle.state = settings.textRefinementEnabled ? .on : .off
-        textRefinementMenuItem = toggle
-        menu.addItem(toggle)
-
-        let settingsItem = NSMenuItem(title: "Settings…", action: #selector(openSettings), keyEquivalent: "")
-        settingsItem.target = self
-        menu.addItem(settingsItem)
-
-        return menu
+        dashboardHostingView?.rootView = MenuDashboardMenuItemView(
+            summary: usageStore.todaySummary,
+            summaries: usageStore.weeklySummaries
+        )
     }
 
     private func configureOverlayActions() {
@@ -825,27 +809,6 @@ final class AppController: NSObject {
     }
 
     @objc
-    private func selectLanguage(_ sender: NSMenuItem) {
-        guard
-            let rawValue = sender.representedObject as? String,
-            let language = SupportedLanguage(rawValue: rawValue)
-        else {
-            return
-        }
-
-        settings.selectedLanguage = language
-        for (key, item) in languageMenuItems {
-            item.state = key == language ? .on : .off
-        }
-    }
-
-    @objc
-    private func toggleLLM() {
-        settings.textRefinementEnabled.toggle()
-        textRefinementMenuItem?.state = settings.textRefinementEnabled ? .on : .off
-    }
-
-    @objc
     private func openSettings() {
         settingsWindowController.show()
     }
@@ -854,4 +817,166 @@ final class AppController: NSObject {
     private func quit() {
         NSApp.terminate(nil)
     }
+}
+
+@available(macOS 26.0, *)
+extension AppController: NSMenuDelegate {
+    func menuWillOpen(_ menu: NSMenu) {
+        guard menu === statusMenu else { return }
+        refreshDashboardMenuItem()
+    }
+}
+
+@available(macOS 26.0, *)
+private struct MenuDashboardMenuItemView: View {
+    let summary: TodayUsageSummary
+    let summaries: [DailyUsageSummary]
+    private let chartWidth: CGFloat = 160
+    private let horizontalPadding: CGFloat = 14
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            VStack(alignment: .leading, spacing: 6) {
+                Text("今日概览")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(.secondary)
+
+                Text(summaryLine)
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(.primary)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+
+            MenuMiniSparklineView(summaries: summaries)
+                .frame(width: chartWidth, height: 40, alignment: .leading)
+        }
+        .padding(.horizontal, horizontalPadding)
+        .padding(.top, 14)
+        .padding(.bottom, 12)
+        .frame(width: chartWidth + horizontalPadding * 2, height: 102, alignment: .leading)
+        .background(Color.clear)
+        .allowsHitTesting(false)
+    }
+
+    private var summaryLine: String {
+        "\(formattedDuration(summary.totalDurationMs)) · \(summary.sessionCount) 次 · \(summary.totalCharacters) 字"
+    }
+
+    private func formattedDuration(_ durationMs: Int) -> String {
+        let totalSeconds = max(0, durationMs / 1000)
+        let minutes = totalSeconds / 60
+        let seconds = totalSeconds % 60
+
+        if minutes > 0 {
+            return "\(minutes) 分 \(seconds) 秒"
+        }
+
+        return "\(seconds) 秒"
+    }
+}
+
+@available(macOS 26.0, *)
+private struct MenuMiniSparklineView: View {
+    let summaries: [DailyUsageSummary]
+
+    var body: some View {
+        let chartData = normalizedChartData
+        let maxValue = max(chartData.map(\.value).max() ?? 0, 1)
+        let paddedMaxValue = max(1, Int((Double(maxValue) * 1.18).rounded(.up)))
+
+        Chart(chartData) { item in
+            AreaMark(
+                x: .value("Day", item.date),
+                y: .value("Duration", item.value)
+            )
+            .interpolationMethod(.catmullRom)
+            .foregroundStyle(
+                .linearGradient(
+                    colors: [
+                        Color.accentColor.opacity(hasNonZeroValue ? 0.24 : 0.10),
+                        Color.accentColor.opacity(0.02)
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+            )
+
+            LineMark(
+                x: .value("Day", item.date),
+                y: .value("Duration", item.value)
+            )
+            .interpolationMethod(.catmullRom)
+            .foregroundStyle(Color.accentColor.opacity(hasNonZeroValue ? 0.95 : 0.4))
+            .lineStyle(StrokeStyle(lineWidth: 2.5, lineCap: .round, lineJoin: .round))
+
+            if item.isLastPoint {
+                PointMark(
+                    x: .value("Day", item.date),
+                    y: .value("Duration", item.value)
+                )
+                .symbolSize(18)
+                .foregroundStyle(Color.accentColor.opacity(hasNonZeroValue ? 0.95 : 0.4))
+            }
+        }
+        .chartXAxis(.hidden)
+        .chartYAxis(.hidden)
+        .chartLegend(.hidden)
+        .chartXScale(range: .plotDimension(startPadding: 10, endPadding: 10))
+        .chartPlotStyle { plot in
+            plot
+                .background(
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .fill(Color.primary.opacity(0.05))
+                )
+        }
+        .chartYScale(
+            domain: 0...paddedMaxValue,
+            range: .plotDimension(startPadding: 6, endPadding: 8)
+        )
+        .clipped()
+        .accessibilityHidden(true)
+    }
+
+    private var hasNonZeroValue: Bool {
+        summaries.contains(where: { $0.totalDurationMs > 0 })
+    }
+
+    private var normalizedChartData: [MenuChartPoint] {
+        let base = summaries.isEmpty
+            ? [
+                MenuChartPoint(date: Date().addingTimeInterval(-86_400), value: 0, isLastPoint: false),
+                MenuChartPoint(date: Date(), value: 0, isLastPoint: true),
+            ]
+            : summaries.enumerated().map { index, summary in
+                MenuChartPoint(
+                    date: summary.date,
+                    value: summary.totalDurationMs,
+                    isLastPoint: index == summaries.count - 1
+                )
+            }
+
+        return base
+    }
+}
+
+private struct MenuChartPoint: Identifiable {
+    let date: Date
+    let value: Int
+    let isLastPoint: Bool
+
+    var id: Date { date }
+}
+
+@available(macOS 26.0, *)
+#Preview("Menu Dashboard") {
+    let usageStore = UsageStore()
+
+    MenuDashboardMenuItemView(
+        summary: usageStore.todaySummary,
+        summaries: usageStore.weeklySummaries
+    )
+    .padding()
+    .frame(width: 320)
+    .background(Color(nsColor: .windowBackgroundColor))
 }
