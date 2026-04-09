@@ -105,6 +105,7 @@ final class AppController: NSObject {
         configureMainMenu()
         configureStatusItem()
         observeDockIconPreference()
+        observeAppIconPreference()
         configureOverlayActions()
         configureAccessibilityFeatures()
         showSettingsWindow()
@@ -167,10 +168,35 @@ final class AppController: NSObject {
         applyDockIconVisibility()
     }
 
+    private func observeAppIconPreference() {
+        withObservationTracking {
+            _ = settings.selectedAppIconVariant
+        } onChange: { [weak self] in
+            Task { @MainActor in
+                self?.applySelectedAppIcon()
+                self?.observeAppIconPreference()
+            }
+        }
+
+        applySelectedAppIcon()
+    }
+
     private func applyDockIconVisibility() {
         let policy: NSApplication.ActivationPolicy = settings.dockIconVisible ? .regular : .accessory
         guard NSApp.activationPolicy() != policy else { return }
         NSApp.setActivationPolicy(policy)
+    }
+
+    private func applySelectedAppIcon() {
+        let image: NSImage?
+        switch settings.selectedAppIconVariant {
+        case .default:
+            image = NSWorkspace.shared.icon(forFile: Bundle.main.bundlePath)
+        case .easterEggSVG4:
+            image = NSImage(named: settings.selectedAppIconVariant.imageAssetName)
+        }
+        guard let image else { return }
+        NSApp.applicationIconImage = image
     }
 
     private func configureStatusItem() {
@@ -378,7 +404,7 @@ final class AppController: NSObject {
                 }
             }
 
-            try audioCaptureService.start { [weak self] buffer in
+            try audioCaptureService.start(inputDeviceUID: settings.preferredMicrophoneUID) { [weak self] buffer in
                 self?.handleCapturedBuffer(buffer)
                 Task { @MainActor in
                     if self?.currentSpeechCaptureEnabled == true {

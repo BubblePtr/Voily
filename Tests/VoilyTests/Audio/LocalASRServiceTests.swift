@@ -121,6 +121,32 @@ final class LocalASRServiceTests: XCTestCase {
         XCTAssertEqual(String(data: data.subdata(in: 36..<40), encoding: .ascii), "data")
     }
 
+    func testAutomaticMicrophoneSelectionPrefersUSBThenBuiltInThenBluetooth() {
+        let catalog = AudioInputDeviceCatalog()
+        let devices = [
+            AudioInputDevice(uid: "bluetooth", name: "AirPods Pro", isDefault: true, transport: .bluetooth),
+            AudioInputDevice(uid: "builtin", name: "MacBook Pro Microphone", isDefault: false, transport: .builtIn),
+            AudioInputDevice(uid: "usb", name: "Shure MV7", isDefault: false, transport: .usb),
+        ]
+
+        XCTAssertEqual(catalog.automaticallySelectedInputDevice(from: devices)?.uid, "usb")
+        XCTAssertEqual(catalog.automaticallySelectedInputDevice(from: Array(devices.dropLast()))?.uid, "builtin")
+        XCTAssertEqual(catalog.automaticallySelectedInputDevice(from: [devices[0]])?.uid, "bluetooth")
+    }
+
+    func testDisplayNamePrefersExistingReadableShortName() {
+        XCTAssertEqual(
+            AudioInputDeviceCatalog.makeDisplayName(
+                rawName: "DJI Mic Mini",
+                manufacturer: "SZ DJI Technology Co., Ltd.",
+                modelName: "Wireless Microphone Transmitter",
+                modelUID: "DJI Mic Mini Transmitter",
+                fallbackUID: "dji-mic"
+            ),
+            "DJI Mic Mini"
+        )
+    }
+
     private func makeExecutable() throws -> String {
         let url = FileManager.default.temporaryDirectory
             .appending(path: "voily-test-\(UUID().uuidString)")

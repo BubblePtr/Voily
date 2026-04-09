@@ -55,13 +55,13 @@ private enum SettingsPage: String, CaseIterable, Identifiable, Hashable {
     var systemImage: String {
         switch self {
         case .home:
-            return "house"
+            return "rectangle.grid.2x2"
         case .model:
-            return "cpu"
+            return "cpu.fill"
         case .glossary:
-            return "text.book.closed"
+            return "text.book.closed.fill"
         case .settings:
-            return "gearshape"
+            return "slider.horizontal.3"
         }
     }
 }
@@ -77,7 +77,7 @@ private struct SettingsRootView: View {
 
     var body: some View {
         NavigationSplitView(columnVisibility: $columnVisibility) {
-            SettingsSidebar(selection: $selection)
+            SettingsSidebar(settings: settings, selection: $selection)
                 .navigationSplitViewColumnWidth(min: 220, ideal: 220, max: 220)
         } detail: {
             Group {
@@ -115,12 +115,13 @@ private struct SettingsRootView: View {
 }
 
 private struct SettingsSidebar: View {
+    let settings: AppSettings
     @Binding var selection: SettingsPage?
     private let backgroundColor = Color(nsColor: .windowBackgroundColor)
 
     var body: some View {
         VStack(spacing: 0) {
-            SidebarHeader()
+            SidebarHeader(settings: settings)
 
             List(SettingsPage.allCases, selection: $selection) { page in
                 NavigationLink(value: page) {
@@ -139,16 +140,26 @@ private struct SettingsSidebar: View {
 }
 
 private struct SidebarHeader: View {
+    let settings: AppSettings
     private let backgroundColor = Color(nsColor: .windowBackgroundColor)
+    @State private var isUnlockMessageVisible = false
 
     var body: some View {
         HStack(spacing: 12) {
-            SidebarAppIcon()
+            SidebarAppIcon(settings: settings, onUnlock: showUnlockMessage)
                 .frame(width: 44, height: 44)
 
-            Text("Voily")
-                .font(.system(size: 22, weight: .semibold))
-                .foregroundStyle(.primary)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Voily")
+                    .font(.system(size: 22, weight: .semibold))
+                    .foregroundStyle(.primary)
+
+                if isUnlockMessageVisible {
+                    Text("彩蛋已解锁")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(.secondary)
+                }
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 16)
@@ -156,15 +167,28 @@ private struct SidebarHeader: View {
         .padding(.bottom, 16)
         .background(backgroundColor)
     }
+
+    private func showUnlockMessage() {
+        isUnlockMessageVisible = true
+
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 2_000_000_000)
+            isUnlockMessageVisible = false
+        }
+    }
 }
 
 private struct SidebarAppIcon: View {
+    let settings: AppSettings
+    let onUnlock: () -> Void
+
     var body: some View {
         Group {
-            if let image = NSApp.applicationIconImage {
+            if let image = currentIconImage {
                 Image(nsImage: image)
                     .resizable()
-                    .interpolation(.high)
+                    .interpolation(.none)
+                    .antialiased(false)
                     .aspectRatio(contentMode: .fit)
             } else {
                 Image(systemName: "app.fill")
@@ -175,6 +199,21 @@ private struct SidebarAppIcon: View {
             }
         }
         .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .onTapGesture(count: 7) {
+            guard !settings.isEasterEggUnlocked else { return }
+            settings.isEasterEggUnlocked = true
+            onUnlock()
+        }
+    }
+
+    private var currentIconImage: NSImage? {
+        switch settings.selectedAppIconVariant {
+        case .default:
+            return NSWorkspace.shared.icon(forFile: Bundle.main.bundlePath)
+        case .easterEggSVG4:
+            return NSImage(named: settings.selectedAppIconVariant.imageAssetName)
+        }
     }
 }
 
@@ -1259,6 +1298,18 @@ private struct GlossarySettingsPage: View {
 
 private struct GeneralSettingsPage: View {
     @Bindable var settings: AppSettings
+    let loadInputDevices: () -> [AudioInputDevice]
+
+    @State private var availableInputDevices: [AudioInputDevice] = []
+    @State private var deviceMonitor = AudioInputDeviceMonitor()
+
+    init(
+        settings: AppSettings,
+        loadInputDevices: @escaping () -> [AudioInputDevice] = { AudioInputDeviceCatalog().availableInputDevices() }
+    ) {
+        self.settings = settings
+        self.loadInputDevices = loadInputDevices
+    }
 
     var body: some View {
         ScrollView {
@@ -1284,10 +1335,30 @@ private struct GeneralSettingsPage: View {
                     }
                 }
 
+                MicrophoneInputSettingsCard(
+                    preferredMicrophoneUID: $settings.preferredMicrophoneUID,
+                    availableDevices: availableInputDevices,
+                    onRefresh: reloadInputDevices
+                )
+
                 SettingsCard(title: "App 外观", subtitle: "控制 Dock 与 menu bar 的展示方式") {
                     VStack(alignment: .leading, spacing: 14) {
                         Toggle("显示 Dock 图标", isOn: $settings.dockIconVisible)
                             .toggleStyle(.switch)
+
+                        if settings.isEasterEggUnlocked {
+                            Picker("App 图标", selection: $settings.selectedAppIconVariant) {
+                                ForEach(AppIconVariant.allCases) { variant in
+                                    Text(variant.displayName).tag(variant)
+                                }
+                            }
+                            .pickerStyle(.menu)
+                            .labelsHidden()
+
+                            Text("图标切换会立即作用到当前运行中的 App。")
+                                .font(.system(size: 12))
+                                .foregroundStyle(.secondary)
+                        }
 
                         Text("关闭后会隐藏 Dock 图标，仅保留 menu bar 入口；切换会立即生效。")
                             .font(.system(size: 12))
@@ -1318,6 +1389,17 @@ private struct GeneralSettingsPage: View {
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .scrollIndicators(.hidden)
+        .onAppear {
+            reloadInputDevices()
+            deviceMonitor.start(onChange: reloadInputDevices)
+        }
+        .onDisappear {
+            deviceMonitor.stop()
+        }
+    }
+
+    private func reloadInputDevices() {
+        availableInputDevices = loadInputDevices()
     }
 }
 
@@ -1334,6 +1416,87 @@ private struct GeneralSettingNoteRow: View {
                 .font(.system(size: 13))
                 .foregroundStyle(.secondary)
         }
+    }
+}
+
+private struct MicrophoneInputSettingsCard: View {
+    @Binding var preferredMicrophoneUID: String?
+
+    let availableDevices: [AudioInputDevice]
+    let onRefresh: () -> Void
+
+    private let catalog = AudioInputDeviceCatalog()
+
+    private var isPreferredDeviceMissing: Bool {
+        guard let preferredMicrophoneUID else { return false }
+        return !availableDevices.contains(where: { $0.uid == preferredMicrophoneUID })
+    }
+
+    private var automaticallySelectedDevice: AudioInputDevice? {
+        catalog.automaticallySelectedInputDevice(from: availableDevices)
+    }
+
+    private var selectedDeviceDescription: String {
+        if let preferredMicrophoneUID,
+           let device = availableDevices.first(where: { $0.uid == preferredMicrophoneUID }) {
+            return "当前使用 \(device.name)，普通听写和快捷翻译都会立即生效。"
+        }
+
+        if let automaticallySelectedDevice {
+            return "当前自动选择 \(automaticallySelectedDevice.name)。优先级为 USB > 内置麦克风 > 蓝牙，普通听写和快捷翻译都会立即生效。"
+        }
+
+        return "当前自动选择可用输入设备。优先级为 USB > 内置麦克风 > 蓝牙，普通听写和快捷翻译都会立即生效。"
+    }
+
+    private var automaticSelectionLabel: String {
+        if let automaticallySelectedDevice {
+            return "自动选择（当前会用 \(automaticallySelectedDevice.name)）"
+        }
+        return "自动选择"
+    }
+
+    var body: some View {
+        SettingsCard(title: "麦克风输入", subtitle: "为所有录音场景选择统一的输入设备") {
+            VStack(alignment: .leading, spacing: 14) {
+                HStack(alignment: .center, spacing: 12) {
+                    Picker("麦克风输入", selection: $preferredMicrophoneUID) {
+                        Text(automaticSelectionLabel)
+                            .tag(nil as String?)
+
+                        ForEach(availableDevices) { device in
+                            Text(deviceLabel(for: device))
+                                .tag(Optional(device.uid))
+                        }
+                    }
+                    .pickerStyle(.menu)
+                    .labelsHidden()
+
+                    Button("重新扫描", action: onRefresh)
+                        .controlSize(.small)
+                }
+
+                Text(selectedDeviceDescription)
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+
+                if isPreferredDeviceMissing {
+                    Text("当前设备不可用，录音时将回退到自动选择规则。重新接回设备后会继续命中这个选择。")
+                        .font(.system(size: 12))
+                        .foregroundStyle(.orange)
+                }
+            }
+        }
+    }
+
+    private func deviceLabel(for device: AudioInputDevice) -> String {
+        if automaticallySelectedDevice?.uid == device.uid {
+            return "\(device.name)（自动优先）"
+        }
+        if device.isDefault {
+            return "\(device.name)（系统默认）"
+        }
+        return device.name
     }
 }
 
@@ -1577,12 +1740,39 @@ enum SettingsPreviewData {
         return settings
     }
 
+    static func configuredSettings(preferredMicrophoneUID: String?) -> AppSettings {
+        let settings = configuredSettings()
+        settings.preferredMicrophoneUID = preferredMicrophoneUID
+        return settings
+    }
+
     static func emptySettings() -> AppSettings {
         let suiteName = "Voily.SettingsPreview.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!
         defaults.removePersistentDomain(forName: suiteName)
         return AppSettings(defaults: defaults)
     }
+
+    static let sampleAudioInputDevices: [AudioInputDevice] = [
+        AudioInputDevice(
+            uid: "usb-audio-interface",
+            name: "Shure MV7",
+            isDefault: false,
+            transport: .usb
+        ),
+        AudioInputDevice(
+            uid: "BuiltInMicrophoneDevice",
+            name: "MacBook Pro Microphone",
+            isDefault: true,
+            transport: .builtIn
+        ),
+        AudioInputDevice(
+            uid: "airpods-mic",
+            name: "AirPods Pro 麦克风",
+            isDefault: false,
+            transport: .bluetooth
+        ),
+    ]
 
     static func populatedUsageStore() -> UsageStore {
         let store = UsageStore(databasePath: ":memory:")
@@ -1736,4 +1926,37 @@ private extension TextRefinementProvider {
 #Preview("Settings Glossary") {
     GlossarySettingsPage(settings: SettingsPreviewData.configuredSettings())
         .frame(width: 760, height: 700)
+}
+
+@available(macOS 26.0, *)
+#Preview("Settings General") {
+    ScrollView {
+        VStack(alignment: .leading, spacing: 20) {
+            MicrophoneInputSettingsCard(
+                preferredMicrophoneUID: .constant(nil),
+                availableDevices: SettingsPreviewData.sampleAudioInputDevices,
+                onRefresh: {}
+            )
+
+            MicrophoneInputSettingsCard(
+                preferredMicrophoneUID: .constant("BuiltInMicrophoneDevice"),
+                availableDevices: SettingsPreviewData.sampleAudioInputDevices,
+                onRefresh: {}
+            )
+
+            MicrophoneInputSettingsCard(
+                preferredMicrophoneUID: .constant("usb-audio-interface"),
+                availableDevices: SettingsPreviewData.sampleAudioInputDevices,
+                onRefresh: {}
+            )
+
+            MicrophoneInputSettingsCard(
+                preferredMicrophoneUID: .constant("missing-microphone"),
+                availableDevices: SettingsPreviewData.sampleAudioInputDevices,
+                onRefresh: {}
+            )
+        }
+        .padding(28)
+    }
+    .frame(width: 760, height: 760)
 }

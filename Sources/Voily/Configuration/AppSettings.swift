@@ -92,6 +92,31 @@ enum ProviderCategory: String, Codable {
     }
 }
 
+enum AppIconVariant: String, CaseIterable, Codable, Identifiable {
+    case `default`
+    case easterEggSVG4
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .default:
+            return "默认图标"
+        case .easterEggSVG4:
+            return "彩蛋图标"
+        }
+    }
+
+    var imageAssetName: String {
+        switch self {
+        case .default:
+            return "AppIconDefaultImage"
+        case .easterEggSVG4:
+            return "AppIconEasterEggSVG4Image"
+        }
+    }
+}
+
 struct ASRProviderConfig: Codable, Equatable {
     var executablePath: String
     var modelPath: String
@@ -171,6 +196,7 @@ struct ModelSettingsSnapshot: Codable, Equatable {
     var selectedTextProvider: TextRefinementProvider
     var textRefinementEnabled: Bool
     var dockIconVisible: Bool
+    var preferredMicrophoneUID: String?
     var enabledDictationSkills: [DictationProcessingSkill]
     var asrConfigsByProvider: [ASRProvider: ASRProviderConfig]
     var textConfigsByProvider: [TextRefinementProvider: TextRefinementProviderConfig]
@@ -180,6 +206,7 @@ struct ModelSettingsSnapshot: Codable, Equatable {
         selectedTextProvider: .deepSeek,
         textRefinementEnabled: false,
         dockIconVisible: true,
+        preferredMicrophoneUID: nil,
         enabledDictationSkills: [],
         asrConfigsByProvider: {
             var configs: [ASRProvider: ASRProviderConfig] = Dictionary(
@@ -205,6 +232,7 @@ struct ModelSettingsSnapshot: Codable, Equatable {
         case selectedTextProvider
         case textRefinementEnabled
         case dockIconVisible
+        case preferredMicrophoneUID
         case enabledDictationSkills
         case asrConfigsByProvider
         case textConfigsByProvider
@@ -215,6 +243,7 @@ struct ModelSettingsSnapshot: Codable, Equatable {
         selectedTextProvider: TextRefinementProvider,
         textRefinementEnabled: Bool,
         dockIconVisible: Bool,
+        preferredMicrophoneUID: String?,
         enabledDictationSkills: [DictationProcessingSkill],
         asrConfigsByProvider: [ASRProvider: ASRProviderConfig],
         textConfigsByProvider: [TextRefinementProvider: TextRefinementProviderConfig]
@@ -223,6 +252,7 @@ struct ModelSettingsSnapshot: Codable, Equatable {
         self.selectedTextProvider = selectedTextProvider
         self.textRefinementEnabled = textRefinementEnabled
         self.dockIconVisible = dockIconVisible
+        self.preferredMicrophoneUID = preferredMicrophoneUID
         self.enabledDictationSkills = enabledDictationSkills
         self.asrConfigsByProvider = asrConfigsByProvider
         self.textConfigsByProvider = textConfigsByProvider
@@ -235,6 +265,7 @@ struct ModelSettingsSnapshot: Codable, Equatable {
         selectedTextProvider = try container.decodeIfPresent(TextRefinementProvider.self, forKey: .selectedTextProvider) ?? .deepSeek
         textRefinementEnabled = try container.decode(Bool.self, forKey: .textRefinementEnabled)
         dockIconVisible = try container.decodeIfPresent(Bool.self, forKey: .dockIconVisible) ?? true
+        preferredMicrophoneUID = try container.decodeIfPresent(String.self, forKey: .preferredMicrophoneUID)
         enabledDictationSkills = try container.decodeIfPresent([DictationProcessingSkill].self, forKey: .enabledDictationSkills) ?? []
         let rawASRConfigs: [ASRProvider: ASRProviderConfig] = try Self.decodeRawConfigMap(
             from: container,
@@ -257,6 +288,7 @@ struct ModelSettingsSnapshot: Codable, Equatable {
         try container.encode(selectedTextProvider, forKey: .selectedTextProvider)
         try container.encode(textRefinementEnabled, forKey: .textRefinementEnabled)
         try container.encode(dockIconVisible, forKey: .dockIconVisible)
+        try container.encodeIfPresent(preferredMicrophoneUID, forKey: .preferredMicrophoneUID)
         try container.encode(enabledDictationSkills, forKey: .enabledDictationSkills)
         try container.encode(
             Dictionary(uniqueKeysWithValues: asrConfigsByProvider.map { ($0.key.rawValue, $0.value) }),
@@ -493,6 +525,8 @@ final class AppSettings {
         static let glossaryEntries = "glossaryEntries"
         static let glossarySettingsSnapshot = "glossarySettingsSnapshot"
         static let modelSettingsSnapshot = "modelSettingsSnapshot"
+        static let isEasterEggUnlocked = "isEasterEggUnlocked"
+        static let selectedAppIconVariant = "selectedAppIconVariant"
 
         static let legacyLLMEnabled = "llmEnabled"
         static let legacyLLMBaseURL = "llmBaseURL"
@@ -540,6 +574,10 @@ final class AppSettings {
         didSet { persistSnapshot() }
     }
 
+    var preferredMicrophoneUID: String? {
+        didSet { persistSnapshot() }
+    }
+
     var enabledDictationSkills: [DictationProcessingSkill] {
         didSet {
             let normalized = Self.normalizedDictationSkills(enabledDictationSkills)
@@ -557,6 +595,20 @@ final class AppSettings {
 
     var textConfigsByProvider: [TextRefinementProvider: TextRefinementProviderConfig] {
         didSet { persistSnapshot() }
+    }
+
+    var isEasterEggUnlocked: Bool {
+        didSet {
+            defaults.set(isEasterEggUnlocked, forKey: Keys.isEasterEggUnlocked)
+            flushDefaults()
+        }
+    }
+
+    var selectedAppIconVariant: AppIconVariant {
+        didSet {
+            defaults.set(selectedAppIconVariant.rawValue, forKey: Keys.selectedAppIconVariant)
+            flushDefaults()
+        }
     }
 
     private var glossaryState: GlossarySettingsSnapshot {
@@ -584,9 +636,14 @@ final class AppSettings {
         self.selectedTextProvider = snapshot.selectedTextProvider
         self.textRefinementEnabled = snapshot.textRefinementEnabled
         self.dockIconVisible = snapshot.dockIconVisible
+        self.preferredMicrophoneUID = snapshot.preferredMicrophoneUID?.trimmed.nilIfEmpty
         self.enabledDictationSkills = snapshot.enabledDictationSkills
         self.asrConfigsByProvider = snapshot.asrConfigsByProvider
         self.textConfigsByProvider = snapshot.textConfigsByProvider
+        self.isEasterEggUnlocked = defaults.object(forKey: Keys.isEasterEggUnlocked) as? Bool ?? false
+        self.selectedAppIconVariant = AppIconVariant(
+            rawValue: defaults.string(forKey: Keys.selectedAppIconVariant) ?? AppIconVariant.default.rawValue
+        ) ?? .default
 
         persistSnapshot()
         persistGlossaryState()
@@ -744,6 +801,7 @@ final class AppSettings {
             selectedTextProvider: selectedTextProvider,
             textRefinementEnabled: textRefinementEnabled,
             dockIconVisible: dockIconVisible,
+            preferredMicrophoneUID: preferredMicrophoneUID?.trimmed.nilIfEmpty,
             enabledDictationSkills: enabledDictationSkills,
             asrConfigsByProvider: Dictionary(
                 uniqueKeysWithValues: ASRProvider.allCases.map { provider in
@@ -848,6 +906,7 @@ final class AppSettings {
 
     private static func normalizedSnapshot(_ snapshot: ModelSettingsSnapshot) -> ModelSettingsSnapshot {
         var normalized = snapshot
+        normalized.preferredMicrophoneUID = normalized.preferredMicrophoneUID?.trimmed.nilIfEmpty
         normalized.enabledDictationSkills = normalizedDictationSkills(snapshot.enabledDictationSkills)
         var qwenConfig = normalized.asrConfigsByProvider[.qwenASR] ?? .empty
         if qwenConfig.baseURL.trimmed.isEmpty {
@@ -889,5 +948,11 @@ final class AppSettings {
         }
 
         return normalizedTerms
+    }
+}
+
+private extension String {
+    var nilIfEmpty: String? {
+        isEmpty ? nil : self
     }
 }

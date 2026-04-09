@@ -14,6 +14,12 @@ final class AppSettingsTests: XCTestCase {
         XCTAssertEqual(settings.glossaryEntries, "OpenAI\nJSON\nVoily")
     }
 
+    func testPreferredMicrophoneUIDDefaultsToSystemDefault() {
+        let settings = AppSettings(defaults: makeDefaults())
+
+        XCTAssertNil(settings.preferredMicrophoneUID)
+    }
+
     func testEffectiveGlossaryItemsDeduplicateAcrossCustomTermsAndPresets() {
         let settings = AppSettings(defaults: makeDefaults())
         settings.setGlossaryState(
@@ -85,6 +91,15 @@ final class AppSettingsTests: XCTestCase {
         XCTAssertTrue(settings.dockIconVisible)
     }
 
+    func testLegacyModelSnapshotWithoutPreferredMicrophoneUIDDefaultsToSystemDefault() throws {
+        let defaults = makeDefaults()
+        defaults.set(try legacyModelSnapshotData(), forKey: "modelSettingsSnapshot")
+
+        let settings = AppSettings(defaults: defaults)
+
+        XCTAssertNil(settings.preferredMicrophoneUID)
+    }
+
     func testDockIconVisibilityPersistsAcrossReload() {
         let defaults = makeDefaults()
         let settings = AppSettings(defaults: defaults)
@@ -93,6 +108,16 @@ final class AppSettingsTests: XCTestCase {
 
         let reloaded = AppSettings(defaults: defaults)
         XCTAssertFalse(reloaded.dockIconVisible)
+    }
+
+    func testPreferredMicrophoneUIDPersistsAcrossReload() {
+        let defaults = makeDefaults()
+        let settings = AppSettings(defaults: defaults)
+
+        settings.preferredMicrophoneUID = "usb-mic"
+
+        let reloaded = AppSettings(defaults: defaults)
+        XCTAssertEqual(reloaded.preferredMicrophoneUID, "usb-mic")
     }
 
     func testGlossaryStatePersistsAcrossReload() {
