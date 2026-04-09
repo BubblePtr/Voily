@@ -517,9 +517,38 @@ final class AppController: NSObject {
         }
     }
 
+    private func requestSystemPermissionWhileFnMonitoringPaused(_ request: @escaping () async -> Bool) async -> Bool {
+        debugLog("Pausing Fn monitoring for system permission prompt")
+        fnKeyMonitor.stop()
+        overlayController.hide()
+        NSApp.activate(ignoringOtherApps: true)
+        try? await Task.sleep(for: .milliseconds(150))
+
+        let granted = await request()
+
+        debugLog("Resuming Fn monitoring after system permission prompt granted=\(granted)")
+        fnKeyMonitor.start()
+        return granted
+    }
+
     private func ensureRecordingPermissions(for provider: ASRProvider) async -> Bool {
-        let microphoneAuthorized = await permissionCoordinator.requestMicrophoneIfNeeded()
-        guard microphoneAuthorized else {
+        switch permissionCoordinator.microphoneAuthorizationStatus {
+        case .authorized:
+            break
+        case .notDetermined:
+            let granted = await requestSystemPermissionWhileFnMonitoringPaused { [permissionCoordinator] in
+                await permissionCoordinator.requestMicrophoneIfNeeded()
+            }
+            if granted {
+                await showTransientMessage("Microphone access granted. Hold Fn again to start recording.")
+            } else {
+                await showTransientMessage("Allow microphone access to start recording.")
+            }
+            return false
+        case .denied, .restricted:
+            await showTransientMessage("Allow microphone access to start recording.")
+            return false
+        @unknown default:
             await showTransientMessage("Allow microphone access to start recording.")
             return false
         }
@@ -528,13 +557,26 @@ final class AppController: NSObject {
             return true
         }
 
-        let speechAuthorized = await permissionCoordinator.requestSpeechRecognitionIfNeeded()
-        guard speechAuthorized else {
+        switch permissionCoordinator.speechRecognitionAuthorizationStatus {
+        case .authorized:
+            return true
+        case .notDetermined:
+            let granted = await requestSystemPermissionWhileFnMonitoringPaused { [permissionCoordinator] in
+                await permissionCoordinator.requestSpeechRecognitionIfNeeded()
+            }
+            if granted {
+                await showTransientMessage("Speech Recognition access granted. Hold Fn again to start recording.")
+            } else {
+                await showTransientMessage("Allow Speech Recognition to use the system transcription fallback.")
+            }
+            return false
+        case .denied, .restricted:
+            await showTransientMessage("Allow Speech Recognition to use the system transcription fallback.")
+            return false
+        @unknown default:
             await showTransientMessage("Allow Speech Recognition to use the system transcription fallback.")
             return false
         }
-
-        return true
     }
 
     private func recognizeText() async -> RecognitionOutcome {

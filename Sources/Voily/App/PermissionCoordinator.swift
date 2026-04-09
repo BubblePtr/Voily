@@ -22,6 +22,14 @@ final class PermissionCoordinator {
         SFSpeechRecognizer.authorizationStatus() == .authorized
     }
 
+    var microphoneAuthorizationStatus: AVAuthorizationStatus {
+        AVCaptureDevice.authorizationStatus(for: .audio)
+    }
+
+    var speechRecognitionAuthorizationStatus: SFSpeechRecognizerAuthorizationStatus {
+        SFSpeechRecognizer.authorizationStatus()
+    }
+
     func promptForAccessibilityIfNeeded(force: Bool = false) {
         guard !isAccessibilityTrusted else { return }
         let options = ["AXTrustedCheckOptionPrompt": true] as CFDictionary
