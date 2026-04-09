@@ -1072,14 +1072,23 @@ private struct TextRefinementProviderFields: View {
 private struct APIKeyField: View {
     @Binding var text: String
     @State private var isRevealed = false
+    @FocusState private var focusedField: FocusedField?
+
+    private enum FocusedField {
+        case concealed
+        case revealed
+    }
 
     var body: some View {
         HStack(spacing: 10) {
             if isRevealed {
                 TextField("sk-...", text: $text)
                     .textFieldStyle(.roundedBorder)
+                    .focused($focusedField, equals: .revealed)
             } else {
-                CopyableSecureField(placeholder: "sk-...", text: $text)
+                SecureField("sk-...", text: $text)
+                    .textFieldStyle(.roundedBorder)
+                    .focused($focusedField, equals: .concealed)
             }
 
             Button {
@@ -1091,127 +1100,9 @@ private struct APIKeyField: View {
             .buttonStyle(.borderless)
             .help(isRevealed ? "隐藏 API Key" : "显示 API Key")
         }
-    }
-}
-
-private struct CopyableSecureField: NSViewRepresentable {
-    let placeholder: String
-    @Binding var text: String
-
-    func makeCoordinator() -> Coordinator {
-        Coordinator(text: $text)
-    }
-
-    func makeNSView(context: Context) -> CopyFriendlySecureTextField {
-        let field = CopyFriendlySecureTextField()
-        field.delegate = context.coordinator
-        field.placeholderString = placeholder
-        field.isBordered = true
-        field.isBezeled = true
-        field.bezelStyle = .roundedBezel
-        field.isEditable = true
-        field.isSelectable = true
-        field.focusRingType = .default
-        field.font = .systemFont(ofSize: NSFont.systemFontSize)
-        field.stringValue = text
-        return field
-    }
-
-    func updateNSView(_ nsView: CopyFriendlySecureTextField, context: Context) {
-        nsView.placeholderString = placeholder
-        if nsView.stringValue != text {
-            nsView.stringValue = text
+        .onChange(of: isRevealed) { _, newValue in
+            focusedField = newValue ? .revealed : .concealed
         }
-    }
-
-    final class Coordinator: NSObject, NSTextFieldDelegate {
-        @Binding private var text: String
-
-        init(text: Binding<String>) {
-            _text = text
-        }
-
-        func controlTextDidChange(_ notification: Notification) {
-            guard let field = notification.object as? NSTextField else { return }
-            text = field.stringValue
-        }
-    }
-}
-
-private final class CopyFriendlySecureTextField: NSSecureTextField {
-    override func performKeyEquivalent(with event: NSEvent) -> Bool {
-        guard event.modifierFlags.intersection(.deviceIndependentFlagsMask).contains(.command),
-              let key = event.charactersIgnoringModifiers?.lowercased() else {
-            return super.performKeyEquivalent(with: event)
-        }
-
-        switch key {
-        case "a":
-            currentEditor()?.selectAll(nil)
-            return true
-        case "c":
-            copy(nil)
-            return true
-        case "x":
-            cut(nil)
-            return true
-        case "v":
-            NSApp.sendAction(#selector(NSText.paste(_:)), to: nil, from: self)
-            return true
-        default:
-            return super.performKeyEquivalent(with: event)
-        }
-    }
-
-    @objc func copy(_ sender: Any?) {
-        let value = selectedTextValue()
-        guard !value.isEmpty else { return }
-        NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(value, forType: .string)
-    }
-
-    @objc func cut(_ sender: Any?) {
-        guard isEditable else {
-            copy(sender)
-            return
-        }
-
-        if let editor = currentEditor() {
-            let range = editor.selectedRange
-            if let swiftRange = Range(range, in: stringValue), !swiftRange.isEmpty {
-                copy(sender)
-                stringValue.removeSubrange(swiftRange)
-                if let action {
-                    NSApp.sendAction(action, to: target, from: self)
-                }
-                delegate?.controlTextDidChange?(Notification(name: NSControl.textDidChangeNotification, object: self))
-                return
-            }
-        }
-
-        copy(sender)
-    }
-
-    override func validateUserInterfaceItem(_ item: any NSValidatedUserInterfaceItem) -> Bool {
-        switch item.action {
-        case #selector(copy(_:)), #selector(cut(_:)), #selector(NSText.paste(_:)), #selector(selectAll(_:)):
-            return true
-        default:
-            return super.validateUserInterfaceItem(item)
-        }
-    }
-
-    private func selectedTextValue() -> String {
-        guard let editor = currentEditor() else {
-            return stringValue
-        }
-
-        let range = editor.selectedRange
-        guard let swiftRange = Range(range, in: stringValue), !swiftRange.isEmpty else {
-            return stringValue
-        }
-
-        return String(stringValue[swiftRange])
     }
 }
 
@@ -1388,6 +1279,17 @@ private struct GeneralSettingsPage: View {
                         .labelsHidden()
 
                         Text("双击 Fn 的快捷翻译仍固定使用简体中文作为输入语言。")
+                            .font(.system(size: 12))
+                            .foregroundStyle(.secondary)
+                    }
+                }
+
+                SettingsCard(title: "App 外观", subtitle: "控制 Dock 与 menu bar 的展示方式") {
+                    VStack(alignment: .leading, spacing: 14) {
+                        Toggle("显示 Dock 图标", isOn: $settings.dockIconVisible)
+                            .toggleStyle(.switch)
+
+                        Text("关闭后会隐藏 Dock 图标，仅保留 menu bar 入口；切换会立即生效。")
                             .font(.system(size: 12))
                             .foregroundStyle(.secondary)
                     }

@@ -76,6 +76,25 @@ final class AppSettingsTests: XCTestCase {
         XCTAssertEqual(reloaded.selectedLanguage, .english)
     }
 
+    func testDockIconVisibilityDefaultsToVisibleForLegacySnapshots() throws {
+        let defaults = makeDefaults()
+        defaults.set(try legacyModelSnapshotData(), forKey: "modelSettingsSnapshot")
+
+        let settings = AppSettings(defaults: defaults)
+
+        XCTAssertTrue(settings.dockIconVisible)
+    }
+
+    func testDockIconVisibilityPersistsAcrossReload() {
+        let defaults = makeDefaults()
+        let settings = AppSettings(defaults: defaults)
+
+        settings.dockIconVisible = false
+
+        let reloaded = AppSettings(defaults: defaults)
+        XCTAssertFalse(reloaded.dockIconVisible)
+    }
+
     func testGlossaryStatePersistsAcrossReload() {
         let defaults = makeDefaults()
         let settings = AppSettings(defaults: defaults)
