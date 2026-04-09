@@ -5,6 +5,7 @@
 <p align="center">
   <img src="https://img.shields.io/badge/macOS_26.0+-black?style=flat-square&logo=apple&logoColor=white" alt="macOS 26.0+">
   <img src="https://img.shields.io/badge/Swift-orange?style=flat-square&logo=swift&logoColor=white" alt="Swift">
+  <img src="https://img.shields.io/badge/License-Apache_2.0-blue?style=flat-square" alt="Apache 2.0">
   <img src="https://img.shields.io/badge/Open_Source-green?style=flat-square" alt="Open Source">
 </p>
 
@@ -98,4 +99,4 @@ Sources/Voily/
 
 ## 📄 License
 
-Open source. See the repository for license details.
+This project is licensed under the [Apache License 2.0](LICENSE).

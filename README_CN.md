@@ -5,6 +5,7 @@
 <p align="center">
   <img src="https://img.shields.io/badge/macOS_26.0+-black?style=flat-square&logo=apple&logoColor=white" alt="macOS 26.0+">
   <img src="https://img.shields.io/badge/Swift-orange?style=flat-square&logo=swift&logoColor=white" alt="Swift">
+  <img src="https://img.shields.io/badge/License-Apache_2.0-blue?style=flat-square" alt="Apache 2.0">
   <img src="https://img.shields.io/badge/Open_Source-green?style=flat-square" alt="开源">
 </p>
 
@@ -98,4 +99,4 @@ Sources/Voily/
 
 ## 📄 许可证
 
-开源项目，详见仓库内许可证文件。
+本项目基于 [Apache License 2.0](LICENSE) 开源。
