@@ -1072,29 +1072,36 @@ private struct TextRefinementProviderFields: View {
 private struct APIKeyField: View {
     @Binding var text: String
     @State private var isRevealed = false
+    @FocusState private var focusedField: FocusedField?
+
+    private enum FocusedField {
+        case concealed
+        case revealed
+    }
 
     var body: some View {
         HStack(spacing: 10) {
-            Group {
-                if isRevealed {
-                    TextField("sk-...", text: $text)
-                } else {
-                    SecureField("sk-...", text: $text)
-                }
+            if isRevealed {
+                TextField("sk-...", text: $text)
+                    .textFieldStyle(.roundedBorder)
+                    .focused($focusedField, equals: .revealed)
+            } else {
+                SecureField("sk-...", text: $text)
+                    .textFieldStyle(.roundedBorder)
+                    .focused($focusedField, equals: .concealed)
             }
-            .textFieldStyle(.roundedBorder)
 
-            Button("粘贴") {
-                if let pasted = NSPasteboard.general.string(forType: .string) {
-                    text = pasted.trimmingCharacters(in: .whitespacesAndNewlines)
-                }
-            }
-            .buttonStyle(.borderless)
-
-            Button(isRevealed ? "隐藏" : "显示") {
+            Button {
                 isRevealed.toggle()
+            } label: {
+                Image(systemName: isRevealed ? "eye.slash" : "eye")
+                    .font(.system(size: 14, weight: .medium))
             }
             .buttonStyle(.borderless)
+            .help(isRevealed ? "隐藏 API Key" : "显示 API Key")
+        }
+        .onChange(of: isRevealed) { _, newValue in
+            focusedField = newValue ? .revealed : .concealed
         }
     }
 }
@@ -1272,6 +1279,17 @@ private struct GeneralSettingsPage: View {
                         .labelsHidden()
 
                         Text("双击 Fn 的快捷翻译仍固定使用简体中文作为输入语言。")
+                            .font(.system(size: 12))
+                            .foregroundStyle(.secondary)
+                    }
+                }
+
+                SettingsCard(title: "App 外观", subtitle: "控制 Dock 与 menu bar 的展示方式") {
+                    VStack(alignment: .leading, spacing: 14) {
+                        Toggle("显示 Dock 图标", isOn: $settings.dockIconVisible)
+                            .toggleStyle(.switch)
+
+                        Text("关闭后会隐藏 Dock 图标，仅保留 menu bar 入口；切换会立即生效。")
                             .font(.system(size: 12))
                             .foregroundStyle(.secondary)
                     }

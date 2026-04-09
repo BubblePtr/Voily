@@ -27,6 +27,7 @@ final class AppSettingsPersistenceIntegrationTests: XCTestCase {
         )
         first.selectedTextProvider = .dashScope
         first.textRefinementEnabled = true
+        first.dockIconVisible = false
         first.setEnabledDictationSkills([.removeFillers, .formalize])
         first.setTextRefinementConfig(
             TextRefinementProviderConfig(
@@ -46,6 +47,7 @@ final class AppSettingsPersistenceIntegrationTests: XCTestCase {
         XCTAssertEqual(second.asrConfig(for: .qwenASR).apiKey, "dashscope-key")
         XCTAssertEqual(second.selectedTextProvider, .dashScope)
         XCTAssertTrue(second.textRefinementEnabled)
+        XCTAssertFalse(second.dockIconVisible)
         XCTAssertEqual(second.enabledDictationSkills, [.removeFillers, .formalize])
         XCTAssertEqual(second.textRefinementConfig(for: .dashScope).apiKey, "dashscope-text-key")
     }

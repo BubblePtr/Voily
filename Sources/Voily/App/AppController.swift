@@ -2,6 +2,7 @@ import AppKit
 import AVFoundation
 import Charts
 import Foundation
+import Observation
 import SwiftUI
 
 func isRunningInXcodePreview() -> Bool {
@@ -101,9 +102,12 @@ final class AppController: NSObject {
 
     func start() {
         debugLog("AppController.start()")
+        configureMainMenu()
         configureStatusItem()
+        observeDockIconPreference()
         configureOverlayActions()
         configureAccessibilityFeatures()
+        showSettingsWindow()
     }
 
     func stop() {
@@ -123,6 +127,17 @@ final class AppController: NSObject {
         currentOverlayControls = .none
     }
 
+    func showSettingsWindow() {
+        settingsWindowController.show()
+    }
+
+    func handleReopen(hasVisibleWindows: Bool) -> Bool {
+        if !hasVisibleWindows {
+            showSettingsWindow()
+        }
+        return true
+    }
+
     private func configureAccessibilityFeatures() {
         debugLog("configureAccessibilityFeatures trusted=\(permissionCoordinator.isAccessibilityTrusted)")
         guard permissionCoordinator.isAccessibilityTrusted else {
@@ -137,6 +152,25 @@ final class AppController: NSObject {
 
         debugLog("Accessibility already trusted, starting fn monitoring")
         configureFnMonitoring()
+    }
+
+    private func observeDockIconPreference() {
+        withObservationTracking {
+            _ = settings.dockIconVisible
+        } onChange: { [weak self] in
+            Task { @MainActor in
+                self?.applyDockIconVisibility()
+                self?.observeDockIconPreference()
+            }
+        }
+
+        applyDockIconVisibility()
+    }
+
+    private func applyDockIconVisibility() {
+        let policy: NSApplication.ActivationPolicy = settings.dockIconVisible ? .regular : .accessory
+        guard NSApp.activationPolicy() != policy else { return }
+        NSApp.setActivationPolicy(policy)
     }
 
     private func configureStatusItem() {
@@ -157,6 +191,39 @@ final class AppController: NSObject {
         item.menu = menu
         statusItem = item
         statusMenu = menu
+    }
+
+    private func configureMainMenu() {
+        let mainMenu = NSMenu()
+
+        let appMenuItem = NSMenuItem()
+        let appMenu = NSMenu(title: "Voily")
+
+        let openSettingsItem = NSMenuItem(title: "设置…", action: #selector(openSettings), keyEquivalent: ",")
+        openSettingsItem.target = self
+        appMenu.addItem(openSettingsItem)
+
+        let hideItem = NSMenuItem(title: "隐藏 Voily", action: #selector(NSApplication.hide(_:)), keyEquivalent: "h")
+        appMenu.addItem(hideItem)
+        appMenu.addItem(.separator())
+
+        let quitItem = NSMenuItem(title: "退出 Voily", action: #selector(quit), keyEquivalent: "q")
+        quitItem.target = self
+        appMenu.addItem(quitItem)
+
+        appMenuItem.submenu = appMenu
+        mainMenu.addItem(appMenuItem)
+
+        let editMenuItem = NSMenuItem()
+        let editMenu = NSMenu(title: "Edit")
+        editMenu.addItem(withTitle: "Cut", action: #selector(NSText.cut(_:)), keyEquivalent: "x")
+        editMenu.addItem(withTitle: "Copy", action: #selector(NSText.copy(_:)), keyEquivalent: "c")
+        editMenu.addItem(withTitle: "Paste", action: #selector(NSText.paste(_:)), keyEquivalent: "v")
+        editMenu.addItem(withTitle: "Select All", action: #selector(NSText.selectAll(_:)), keyEquivalent: "a")
+        editMenuItem.submenu = editMenu
+        mainMenu.addItem(editMenuItem)
+
+        NSApp.mainMenu = mainMenu
     }
 
     private func makeMenu() -> NSMenu {
@@ -517,9 +584,38 @@ final class AppController: NSObject {
         }
     }
 
+    private func requestSystemPermissionWhileFnMonitoringPaused(_ request: @escaping () async -> Bool) async -> Bool {
+        debugLog("Pausing Fn monitoring for system permission prompt")
+        fnKeyMonitor.stop()
+        overlayController.hide()
+        NSApp.activate(ignoringOtherApps: true)
+        try? await Task.sleep(for: .milliseconds(150))
+
+        let granted = await request()
+
+        debugLog("Resuming Fn monitoring after system permission prompt granted=\(granted)")
+        fnKeyMonitor.start()
+        return granted
+    }
+
     private func ensureRecordingPermissions(for provider: ASRProvider) async -> Bool {
-        let microphoneAuthorized = await permissionCoordinator.requestMicrophoneIfNeeded()
-        guard microphoneAuthorized else {
+        switch permissionCoordinator.microphoneAuthorizationStatus {
+        case .authorized:
+            break
+        case .notDetermined:
+            let granted = await requestSystemPermissionWhileFnMonitoringPaused { [permissionCoordinator] in
+                await permissionCoordinator.requestMicrophoneIfNeeded()
+            }
+            if granted {
+                await showTransientMessage("Microphone access granted. Hold Fn again to start recording.")
+            } else {
+                await showTransientMessage("Allow microphone access to start recording.")
+            }
+            return false
+        case .denied, .restricted:
+            await showTransientMessage("Allow microphone access to start recording.")
+            return false
+        @unknown default:
             await showTransientMessage("Allow microphone access to start recording.")
             return false
         }
@@ -528,13 +624,26 @@ final class AppController: NSObject {
             return true
         }
 
-        let speechAuthorized = await permissionCoordinator.requestSpeechRecognitionIfNeeded()
-        guard speechAuthorized else {
+        switch permissionCoordinator.speechRecognitionAuthorizationStatus {
+        case .authorized:
+            return true
+        case .notDetermined:
+            let granted = await requestSystemPermissionWhileFnMonitoringPaused { [permissionCoordinator] in
+                await permissionCoordinator.requestSpeechRecognitionIfNeeded()
+            }
+            if granted {
+                await showTransientMessage("Speech Recognition access granted. Hold Fn again to start recording.")
+            } else {
+                await showTransientMessage("Allow Speech Recognition to use the system transcription fallback.")
+            }
+            return false
+        case .denied, .restricted:
+            await showTransientMessage("Allow Speech Recognition to use the system transcription fallback.")
+            return false
+        @unknown default:
             await showTransientMessage("Allow Speech Recognition to use the system transcription fallback.")
             return false
         }
-
-        return true
     }
 
     private func recognizeText() async -> RecognitionOutcome {

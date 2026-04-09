@@ -170,6 +170,7 @@ struct ModelSettingsSnapshot: Codable, Equatable {
     var selectedASRProvider: ASRProvider
     var selectedTextProvider: TextRefinementProvider
     var textRefinementEnabled: Bool
+    var dockIconVisible: Bool
     var enabledDictationSkills: [DictationProcessingSkill]
     var asrConfigsByProvider: [ASRProvider: ASRProviderConfig]
     var textConfigsByProvider: [TextRefinementProvider: TextRefinementProviderConfig]
@@ -178,6 +179,7 @@ struct ModelSettingsSnapshot: Codable, Equatable {
         selectedASRProvider: .senseVoice,
         selectedTextProvider: .deepSeek,
         textRefinementEnabled: false,
+        dockIconVisible: true,
         enabledDictationSkills: [],
         asrConfigsByProvider: {
             var configs: [ASRProvider: ASRProviderConfig] = Dictionary(
@@ -202,6 +204,7 @@ struct ModelSettingsSnapshot: Codable, Equatable {
         case selectedASRProvider
         case selectedTextProvider
         case textRefinementEnabled
+        case dockIconVisible
         case enabledDictationSkills
         case asrConfigsByProvider
         case textConfigsByProvider
@@ -211,6 +214,7 @@ struct ModelSettingsSnapshot: Codable, Equatable {
         selectedASRProvider: ASRProvider,
         selectedTextProvider: TextRefinementProvider,
         textRefinementEnabled: Bool,
+        dockIconVisible: Bool,
         enabledDictationSkills: [DictationProcessingSkill],
         asrConfigsByProvider: [ASRProvider: ASRProviderConfig],
         textConfigsByProvider: [TextRefinementProvider: TextRefinementProviderConfig]
@@ -218,6 +222,7 @@ struct ModelSettingsSnapshot: Codable, Equatable {
         self.selectedASRProvider = selectedASRProvider
         self.selectedTextProvider = selectedTextProvider
         self.textRefinementEnabled = textRefinementEnabled
+        self.dockIconVisible = dockIconVisible
         self.enabledDictationSkills = enabledDictationSkills
         self.asrConfigsByProvider = asrConfigsByProvider
         self.textConfigsByProvider = textConfigsByProvider
@@ -229,6 +234,7 @@ struct ModelSettingsSnapshot: Codable, Equatable {
         selectedASRProvider = Self.migratedSelectedASRProvider(from: selectedASRRawValue)
         selectedTextProvider = try container.decodeIfPresent(TextRefinementProvider.self, forKey: .selectedTextProvider) ?? .deepSeek
         textRefinementEnabled = try container.decode(Bool.self, forKey: .textRefinementEnabled)
+        dockIconVisible = try container.decodeIfPresent(Bool.self, forKey: .dockIconVisible) ?? true
         enabledDictationSkills = try container.decodeIfPresent([DictationProcessingSkill].self, forKey: .enabledDictationSkills) ?? []
         let rawASRConfigs: [ASRProvider: ASRProviderConfig] = try Self.decodeRawConfigMap(
             from: container,
@@ -250,6 +256,7 @@ struct ModelSettingsSnapshot: Codable, Equatable {
         try container.encode(selectedASRProvider.rawValue, forKey: .selectedASRProvider)
         try container.encode(selectedTextProvider, forKey: .selectedTextProvider)
         try container.encode(textRefinementEnabled, forKey: .textRefinementEnabled)
+        try container.encode(dockIconVisible, forKey: .dockIconVisible)
         try container.encode(enabledDictationSkills, forKey: .enabledDictationSkills)
         try container.encode(
             Dictionary(uniqueKeysWithValues: asrConfigsByProvider.map { ($0.key.rawValue, $0.value) }),
@@ -529,6 +536,10 @@ final class AppSettings {
         didSet { persistSnapshot() }
     }
 
+    var dockIconVisible: Bool {
+        didSet { persistSnapshot() }
+    }
+
     var enabledDictationSkills: [DictationProcessingSkill] {
         didSet {
             let normalized = Self.normalizedDictationSkills(enabledDictationSkills)
@@ -572,6 +583,7 @@ final class AppSettings {
         self.selectedASRProvider = snapshot.selectedASRProvider
         self.selectedTextProvider = snapshot.selectedTextProvider
         self.textRefinementEnabled = snapshot.textRefinementEnabled
+        self.dockIconVisible = snapshot.dockIconVisible
         self.enabledDictationSkills = snapshot.enabledDictationSkills
         self.asrConfigsByProvider = snapshot.asrConfigsByProvider
         self.textConfigsByProvider = snapshot.textConfigsByProvider
@@ -731,6 +743,7 @@ final class AppSettings {
             selectedASRProvider: selectedASRProvider,
             selectedTextProvider: selectedTextProvider,
             textRefinementEnabled: textRefinementEnabled,
+            dockIconVisible: dockIconVisible,
             enabledDictationSkills: enabledDictationSkills,
             asrConfigsByProvider: Dictionary(
                 uniqueKeysWithValues: ASRProvider.allCases.map { provider in
