@@ -184,11 +184,9 @@ private struct SidebarAppIcon: View {
 
     var body: some View {
         Group {
-            if let image = currentIconImage {
+            if let image = settings.selectedAppIconVariant.previewImage {
                 Image(nsImage: image)
                     .resizable()
-                    .interpolation(.none)
-                    .antialiased(false)
                     .aspectRatio(contentMode: .fit)
             } else {
                 Image(systemName: "app.fill")
@@ -206,14 +204,92 @@ private struct SidebarAppIcon: View {
             onUnlock()
         }
     }
+}
 
-    private var currentIconImage: NSImage? {
-        switch settings.selectedAppIconVariant {
-        case .default:
-            return NSWorkspace.shared.icon(forFile: Bundle.main.bundlePath)
-        case .easterEggSVG4:
-            return NSImage(named: settings.selectedAppIconVariant.imageAssetName)
+private struct AppIconSelector: View {
+    @Binding var selection: AppIconVariant
+
+    var body: some View {
+        HStack(spacing: 12) {
+            ForEach(AppIconVariant.allCases) { variant in
+                AppIconOptionCard(
+                    variant: variant,
+                    isSelected: selection == variant
+                ) {
+                    selection = variant
+                }
+            }
         }
+    }
+}
+
+private struct AppIconOptionCard: View {
+    let variant: AppIconVariant
+    let isSelected: Bool
+    let onSelect: () -> Void
+
+    var body: some View {
+        Button(action: onSelect) {
+            VStack(alignment: .leading, spacing: 12) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .fill(Color(nsColor: .textBackgroundColor))
+
+                    if let image = variant.previewImage {
+                        Image(nsImage: image)
+                            .resizable()
+                            .aspectRatio(contentMode: .fit)
+                            .padding(12)
+                    } else {
+                        Image(systemName: "app.fill")
+                            .font(.system(size: 28, weight: .medium))
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .frame(height: 96)
+
+                HStack(spacing: 8) {
+                    Text(variant.displayName)
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(.primary)
+
+                    Spacer(minLength: 8)
+
+                    Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(isSelected ? Color.accentColor : Color.secondary.opacity(0.7))
+                }
+
+                Text(isSelected ? "当前使用中" : "点击切换")
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+            }
+            .padding(14)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(cardBackground)
+            .overlay(cardBorder)
+            .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var cardBackground: some View {
+        RoundedRectangle(cornerRadius: 18, style: .continuous)
+            .fill(isSelected ? Color.accentColor.opacity(0.08) : Color(nsColor: .controlBackgroundColor))
+    }
+
+    private var cardBorder: some View {
+        RoundedRectangle(cornerRadius: 18, style: .continuous)
+            .stroke(
+                isSelected ? Color.accentColor.opacity(0.45) : Color.primary.opacity(0.08),
+                lineWidth: isSelected ? 1.5 : 1
+            )
+    }
+}
+
+private extension AppIconVariant {
+    var previewImage: NSImage? {
+        NSImage(named: imageAssetName)
     }
 }
 
@@ -1347,13 +1423,9 @@ private struct GeneralSettingsPage: View {
                             .toggleStyle(.switch)
 
                         if settings.isEasterEggUnlocked {
-                            Picker("App 图标", selection: $settings.selectedAppIconVariant) {
-                                ForEach(AppIconVariant.allCases) { variant in
-                                    Text(variant.displayName).tag(variant)
-                                }
+                            SettingsFormField(title: "App 图标") {
+                                AppIconSelector(selection: $settings.selectedAppIconVariant)
                             }
-                            .pickerStyle(.menu)
-                            .labelsHidden()
 
                             Text("图标切换会立即作用到当前运行中的 App。")
                                 .font(.system(size: 12))
