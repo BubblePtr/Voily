@@ -1,3 +1,4 @@
+import Darwin
 import Foundation
 
 enum SenseVoiceResidentServiceError: LocalizedError {
@@ -59,10 +60,16 @@ private struct SenseVoiceFinalizeResponse: Decodable {
     let text: String
 }
 
+private struct SenseVoiceHealthResponse: Decodable {
+    let status: String
+    let pid: Int32?
+}
+
 actor SenseVoiceResidentService {
     private let port = 50231
     private let partialMinimumDurationMs = 1500
     private var process: Process?
+    private var externalProcessID: Int32?
 
     func startSession(sampleRate: Double, languageCode: String) async throws -> SenseVoiceResidentSession {
         try await ensureServerStarted()
@@ -133,9 +140,16 @@ actor SenseVoiceResidentService {
         elapsedMs >= partialMinimumDurationMs
     }
 
-    func stop() {
-        process?.terminate()
-        process = nil
+    func stop() async {
+        if let process {
+            await terminate(process: process, reason: "owned")
+            self.process = nil
+        }
+
+        if let externalProcessID {
+            await terminate(processID: externalProcessID, reason: "adopted")
+            self.externalProcessID = nil
+        }
     }
 
     private func sendJSONRequest<Response: Decodable, RequestBody: Encodable>(
@@ -167,8 +181,20 @@ actor SenseVoiceResidentService {
     }
 
     private func ensureServerStarted() async throws {
-        if await isHealthy() {
-            return
+        if let server = await runningServer() {
+            if let process, process.isRunning {
+                externalProcessID = nil
+                return
+            }
+            if let pid = server.pid {
+                externalProcessID = pid
+                debugLog("SenseVoice resident adopted existing server pid=\(pid)")
+                return
+            }
+
+            debugLog("SenseVoice resident found legacy server without pid metadata, terminating port=\(port)")
+            try terminateUnknownListenerOnPort()
+            try? await Task.sleep(for: .milliseconds(250))
         }
 
         if let process, process.isRunning {
@@ -182,7 +208,8 @@ actor SenseVoiceResidentService {
 
         for _ in 0 ..< 40 {
             try? await Task.sleep(for: .milliseconds(250))
-            if await isHealthy() {
+            if await runningServer() != nil {
+                externalProcessID = nil
                 debugLog("SenseVoice resident ready port=\(port)")
                 return
             }
@@ -196,17 +223,88 @@ actor SenseVoiceResidentService {
         throw SenseVoiceResidentServiceError.serverUnavailable
     }
 
-    private func isHealthy() async -> Bool {
+    private func runningServer() async -> SenseVoiceHealthResponse? {
         var request = makeRequest(path: "/healthz", method: "GET", timeout: 0.5)
         request.httpBody = nil
         do {
-            let (_, response) = try await URLSession.shared.data(for: request)
-            guard let httpResponse = response as? HTTPURLResponse else {
-                return false
+            let (data, response) = try await URLSession.shared.data(for: request)
+            guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
+                return nil
             }
-            return httpResponse.statusCode == 200
+            let health = try JSONDecoder().decode(SenseVoiceHealthResponse.self, from: data)
+            return health.status == "ok" ? health : nil
         } catch {
-            return false
+            return nil
+        }
+    }
+
+    private func terminate(process: Process, reason: String) async {
+        let processID = process.processIdentifier
+        guard processID > 0 else { return }
+
+        if process.isRunning {
+            debugLog("SenseVoice resident stopping \(reason) pid=\(processID)")
+            process.terminate()
+            for _ in 0 ..< 10 {
+                if !process.isRunning {
+                    return
+                }
+                try? await Task.sleep(for: .milliseconds(100))
+            }
+        }
+
+        if process.isRunning {
+            debugLog("SenseVoice resident force killing \(reason) pid=\(processID)")
+            kill(processID, SIGKILL)
+        }
+    }
+
+    private func terminate(processID: Int32, reason: String) async {
+        guard processID > 0, processID != getpid() else { return }
+
+        debugLog("SenseVoice resident stopping \(reason) pid=\(processID)")
+        kill(processID, SIGTERM)
+        for _ in 0 ..< 10 {
+            if kill(processID, 0) != 0 {
+                return
+            }
+            try? await Task.sleep(for: .milliseconds(100))
+        }
+
+        debugLog("SenseVoice resident force killing \(reason) pid=\(processID)")
+        kill(processID, SIGKILL)
+    }
+
+    private func terminateUnknownListenerOnPort() throws {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/sbin/lsof")
+        process.arguments = ["-nP", "-iTCP:\(port)", "-sTCP:LISTEN", "-t"]
+
+        let stdoutPipe = Pipe()
+        let stderrPipe = Pipe()
+        process.standardOutput = stdoutPipe
+        process.standardError = stderrPipe
+
+        do {
+            try process.run()
+        } catch {
+            throw SenseVoiceResidentServiceError.startupFailed("无法清理旧服务：\(error.localizedDescription)")
+        }
+
+        process.waitUntilExit()
+        guard process.terminationStatus == 0 || process.terminationStatus == 1 else {
+            let stderr = stderrPipe.readSummary()
+            throw SenseVoiceResidentServiceError.startupFailed(stderr.isEmpty ? "无法识别旧服务进程" : stderr)
+        }
+
+        let output = String(decoding: stdoutPipe.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
+        let processIDs = output
+            .split(whereSeparator: \.isNewline)
+            .compactMap { Int32($0.trimmingCharacters(in: .whitespacesAndNewlines)) }
+            .filter { $0 > 0 && $0 != getpid() }
+
+        for processID in processIDs {
+            kill(processID, SIGTERM)
         }
     }
 
@@ -370,7 +468,7 @@ def transcribe_pcm(session: Session) -> str:
 
 @app.get("/healthz")
 async def healthz():
-    return {"status": "ok"}
+    return {"status": "ok", "pid": os.getpid()}
 
 
 @app.post("/sessions/start")

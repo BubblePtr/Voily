@@ -93,12 +93,11 @@ final class AppController: NSObject {
     private var currentSessionMode: CaptureSessionMode?
     private var localAudioWriter: TemporaryAudioCaptureWriter?
     private var currentResidentSession: SenseVoiceResidentSession?
-    private var partialPollingTask: Task<Void, Never>?
-    private var partialPollingInFlight = false
     private var currentFirstPartialMs: Int?
     private var currentPartialCount = 0
     private var currentSpeechCaptureEnabled = false
     private var currentPendingRealtimeAppendCount = 0
+    private var hasStopped = false
 
     func start() {
         debugLog("AppController.start()")
@@ -111,19 +110,22 @@ final class AppController: NSObject {
         showSettingsWindow()
     }
 
-    func stop() {
+    func stop() async {
+        guard !hasStopped else { return }
+        hasStopped = true
+
         debugLog("AppController.stop()")
         fnKeyMonitor.stop()
         audioCaptureService.stop()
         speechService.cancel()
-        partialPollingTask?.cancel()
-        Task {
-            if let currentResidentSession {
-                await senseVoiceResidentService.cancelSession(currentResidentSession)
-            }
-            try? await qwenRealtimeASRService.cancelSession()
-            await senseVoiceResidentService.stop()
+        if let currentResidentSession {
+            await senseVoiceResidentService.cancelSession(currentResidentSession)
         }
+        try? await qwenRealtimeASRService.cancelSession()
+        await senseVoiceResidentService.stop()
+        currentResidentSession = nil
+        localAudioWriter?.cancel()
+        localAudioWriter = nil
         currentSessionMode = nil
         currentOverlayControls = .none
     }
@@ -378,9 +380,6 @@ final class AppController: NSObject {
         currentFirstPartialMs = nil
         currentPartialCount = 0
         currentResidentSession = nil
-        partialPollingTask?.cancel()
-        partialPollingTask = nil
-        partialPollingInFlight = false
         currentSpeechCaptureEnabled = false
         currentPendingRealtimeAppendCount = 0
         setOverlay(text: "", rmsLevel: 0, phase: .recording)
@@ -390,7 +389,6 @@ final class AppController: NSObject {
             if selectedASRProvider.category == .local {
                 debugLog("Recording with local ASR provider=\(selectedASRProvider.rawValue)")
                 localAudioWriter = TemporaryAudioCaptureWriter()
-                startSenseVoicePartialPolling()
             } else {
                 if selectedASRProvider == .qwenASR {
                     try await startQwenRealtimeSession()
@@ -427,8 +425,6 @@ final class AppController: NSObject {
                 }
             }
             currentResidentSession = nil
-            partialPollingTask?.cancel()
-            partialPollingTask = nil
             currentPendingRealtimeAppendCount = 0
             currentSessionMode = nil
             currentOverlayControls = .none
@@ -443,8 +439,6 @@ final class AppController: NSObject {
         guard let sessionMode = currentSessionMode else { return }
         debugLog("finishRecording mode=\(sessionMode.debugName)")
 
-        partialPollingTask?.cancel()
-        partialPollingTask = nil
         setOverlay(text: currentText, rmsLevel: smoothedRMS, phase: .transcribing)
         audioCaptureService.stop()
         await waitForPendingRealtimeAppends()
@@ -576,8 +570,6 @@ final class AppController: NSObject {
         speechService.cancel()
         localAudioWriter?.cancel()
         localAudioWriter = nil
-        partialPollingTask?.cancel()
-        partialPollingTask = nil
 
         if let currentResidentSession {
             await senseVoiceResidentService.cancelSession(currentResidentSession)
@@ -595,7 +587,6 @@ final class AppController: NSObject {
         currentPhase = .idle
         currentSessionStartedAt = nil
         smoothedRMS = 0
-        partialPollingInFlight = false
 
         if hideOverlay {
             overlayController.hide()
@@ -817,17 +808,6 @@ final class AppController: NSObject {
         }
     }
 
-    private func startSenseVoicePartialPolling() {
-        partialPollingTask?.cancel()
-        partialPollingTask = Task { [weak self] in
-            guard let self else { return }
-            while !Task.isCancelled {
-                try? await Task.sleep(for: .milliseconds(500))
-                await self.pollSenseVoicePartialIfNeeded()
-            }
-        }
-    }
-
     private func appendSenseVoiceChunk(_ pcmData: Data, sampleRate: Double) async {
         guard currentPhase == .recording || currentPhase == .recordingPartial else { return }
         currentPendingRealtimeAppendCount += 1
@@ -892,36 +872,6 @@ final class AppController: NSObject {
         setOverlay(text: trimmed, rmsLevel: smoothedRMS, phase: .recordingPartial)
     }
 
-    private func pollSenseVoicePartialIfNeeded() async {
-        guard !partialPollingInFlight else { return }
-        guard currentPhase == .recording || currentPhase == .recordingPartial else { return }
-        guard let currentResidentSession, let currentSessionStartedAt else { return }
-
-        let elapsedMs = Int(Date().timeIntervalSince(currentSessionStartedAt) * 1000)
-        guard senseVoiceResidentService.shouldFetchPartial(elapsedMs: elapsedMs) else { return }
-
-        partialPollingInFlight = true
-        defer { partialPollingInFlight = false }
-
-        do {
-            guard let partialText = try await senseVoiceResidentService.fetchPartial(sessionID: currentResidentSession.id) else {
-                return
-            }
-            guard shouldDisplayPartial(partialText) else {
-                return
-            }
-            currentText = partialText
-            currentPhase = .recordingPartial
-            if currentFirstPartialMs == nil {
-                currentFirstPartialMs = elapsedMs
-            }
-            currentPartialCount += 1
-            setOverlay(text: partialText, rmsLevel: smoothedRMS, phase: .recordingPartial)
-        } catch {
-            debugLog("SenseVoice resident partial failed error=\(error.localizedDescription)")
-        }
-    }
-
     private func waitForPendingRealtimeAppends() async {
         guard settings.selectedASRProvider == .senseVoice || settings.selectedASRProvider == .qwenASR else { return }
         let deadline = Date().addingTimeInterval(1.5)
@@ -931,16 +881,6 @@ final class AppController: NSObject {
         if currentPendingRealtimeAppendCount > 0 {
             debugLog("Realtime pending appends timed out count=\(currentPendingRealtimeAppendCount)")
         }
-    }
-
-    private func shouldDisplayPartial(_ candidate: String) -> Bool {
-        let trimmed = candidate.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard trimmed.count >= 4 else { return false }
-        guard trimmed != "。" && trimmed != "，" && trimmed != "." && trimmed != "," else { return false }
-        if currentText.isEmpty {
-            return true
-        }
-        return trimmed.count > currentText.count && trimmed.hasPrefix(currentText)
     }
 
     @objc
