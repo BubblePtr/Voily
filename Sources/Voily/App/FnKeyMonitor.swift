@@ -110,6 +110,7 @@ final class FnKeyMonitor: @unchecked Sendable {
     private var tapThread: Thread?
     private var tapRunLoop: CFRunLoop?
     private var isFnPressed = false
+    private var tapRequested = false
     private var stateMachine = FnShortcutStateMachine()
     private var longPressWorkItem: DispatchWorkItem?
     private var doubleTapWorkItem: DispatchWorkItem?
@@ -117,17 +118,22 @@ final class FnKeyMonitor: @unchecked Sendable {
     func start() {
         guard tapThread == nil else { return }
         debugLog("FnKeyMonitor.start()")
-
-        let ready = DispatchSemaphore(value: 0)
+        stateQueue.sync {
+            tapRequested = true
+        }
         let thread = Thread { [weak self] in
-            guard let self else {
-                ready.signal()
-                return
-            }
+            guard let self else { return }
 
             self.tapRunLoop = CFRunLoopGetCurrent()
             self.setupEventTap()
-            ready.signal()
+
+            let shouldKeepRunning = self.stateQueue.sync { self.tapRequested }
+            guard shouldKeepRunning else {
+                self.invalidateEventTap()
+                self.tapRunLoop = nil
+                self.tapThread = nil
+                return
+            }
 
             guard self.eventTap != nil else {
                 self.tapRunLoop = nil
@@ -138,9 +144,9 @@ final class FnKeyMonitor: @unchecked Sendable {
             CFRunLoopRun()
         }
         thread.name = "Voily.FnKeyMonitor"
+        thread.qualityOfService = .userInteractive
         tapThread = thread
         thread.start()
-        ready.wait()
     }
 
     func stop() {
@@ -149,6 +155,7 @@ final class FnKeyMonitor: @unchecked Sendable {
             cancelTimers()
             stateMachine.reset()
             isFnPressed = false
+            tapRequested = false
         }
 
         guard let tapRunLoop else {

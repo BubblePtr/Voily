@@ -14,7 +14,10 @@ final class SettingsWindowController: NSWindowController {
         window.setContentSize(minimumContentSize)
         window.contentMinSize = minimumContentSize
         window.minSize = window.frameRect(forContentRect: NSRect(origin: .zero, size: minimumContentSize)).size
-        window.styleMask = [.titled, .closable, .miniaturizable, .resizable]
+        window.styleMask = [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView]
+        window.titlebarAppearsTransparent = true
+        window.toolbarStyle = .unified
+        window.isMovableByWindowBackground = true
         window.center()
         super.init(window: window)
         shouldCascadeWindows = true
@@ -52,16 +55,16 @@ private enum SettingsPage: String, CaseIterable, Identifiable, Hashable {
         }
     }
 
-    var systemImage: String {
+    var sidebarIcon: Image {
         switch self {
         case .home:
-            return "rectangle.grid.2x2"
+            return Ph.house.regular
         case .model:
-            return "cpu.fill"
+            return Ph.cpu.regular
         case .glossary:
-            return "text.book.closed.fill"
+            return Ph.books.regular
         case .settings:
-            return "slider.horizontal.3"
+            return Ph.gear.regular
         }
     }
 }
@@ -92,6 +95,7 @@ private struct SettingsRootView: View {
                     GeneralSettingsPage(settings: settings)
                 }
             }
+            .id(selection ?? .home)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(Color(nsColor: .windowBackgroundColor))
         }
@@ -117,31 +121,60 @@ private struct SettingsRootView: View {
 private struct SettingsSidebar: View {
     let settings: AppSettings
     @Binding var selection: SettingsPage?
-    private let backgroundColor = Color(nsColor: .windowBackgroundColor)
 
     var body: some View {
-        VStack(spacing: 0) {
-            SidebarHeader(settings: settings)
-
-            List(SettingsPage.allCases, selection: $selection) { page in
-                NavigationLink(value: page) {
-                    Label(page.title, systemImage: page.systemImage)
-                        .font(.system(size: 14, weight: .medium))
-                        .padding(.vertical, 6)
-                }
-                .tag(page)
+        List(selection: $selection) {
+            Section {
+                SidebarHeader(settings: settings)
+                    .tag(nil as SettingsPage?)
+                    .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 12, trailing: 16))
+                    .listRowBackground(Color.clear)
+                    .allowsHitTesting(false)
             }
-            .listStyle(.sidebar)
-            .scrollContentBackground(.hidden)
-            .background(backgroundColor)
+
+            Section {
+                sidebarRow(.home)
+                sidebarRow(.model)
+                sidebarRow(.glossary)
+                sidebarRow(.settings)
+            }
         }
-        .background(backgroundColor)
+        .listStyle(.sidebar)
     }
+
+    private func sidebarRow(_ page: SettingsPage) -> some View {
+        HStack(spacing: 12) {
+            page.sidebarIcon
+                .renderingMode(.template)
+                .scaledToFit()
+                .frame(width: 24, height: 24)
+
+            Text(page.title)
+                .font(.system(size: 14, weight: .medium))
+        }
+        .tag(page)
+    }
+}
+
+private enum Ph {
+    struct Icon {
+        let assetName: String
+
+        var regular: Image {
+            Image(assetName)
+                .renderingMode(.template)
+                .resizable()
+        }
+    }
+
+    static let house = Icon(assetName: "SidebarPhHouseIcon")
+    static let books = Icon(assetName: "SidebarPhBooksIcon")
+    static let cpu = Icon(assetName: "SidebarPhCPUIcon")
+    static let gear = Icon(assetName: "SidebarPhGearIcon")
 }
 
 private struct SidebarHeader: View {
     let settings: AppSettings
-    private let backgroundColor = Color(nsColor: .windowBackgroundColor)
     @State private var isUnlockMessageVisible = false
 
     var body: some View {
@@ -162,10 +195,6 @@ private struct SidebarHeader: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 16)
-        .padding(.top, 20)
-        .padding(.bottom, 16)
-        .background(backgroundColor)
     }
 
     private func showUnlockMessage() {
