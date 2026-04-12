@@ -9,8 +9,8 @@ struct DashboardHomePage: View {
     @State private var copyToastTask: Task<Void, Never>?
 
     private let historyColumns = [
-        GridItem(.flexible(minimum: 420), spacing: 20, alignment: .top),
-        GridItem(.flexible(minimum: 420), spacing: 20, alignment: .top),
+        GridItem(.flexible(minimum: 360), spacing: 20, alignment: .top),
+        GridItem(.flexible(minimum: 360), spacing: 20, alignment: .top),
     ]
 
     var body: some View {
@@ -96,12 +96,14 @@ private struct TodayMetricsSection: View {
     let asrSummary: TodayASRPerformanceSummary
 
     private let columns = [
-        GridItem(.flexible(), spacing: 18),
-        GridItem(.flexible(), spacing: 18),
+        GridItem(.flexible(), spacing: 16),
+        GridItem(.flexible(), spacing: 16),
+        GridItem(.flexible(), spacing: 16),
+        GridItem(.flexible(), spacing: 16),
     ]
 
     var body: some View {
-        LazyVGrid(columns: columns, spacing: 18) {
+        LazyVGrid(columns: columns, spacing: 16) {
             MetricCard(
                 title: "今日语音输入时长",
                 value: formattedDuration(summary.totalDurationMs),
@@ -169,10 +171,10 @@ private struct MetricCard: View {
     let accent: Color
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 18) {
+        VStack(alignment: .leading, spacing: 14) {
             RoundedRectangle(cornerRadius: 12, style: .continuous)
                 .fill(accent.opacity(0.12))
-                .frame(width: 42, height: 42)
+                .frame(width: 40, height: 40)
                 .overlay(
                     Circle()
                         .fill(accent)
@@ -184,14 +186,16 @@ private struct MetricCard: View {
                 .foregroundStyle(.secondary)
 
             Text(value)
-                .font(.system(size: 34, weight: .semibold))
+                .font(.system(size: 30, weight: .semibold))
+                .lineLimit(1)
+                .minimumScaleFactor(0.75)
 
             Text(footnote)
                 .font(.system(size: 12))
                 .foregroundStyle(.secondary)
         }
-        .padding(20)
-        .frame(maxWidth: .infinity, minHeight: 176, alignment: .leading)
+        .padding(18)
+        .frame(maxWidth: .infinity, minHeight: 152, alignment: .leading)
         .background(
             RoundedRectangle(cornerRadius: 22, style: .continuous)
                 .fill(Color(nsColor: .controlBackgroundColor))

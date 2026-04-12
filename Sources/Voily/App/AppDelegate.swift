@@ -3,27 +3,23 @@ import AppKit
 @available(macOS 26.0, *)
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
-    private var appController: AppController?
+    let windowActions = WindowActions()
+    lazy var appController = AppController(windowActions: windowActions)
     private var isTerminating = false
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         guard !isRunningInXcodePreview() else { return }
         try? FileManager.default.removeItem(atPath: "/tmp/voily.log")
         debugLog("AppDelegate.applicationDidFinishLaunching")
-        appController = AppController()
-        appController?.start()
+        appController.start()
     }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
-        appController?.handleReopen(hasVisibleWindows: flag) ?? false
+        appController.handleReopen(hasVisibleWindows: flag)
     }
 
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         guard !isTerminating else {
-            return .terminateNow
-        }
-
-        guard let appController else {
             return .terminateNow
         }
 

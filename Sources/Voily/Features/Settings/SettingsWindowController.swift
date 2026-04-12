@@ -1,36 +1,37 @@
 import AppKit
 import SwiftUI
 
-@MainActor
-final class SettingsWindowController: NSWindowController {
-    init(settings: AppSettings, usageStore: UsageStore, llmService: LLMRefinementService, managedASRModels: ManagedASRModelStore) {
-        let view = SettingsRootView(settings: settings, usageStore: usageStore, llmService: llmService, managedASRModels: managedASRModels)
-        let hostingController = NSHostingController(rootView: view)
-        let window = NSWindow(contentViewController: hostingController)
-        let minimumContentSize = NSSize(width: 1120, height: 760)
+enum SettingsWindowSceneID {
+    static let settings = "settings-window"
+}
 
-        window.title = ""
-        window.titleVisibility = .hidden
-        window.setContentSize(minimumContentSize)
-        window.contentMinSize = minimumContentSize
-        window.minSize = window.frameRect(forContentRect: NSRect(origin: .zero, size: minimumContentSize)).size
-        window.styleMask = [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView]
-        window.titlebarAppearsTransparent = true
-        window.toolbarStyle = .unified
-        window.isMovableByWindowBackground = true
-        window.center()
-        super.init(window: window)
-        shouldCascadeWindows = true
-    }
+@available(macOS 26.0, *)
+struct SettingsWindowSceneView: View {
+    let settings: AppSettings
+    let usageStore: UsageStore
+    let llmService: LLMRefinementService
+    let managedASRModels: ManagedASRModelStore
+    let registerShowWindowAction: (@escaping () -> Void) -> Void
 
-    @available(*, unavailable)
-    required init?(coder: NSCoder) {
-        fatalError("init(coder:) has not been implemented")
-    }
+    @Environment(\.openWindow) private var openWindow
 
-    func show() {
-        window?.makeKeyAndOrderFront(nil)
-        NSApp.activate(ignoringOtherApps: true)
+    var body: some View {
+        SettingsRootView(
+            settings: settings,
+            usageStore: usageStore,
+            llmService: llmService,
+            managedASRModels: managedASRModels
+        )
+        .frame(minWidth: 1120, minHeight: 760)
+        .toolbar(removing: .title)
+        .toolbarBackgroundVisibility(.hidden, for: .windowToolbar)
+        .onAppear {
+            registerShowWindowAction {
+                Task { @MainActor in
+                    try? await openWindow(id: SettingsWindowSceneID.settings, sharingBehavior: .required)
+                }
+            }
+        }
     }
 }
 
@@ -99,22 +100,6 @@ private struct SettingsRootView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(Color(nsColor: .windowBackgroundColor))
         }
-        .toolbar {
-            ToolbarItem(placement: .navigation) {
-                Button(action: toggleSidebar) {
-                    Label(sidebarToggleTitle, systemImage: "sidebar.left")
-                }
-                .help(sidebarToggleTitle)
-            }
-        }
-    }
-
-    private var sidebarToggleTitle: String {
-        columnVisibility == .detailOnly ? "显示侧边栏" : "隐藏侧边栏"
-    }
-
-    private func toggleSidebar() {
-        columnVisibility = columnVisibility == .detailOnly ? .all : .detailOnly
     }
 }
 

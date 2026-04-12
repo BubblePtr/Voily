@@ -20,7 +20,7 @@
 		A001000B0000000000000000 /* SpeechTranscriptionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A002000B0000000000000000 /* SpeechTranscriptionService.swift */; };
 		A001000C0000000000000000 /* SupportedLanguage.swift in Sources */ = {isa = PBXBuildFile; fileRef = A002000C0000000000000000 /* SupportedLanguage.swift */; };
 		A001000D0000000000000000 /* TextInjectionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A002000D0000000000000000 /* TextInjectionService.swift */; };
-		A001000E0000000000000000 /* VoilyMain.swift in Sources */ = {isa = PBXBuildFile; fileRef = A002000E0000000000000000 /* VoilyMain.swift */; };
+		A001000E0000000000000000 /* VoilyApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A002000E0000000000000000 /* VoilyApp.swift */; };
 		A00100100000000000000000 /* OverlayPreview.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00200120000000000000000 /* OverlayPreview.swift */; };
 		A00100110000000000000000 /* BrandIcons in Resources */ = {isa = PBXBuildFile; fileRef = A00200130000000000000000 /* BrandIcons */; };
 		A00100120000000000000000 /* DashboardHomePage.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00200140000000000000000 /* DashboardHomePage.swift */; };
@@ -63,7 +63,7 @@
 		A002000B0000000000000000 /* SpeechTranscriptionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeechTranscriptionService.swift; sourceTree = "<group>"; };
 		A002000C0000000000000000 /* SupportedLanguage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupportedLanguage.swift; sourceTree = "<group>"; };
 		A002000D0000000000000000 /* TextInjectionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextInjectionService.swift; sourceTree = "<group>"; };
-		A002000E0000000000000000 /* VoilyMain.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoilyMain.swift; sourceTree = "<group>"; };
+		A002000E0000000000000000 /* VoilyApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoilyApp.swift; sourceTree = "<group>"; };
 		A002000F0000000000000000 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		A00200100000000000000000 /* Voily.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Voily.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A00200120000000000000000 /* OverlayPreview.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OverlayPreview.swift; sourceTree = "<group>"; };
@@ -136,7 +136,7 @@
 				A00200020000000000000000 /* AppDelegate.swift */,
 				A00200050000000000000000 /* FnKeyMonitor.swift */,
 				A00200090000000000000000 /* PermissionCoordinator.swift */,
-				A002000E0000000000000000 /* VoilyMain.swift */,
+				A002000E0000000000000000 /* VoilyApp.swift */,
 			);
 			path = App;
 			sourceTree = "<group>";
@@ -395,7 +395,7 @@
 				A001000C0000000000000000 /* SupportedLanguage.swift in Sources */,
 				A001000D0000000000000000 /* TextInjectionService.swift in Sources */,
 				A00100130000000000000000 /* UsageStore.swift in Sources */,
-				A001000E0000000000000000 /* VoilyMain.swift in Sources */,
+				A001000E0000000000000000 /* VoilyApp.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

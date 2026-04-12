@@ -60,7 +60,14 @@ private enum CaptureSessionMode: Equatable {
 
 @available(macOS 26.0, *)
 @MainActor
+final class WindowActions {
+    var showSettingsWindow: () -> Void = {}
+}
+
+@available(macOS 26.0, *)
+@MainActor
 final class AppController: NSObject {
+    private let windowActions: WindowActions
     private let settings = AppSettings()
     private let usageStore = UsageStore()
     private let permissionCoordinator = PermissionCoordinator()
@@ -73,13 +80,6 @@ final class AppController: NSObject {
     private let overlayController = OverlayPanelController()
     private let textInjectionService = TextInjectionService()
     private let llmRefinementService = LLMRefinementService()
-
-    private lazy var settingsWindowController = SettingsWindowController(
-        settings: settings,
-        usageStore: usageStore,
-        llmService: llmRefinementService,
-        managedASRModels: managedASRModels
-    )
 
     private var statusItem: NSStatusItem?
     private var statusMenu: NSMenu?
@@ -99,6 +99,10 @@ final class AppController: NSObject {
     private var currentPendingRealtimeAppendCount = 0
     private var hasStopped = false
 
+    init(windowActions: WindowActions) {
+        self.windowActions = windowActions
+    }
+
     func start() {
         debugLog("AppController.start()")
         configureMainMenu()
@@ -107,7 +111,6 @@ final class AppController: NSObject {
         observeAppIconPreference()
         configureOverlayActions()
         configureAccessibilityFeatures()
-        showSettingsWindow()
     }
 
     func stop() async {
@@ -131,7 +134,8 @@ final class AppController: NSObject {
     }
 
     func showSettingsWindow() {
-        settingsWindowController.show()
+        NSApp.activate(ignoringOtherApps: true)
+        windowActions.showSettingsWindow()
     }
 
     func handleReopen(hasVisibleWindows: Bool) -> Bool {
@@ -181,6 +185,20 @@ final class AppController: NSObject {
         }
 
         applySelectedAppIcon()
+    }
+
+    func registerShowSettingsWindowAction(_ action: @escaping () -> Void) {
+        windowActions.showSettingsWindow = action
+    }
+
+    func makeSettingsWindowSceneView() -> some View {
+        SettingsWindowSceneView(
+            settings: settings,
+            usageStore: usageStore,
+            llmService: llmRefinementService,
+            managedASRModels: managedASRModels,
+            registerShowWindowAction: registerShowSettingsWindowAction(_:)
+        )
     }
 
     private func applyDockIconVisibility() {
@@ -885,7 +903,7 @@ final class AppController: NSObject {
 
     @objc
     private func openSettings() {
-        settingsWindowController.show()
+        showSettingsWindow()
     }
 
     @objc
