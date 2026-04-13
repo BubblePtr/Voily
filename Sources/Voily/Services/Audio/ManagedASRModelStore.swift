@@ -80,39 +80,8 @@ final class ManagedASRModelStore {
         states[provider] = .notInstalled
     }
 
-    func managedConfig(for provider: ASRProvider) -> ASRProviderConfig? {
-        guard let spec = Self.spec(for: provider) else { return nil }
-        guard let executableRelativePath = spec.executableRelativePath else { return nil }
-
-        let executableURL = installRoot(for: provider).appending(path: executableRelativePath)
-        let modelURL = installRoot(for: provider).appending(path: spec.modelFiles[0].relativePath)
-        guard fileManager.fileExists(atPath: executableURL.path), fileManager.fileExists(atPath: modelURL.path) else {
-            return nil
-        }
-
-        return ASRProviderConfig(
-            executablePath: executableURL.path,
-            modelPath: modelURL.path,
-            additionalArguments: spec.defaultArguments,
-            baseURL: "",
-            apiKey: "",
-            model: ""
-        )
-    }
-
     func estimatedDownload(for provider: ASRProvider) -> String {
         Self.spec(for: provider)?.estimatedDownload ?? ""
-    }
-
-    func modelDirectory(for provider: ASRProvider) -> URL? {
-        guard let spec = Self.spec(for: provider), !spec.modelFiles.isEmpty else { return nil }
-        return installRoot(for: provider).appending(path: "model")
-    }
-
-    func runtimeDirectory(for provider: ASRProvider) -> URL? {
-        let runtimeDirectory = installRoot(for: provider).appending(path: "runtime")
-        guard fileManager.fileExists(atPath: runtimeDirectory.path) else { return nil }
-        return runtimeDirectory
     }
 
     private func refreshStates() {
