@@ -61,7 +61,31 @@ private enum CaptureSessionMode: Equatable {
 @available(macOS 26.0, *)
 @MainActor
 final class WindowActions {
-    var showSettingsWindow: () -> Void = {}
+    private weak var settingsWindow: NSWindow?
+    private var openSettingsWindowAction: () -> Void = {}
+
+    func registerSettingsWindow(_ window: NSWindow) {
+        settingsWindow = window
+        debugLog("WindowActions.registerSettingsWindow title=\(window.title) isVisible=\(window.isVisible)")
+    }
+
+    func registerShowSettingsWindowAction(_ action: @escaping () -> Void) {
+        openSettingsWindowAction = action
+    }
+
+    func showSettingsWindow() {
+        if let window = settingsWindow {
+            debugLog("WindowActions.showSettingsWindow existingWindow isVisible=\(window.isVisible)")
+            if !window.isVisible {
+                window.orderFrontRegardless()
+            }
+            window.makeKeyAndOrderFront(nil)
+            return
+        }
+
+        debugLog("WindowActions.showSettingsWindow fallbackOpenWindow")
+        openSettingsWindowAction()
+    }
 }
 
 @available(macOS 26.0, *)
@@ -134,11 +158,17 @@ final class AppController: NSObject {
     }
 
     func showSettingsWindow() {
+        debugLog(
+            "showSettingsWindow() begin activationPolicy=\(NSApp.activationPolicy().rawValue) isActive=\(NSApp.isActive)"
+        )
         NSApp.activate(ignoringOtherApps: true)
+        debugLog("showSettingsWindow() activated isActive=\(NSApp.isActive)")
         windowActions.showSettingsWindow()
+        debugLog("showSettingsWindow() dispatched action")
     }
 
     func handleReopen(hasVisibleWindows: Bool) -> Bool {
+        debugLog("handleReopen(hasVisibleWindows: \(hasVisibleWindows))")
         if !hasVisibleWindows {
             showSettingsWindow()
         }
@@ -188,7 +218,12 @@ final class AppController: NSObject {
     }
 
     func registerShowSettingsWindowAction(_ action: @escaping () -> Void) {
-        windowActions.showSettingsWindow = action
+        debugLog("registerShowSettingsWindowAction()")
+        windowActions.registerShowSettingsWindowAction(action)
+    }
+
+    func registerSettingsWindow(_ window: NSWindow) {
+        windowActions.registerSettingsWindow(window)
     }
 
     func makeSettingsWindowSceneView() -> some View {
@@ -197,7 +232,8 @@ final class AppController: NSObject {
             usageStore: usageStore,
             llmService: llmRefinementService,
             managedASRModels: managedASRModels,
-            registerShowWindowAction: registerShowSettingsWindowAction(_:)
+            registerShowWindowAction: registerShowSettingsWindowAction(_:),
+            registerWindow: registerSettingsWindow(_:)
         )
     }
 
@@ -903,11 +939,13 @@ final class AppController: NSObject {
 
     @objc
     private func openSettings() {
+        debugLog("openSettings()")
         showSettingsWindow()
     }
 
     @objc
     private func quit() {
+        debugLog("quit()")
         NSApp.terminate(nil)
     }
 }

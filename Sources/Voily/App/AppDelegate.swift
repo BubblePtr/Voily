@@ -15,11 +15,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
-        appController.handleReopen(hasVisibleWindows: flag)
+        debugLog("AppDelegate.applicationShouldHandleReopen hasVisibleWindows=\(flag)")
+        return appController.handleReopen(hasVisibleWindows: flag)
+    }
+
+    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
+        debugLog("AppDelegate.applicationShouldTerminateAfterLastWindowClosed false")
+        return false
     }
 
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         guard !isTerminating else {
+            debugLog("AppDelegate.applicationShouldTerminate already terminating")
             return .terminateNow
         }
 
@@ -34,5 +41,37 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationWillTerminate(_ notification: Notification) {
         debugLog("AppDelegate.applicationWillTerminate")
+    }
+
+    func applicationWillBecomeActive(_ notification: Notification) {
+        debugLog("AppDelegate.applicationWillBecomeActive")
+    }
+
+    func applicationDidBecomeActive(_ notification: Notification) {
+        debugLog("AppDelegate.applicationDidBecomeActive")
+    }
+
+    func applicationWillResignActive(_ notification: Notification) {
+        debugLog("AppDelegate.applicationWillResignActive")
+    }
+
+    func applicationDidResignActive(_ notification: Notification) {
+        debugLog("AppDelegate.applicationDidResignActive")
+    }
+
+    func applicationWillHide(_ notification: Notification) {
+        debugLog("AppDelegate.applicationWillHide")
+    }
+
+    func applicationDidHide(_ notification: Notification) {
+        debugLog("AppDelegate.applicationDidHide")
+    }
+
+    func applicationWillUnhide(_ notification: Notification) {
+        debugLog("AppDelegate.applicationWillUnhide")
+    }
+
+    func applicationDidUnhide(_ notification: Notification) {
+        debugLog("AppDelegate.applicationDidUnhide")
     }
 }

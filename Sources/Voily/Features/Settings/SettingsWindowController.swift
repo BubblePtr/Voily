@@ -12,6 +12,7 @@ struct SettingsWindowSceneView: View {
     let llmService: LLMRefinementService
     let managedASRModels: ManagedASRModelStore
     let registerShowWindowAction: (@escaping () -> Void) -> Void
+    let registerWindow: (NSWindow) -> Void
 
     @Environment(\.openWindow) private var openWindow
 
@@ -23,15 +24,112 @@ struct SettingsWindowSceneView: View {
             managedASRModels: managedASRModels
         )
         .frame(minWidth: 1120, minHeight: 760)
+        .background(SettingsWindowLifecycleObserver(registerWindow: registerWindow))
         .toolbar(removing: .title)
         .toolbarBackgroundVisibility(.hidden, for: .windowToolbar)
         .onAppear {
+            debugLog("SettingsWindowSceneView.onAppear")
             registerShowWindowAction {
+                debugLog("SettingsWindowSceneView.openWindow action invoked")
                 Task { @MainActor in
+                    debugLog("SettingsWindowSceneView.openWindow task begin")
                     try? await openWindow(id: SettingsWindowSceneID.settings, sharingBehavior: .required)
+                    debugLog("SettingsWindowSceneView.openWindow task end")
                 }
             }
         }
+        .onDisappear {
+            debugLog("SettingsWindowSceneView.onDisappear")
+        }
+    }
+}
+
+private struct SettingsWindowLifecycleObserver: NSViewRepresentable {
+    let registerWindow: (NSWindow) -> Void
+
+    func makeNSView(context: Context) -> SettingsWindowObserverView {
+        SettingsWindowObserverView(registerWindow: registerWindow)
+    }
+
+    func updateNSView(_ nsView: SettingsWindowObserverView, context: Context) {}
+}
+
+private final class SettingsWindowObserverView: NSView {
+    private let closeDelegate = SettingsWindowCloseDelegate()
+    private let registerWindow: (NSWindow) -> Void
+    private weak var observedWindow: NSWindow?
+    private var observationTokens: [NSObjectProtocol] = []
+
+    init(registerWindow: @escaping (NSWindow) -> Void) {
+        self.registerWindow = registerWindow
+        super.init(frame: .zero)
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+
+        guard observedWindow !== window else { return }
+        teardownObservers()
+        observedWindow = window
+
+        guard let window else {
+            debugLog("SettingsWindowObserverView.viewDidMoveToWindow window=nil")
+            return
+        }
+
+        let windowTitle = window.title
+        debugLog("SettingsWindowObserverView.attach title=\(windowTitle) isVisible=\(window.isVisible)")
+        registerWindow(window)
+        closeDelegate.attach(to: window)
+        let center = NotificationCenter.default
+        observationTokens = [
+            center.addObserver(forName: NSWindow.willCloseNotification, object: window, queue: .main) { _ in
+                debugLog("SettingsWindowObserverView.windowWillClose title=\(windowTitle)")
+            },
+            center.addObserver(forName: NSWindow.didBecomeKeyNotification, object: window, queue: .main) { _ in
+                debugLog("SettingsWindowObserverView.windowDidBecomeKey title=\(windowTitle)")
+            },
+            center.addObserver(forName: NSWindow.didResignKeyNotification, object: window, queue: .main) { _ in
+                debugLog("SettingsWindowObserverView.windowDidResignKey title=\(windowTitle)")
+            },
+            center.addObserver(forName: NSWindow.didBecomeMainNotification, object: window, queue: .main) { _ in
+                debugLog("SettingsWindowObserverView.windowDidBecomeMain title=\(windowTitle)")
+            },
+            center.addObserver(forName: NSWindow.didResignMainNotification, object: window, queue: .main) { _ in
+                debugLog("SettingsWindowObserverView.windowDidResignMain title=\(windowTitle)")
+            },
+            center.addObserver(forName: NSWindow.didMiniaturizeNotification, object: window, queue: .main) { _ in
+                debugLog("SettingsWindowObserverView.windowDidMiniaturize title=\(windowTitle)")
+            },
+            center.addObserver(forName: NSWindow.didDeminiaturizeNotification, object: window, queue: .main) { _ in
+                debugLog("SettingsWindowObserverView.windowDidDeminiaturize title=\(windowTitle)")
+            }
+        ]
+    }
+
+    private func teardownObservers() {
+        let center = NotificationCenter.default
+        observationTokens.forEach(center.removeObserver)
+        observationTokens.removeAll()
+    }
+}
+
+@MainActor
+private final class SettingsWindowCloseDelegate: NSObject, NSWindowDelegate {
+    func attach(to window: NSWindow) {
+        guard window.delegate !== self else { return }
+        window.delegate = self
+    }
+
+    func windowShouldClose(_ sender: NSWindow) -> Bool {
+        debugLog("SettingsWindowCloseDelegate.windowShouldClose title=\(sender.title) hiding=true")
+        sender.orderOut(nil)
+        return false
     }
 }
 
