@@ -11,10 +11,9 @@ struct SettingsWindowSceneView: View {
     let usageStore: UsageStore
     let llmService: LLMRefinementService
     let managedASRModels: ManagedASRModelStore
-    let registerShowWindowAction: (@escaping () -> Void) -> Void
     let registerWindow: (NSWindow) -> Void
-
-    @Environment(\.openWindow) private var openWindow
+    let onInitialAppearance: () -> Void
+    let onWindowHide: () -> Void
 
     var body: some View {
         SettingsRootView(
@@ -24,19 +23,12 @@ struct SettingsWindowSceneView: View {
             managedASRModels: managedASRModels
         )
         .frame(minWidth: 1120, minHeight: 760)
-        .background(SettingsWindowLifecycleObserver(registerWindow: registerWindow))
+        .background(SettingsWindowLifecycleObserver(registerWindow: registerWindow, onHide: onWindowHide))
         .toolbar(removing: .title)
         .toolbarBackgroundVisibility(.hidden, for: .windowToolbar)
         .onAppear {
             debugLog("SettingsWindowSceneView.onAppear")
-            registerShowWindowAction {
-                debugLog("SettingsWindowSceneView.openWindow action invoked")
-                Task { @MainActor in
-                    debugLog("SettingsWindowSceneView.openWindow task begin")
-                    try? await openWindow(id: SettingsWindowSceneID.settings, sharingBehavior: .required)
-                    debugLog("SettingsWindowSceneView.openWindow task end")
-                }
-            }
+            onInitialAppearance()
         }
         .onDisappear {
             debugLog("SettingsWindowSceneView.onDisappear")
@@ -46,22 +38,24 @@ struct SettingsWindowSceneView: View {
 
 private struct SettingsWindowLifecycleObserver: NSViewRepresentable {
     let registerWindow: (NSWindow) -> Void
+    let onHide: () -> Void
 
     func makeNSView(context: Context) -> SettingsWindowObserverView {
-        SettingsWindowObserverView(registerWindow: registerWindow)
+        SettingsWindowObserverView(registerWindow: registerWindow, onHide: onHide)
     }
 
     func updateNSView(_ nsView: SettingsWindowObserverView, context: Context) {}
 }
 
 private final class SettingsWindowObserverView: NSView {
-    private let closeDelegate = SettingsWindowCloseDelegate()
+    private let closeDelegate: SettingsWindowCloseDelegate
     private let registerWindow: (NSWindow) -> Void
     private weak var observedWindow: NSWindow?
     private var observationTokens: [NSObjectProtocol] = []
 
-    init(registerWindow: @escaping (NSWindow) -> Void) {
+    init(registerWindow: @escaping (NSWindow) -> Void, onHide: @escaping () -> Void) {
         self.registerWindow = registerWindow
+        closeDelegate = SettingsWindowCloseDelegate(onHide: onHide)
         super.init(frame: .zero)
     }
 
@@ -121,6 +115,12 @@ private final class SettingsWindowObserverView: NSView {
 
 @MainActor
 private final class SettingsWindowCloseDelegate: NSObject, NSWindowDelegate {
+    private let onHide: () -> Void
+
+    init(onHide: @escaping () -> Void) {
+        self.onHide = onHide
+    }
+
     func attach(to window: NSWindow) {
         guard window.delegate !== self else { return }
         window.delegate = self
@@ -129,6 +129,7 @@ private final class SettingsWindowCloseDelegate: NSObject, NSWindowDelegate {
     func windowShouldClose(_ sender: NSWindow) -> Bool {
         debugLog("SettingsWindowCloseDelegate.windowShouldClose title=\(sender.title) hiding=true")
         sender.orderOut(nil)
+        onHide()
         return false
     }
 }
@@ -180,7 +181,7 @@ private struct SettingsRootView: View {
     var body: some View {
         NavigationSplitView(columnVisibility: $columnVisibility) {
             SettingsSidebar(settings: settings, selection: $selection)
-                .navigationSplitViewColumnWidth(min: 220, ideal: 220, max: 220)
+                .navigationSplitViewColumnWidth(min: 196, ideal: 196, max: 196)
         } detail: {
             Group {
                 switch selection ?? .home {
@@ -448,7 +449,7 @@ private struct ModelSettingsPage: View {
             VStack(alignment: .leading, spacing: 30) {
                 SettingsPageHeader(
                     title: "模型",
-                    subtitle: "按模型角色选择默认 provider。按住 Fn 为普通听写，双击 Fn 为快捷翻译。"
+                    subtitle: "按模型角色选择默认 provider。触发键单击用于普通听写，长按用于快捷翻译；触发键可在“设置”页调整。"
                 )
 
                 DefaultModelsOverviewCard(
@@ -1517,7 +1518,7 @@ private struct GeneralSettingsPage: View {
                         .pickerStyle(.menu)
                         .labelsHidden()
 
-                        Text("双击 Fn 的快捷翻译仍固定使用简体中文作为输入语言。")
+                        Text("快捷翻译仍固定使用简体中文作为输入语言。")
                             .font(.system(size: 12))
                             .foregroundStyle(.secondary)
                     }
@@ -1528,6 +1529,28 @@ private struct GeneralSettingsPage: View {
                     availableDevices: availableInputDevices,
                     onRefresh: reloadInputDevices
                 )
+
+                SettingsCard(title: "触发键", subtitle: "选择用于语音输入的触发键，交互固定为单击听写、长按翻译") {
+                    VStack(alignment: .leading, spacing: 14) {
+                        SettingsFormField(title: "用于触发语音输入的按键") {
+                            Picker("触发键", selection: $settings.triggerKey) {
+                                ForEach(TriggerKey.allCases) { triggerKey in
+                                    Text(triggerKey.displayName).tag(triggerKey)
+                                }
+                            }
+                            .pickerStyle(.menu)
+                            .labelsHidden()
+                        }
+
+                        Text(settings.triggerKey.summary)
+                            .font(.system(size: 12))
+                            .foregroundStyle(.secondary)
+
+                        Text("快捷翻译开始后可松手，结束方式保持现在的确认/取消交互。选择右 Command 时，仅单独点击或长按会生效，不会覆盖系统组合键。")
+                            .font(.system(size: 12))
+                            .foregroundStyle(.secondary)
+                    }
+                }
 
                 SettingsCard(title: "App 外观", subtitle: "控制 Dock 与 menu bar 的展示方式") {
                     VStack(alignment: .leading, spacing: 14) {
@@ -1559,7 +1582,7 @@ private struct GeneralSettingsPage: View {
 
                         GeneralSettingNoteRow(
                             title: "快捷操作",
-                            detail: "按住 Fn 开始普通听写，双击 Fn 触发快捷翻译。"
+                            detail: settings.triggerKey.summary
                         )
 
                         GeneralSettingNoteRow(

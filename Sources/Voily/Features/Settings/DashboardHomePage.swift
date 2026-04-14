@@ -1,6 +1,21 @@
 import AppKit
 import SwiftUI
 
+private enum DashboardFormatters {
+    static let shortDate: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "M/d"
+        return formatter
+    }()
+
+    static let timestamp: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .medium
+        formatter.timeStyle = .short
+        return formatter
+    }()
+}
+
 @available(macOS 26.0, *)
 struct DashboardHomePage: View {
     let usageStore: UsageStore
@@ -302,9 +317,7 @@ private struct SparklineChart: View {
     }
 
     private func shortDate(_ date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "M/d"
-        return formatter.string(from: date)
+        DashboardFormatters.shortDate.string(from: date)
     }
 }
 
@@ -321,7 +334,7 @@ private struct HistoryListSection: View {
                     .font(.system(size: 13))
                     .foregroundStyle(.secondary)
             } else {
-                VStack(spacing: 12) {
+                LazyVStack(spacing: 12) {
                     ForEach(sessions) { session in
                         HistorySessionRowView(
                             usageStore: usageStore,
@@ -404,10 +417,7 @@ private struct HistorySessionRowView: View {
     }
 
     private func timestamp(_ date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.dateStyle = .medium
-        formatter.timeStyle = .short
-        return formatter.string(from: date)
+        DashboardFormatters.timestamp.string(from: date)
     }
 
     private func duration(_ durationMs: Int) -> String {

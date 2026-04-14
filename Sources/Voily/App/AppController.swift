@@ -9,6 +9,14 @@ func isRunningInXcodePreview() -> Bool {
     ProcessInfo.processInfo.environment["XCODE_RUNNING_FOR_PREVIEWS"] == "1"
 }
 
+func isRunningUnderXCTest() -> Bool {
+    let environment = ProcessInfo.processInfo.environment
+    if environment["XCTestConfigurationFilePath"] != nil {
+        return true
+    }
+    return NSClassFromString("XCTestCase") != nil
+}
+
 func debugLog(_ message: String) {
     let line = "[Voily] \(message)\n"
     let data = Data(line.utf8)
@@ -62,29 +70,29 @@ private enum CaptureSessionMode: Equatable {
 @MainActor
 final class WindowActions {
     private weak var settingsWindow: NSWindow?
-    private var openSettingsWindowAction: () -> Void = {}
+
+    var isSettingsWindowVisible: Bool {
+        settingsWindow?.isVisible == true
+    }
 
     func registerSettingsWindow(_ window: NSWindow) {
         settingsWindow = window
         debugLog("WindowActions.registerSettingsWindow title=\(window.title) isVisible=\(window.isVisible)")
     }
 
-    func registerShowSettingsWindowAction(_ action: @escaping () -> Void) {
-        openSettingsWindowAction = action
-    }
-
-    func showSettingsWindow() {
+    @discardableResult
+    func showSettingsWindow() -> Bool {
         if let window = settingsWindow {
             debugLog("WindowActions.showSettingsWindow existingWindow isVisible=\(window.isVisible)")
             if !window.isVisible {
                 window.orderFrontRegardless()
             }
             window.makeKeyAndOrderFront(nil)
-            return
+            return true
         }
 
-        debugLog("WindowActions.showSettingsWindow fallbackOpenWindow")
-        openSettingsWindowAction()
+        debugLog("WindowActions.showSettingsWindow noWindow")
+        return false
     }
 }
 
@@ -95,7 +103,7 @@ final class AppController: NSObject {
     private let settings = AppSettings()
     private let usageStore = UsageStore()
     private let permissionCoordinator = PermissionCoordinator()
-    private let fnKeyMonitor = FnKeyMonitor()
+    private let triggerKeyMonitor = TriggerKeyMonitor()
     private let audioCaptureService = AudioCaptureService()
     private let speechService = SpeechTranscriptionService()
     private let senseVoiceResidentService = SenseVoiceResidentService()
@@ -122,6 +130,8 @@ final class AppController: NSObject {
     private var currentSpeechCaptureEnabled = false
     private var currentPendingRealtimeAppendCount = 0
     private var hasStopped = false
+    private var hasStartedStartupPermissionGuidance = false
+    private var hasCompletedInitialSettingsWindowAppearance = false
 
     init(windowActions: WindowActions) {
         self.windowActions = windowActions
@@ -133,8 +143,8 @@ final class AppController: NSObject {
         configureStatusItem()
         observeDockIconPreference()
         observeAppIconPreference()
+        observeTriggerKeyPreference()
         configureOverlayActions()
-        configureAccessibilityFeatures()
     }
 
     func stop() async {
@@ -142,7 +152,7 @@ final class AppController: NSObject {
         hasStopped = true
 
         debugLog("AppController.stop()")
-        fnKeyMonitor.stop()
+        triggerKeyMonitor.stop()
         audioCaptureService.stop()
         speechService.cancel()
         if let currentResidentSession {
@@ -161,10 +171,17 @@ final class AppController: NSObject {
         debugLog(
             "showSettingsWindow() begin activationPolicy=\(NSApp.activationPolicy().rawValue) isActive=\(NSApp.isActive)"
         )
+        if NSApp.activationPolicy() != .regular {
+            debugLog("showSettingsWindow() promoting activation policy to regular")
+            NSApp.setActivationPolicy(.regular)
+        }
         NSApp.activate(ignoringOtherApps: true)
         debugLog("showSettingsWindow() activated isActive=\(NSApp.isActive)")
-        windowActions.showSettingsWindow()
-        debugLog("showSettingsWindow() dispatched action")
+        if windowActions.showSettingsWindow() {
+            debugLog("showSettingsWindow() dispatched action")
+            return
+        }
+        debugLog("showSettingsWindow() noRegisteredWindowYet")
     }
 
     func handleReopen(hasVisibleWindows: Bool) -> Bool {
@@ -181,14 +198,41 @@ final class AppController: NSObject {
             debugLog("Accessibility not trusted yet, prompting and waiting")
             permissionCoordinator.promptForAccessibilityIfNeeded()
             permissionCoordinator.waitForAccessibilityGrant { [weak self] in
-                debugLog("Accessibility granted, starting fn monitoring")
-                self?.configureFnMonitoring()
+                debugLog("Accessibility granted, starting trigger key monitoring")
+                self?.configureTriggerKeyMonitoring()
             }
             return
         }
 
-        debugLog("Accessibility already trusted, starting fn monitoring")
-        configureFnMonitoring()
+        debugLog("Accessibility already trusted, starting trigger key monitoring")
+        configureTriggerKeyMonitoringIfNeeded()
+    }
+
+    private func configureStartupPermissionGuidance() async {
+        debugLog("configureStartupPermissionGuidance() begin")
+        await requestMicrophonePermissionAtLaunchIfNeeded()
+        configureAccessibilityFeatures()
+    }
+
+    private func requestMicrophonePermissionAtLaunchIfNeeded() async {
+        let status = permissionCoordinator.microphoneAuthorizationStatus
+        debugLog("requestMicrophonePermissionAtLaunchIfNeeded status=\(status.rawValue)")
+
+        switch status {
+        case .authorized:
+            return
+        case .notDetermined:
+            NSApp.activate(ignoringOtherApps: true)
+            let granted = await permissionCoordinator.requestMicrophoneIfNeeded()
+            debugLog("Startup microphone permission granted=\(granted)")
+            if !granted {
+                await showPermissionGuidance("Enable Microphone access in System Settings to start recording.")
+            }
+        case .denied, .restricted:
+            await showPermissionGuidance("Enable Microphone access in System Settings to start recording.")
+        @unknown default:
+            await showPermissionGuidance("Enable Microphone access in System Settings to start recording.")
+        }
     }
 
     private func observeDockIconPreference() {
@@ -217,9 +261,17 @@ final class AppController: NSObject {
         applySelectedAppIcon()
     }
 
-    func registerShowSettingsWindowAction(_ action: @escaping () -> Void) {
-        debugLog("registerShowSettingsWindowAction()")
-        windowActions.registerShowSettingsWindowAction(action)
+    private func observeTriggerKeyPreference() {
+        withObservationTracking {
+            _ = settings.triggerKey
+        } onChange: { [weak self] in
+            Task { @MainActor in
+                self?.applyTriggerKey()
+                self?.observeTriggerKeyPreference()
+            }
+        }
+
+        applyTriggerKey()
     }
 
     func registerSettingsWindow(_ window: NSWindow) {
@@ -232,15 +284,39 @@ final class AppController: NSObject {
             usageStore: usageStore,
             llmService: llmRefinementService,
             managedASRModels: managedASRModels,
-            registerShowWindowAction: registerShowSettingsWindowAction(_:),
-            registerWindow: registerSettingsWindow(_:)
+            registerWindow: registerSettingsWindow(_:),
+            onInitialAppearance: handleSettingsWindowInitialAppearance,
+            onWindowHide: handleSettingsWindowDidHide
         )
     }
 
+    private func handleSettingsWindowInitialAppearance() {
+        guard !isRunningUnderXCTest() else {
+            debugLog("handleSettingsWindowInitialAppearance skipping startup permission guidance under XCTest")
+            return
+        }
+        guard !hasStartedStartupPermissionGuidance else { return }
+        hasCompletedInitialSettingsWindowAppearance = true
+        hasStartedStartupPermissionGuidance = true
+        debugLog("handleSettingsWindowInitialAppearance()")
+        Task { @MainActor in
+            await configureStartupPermissionGuidance()
+        }
+    }
+
     private func applyDockIconVisibility() {
-        let policy: NSApplication.ActivationPolicy = settings.dockIconVisible ? .regular : .accessory
+        let shouldKeepRegular =
+            !hasCompletedInitialSettingsWindowAppearance ||
+            windowActions.isSettingsWindowVisible
+        let policy: NSApplication.ActivationPolicy =
+            (settings.dockIconVisible || shouldKeepRegular) ? .regular : .accessory
         guard NSApp.activationPolicy() != policy else { return }
         NSApp.setActivationPolicy(policy)
+    }
+
+    func handleSettingsWindowDidHide() {
+        debugLog("handleSettingsWindowDidHide()")
+        applyDockIconVisibility()
     }
 
     private func applySelectedAppIcon() {
@@ -363,30 +439,56 @@ final class AppController: NSObject {
         }
     }
 
-    private func configureFnMonitoring() {
-        debugLog("configureFnMonitoring()")
-        fnKeyMonitor.onDictationStart = { [weak self] in
-            debugLog("Fn dictation start callback")
+    private func configureTriggerKeyMonitoring() {
+        debugLog("configureTriggerKeyMonitoring()")
+        triggerKeyMonitor.setTriggerKey(settings.triggerKey)
+        triggerKeyMonitor.setSessionMode(triggerKeySessionMode)
+        triggerKeyMonitor.onDictationStart = { [weak self] in
+            debugLog("Trigger key dictation start callback")
             Task { @MainActor in
                 await self?.beginRecording(mode: .dictation)
             }
         }
 
-        fnKeyMonitor.onDictationFinish = { [weak self] in
-            debugLog("Fn dictation finish callback")
+        triggerKeyMonitor.onDictationFinish = { [weak self] in
+            debugLog("Trigger key dictation finish callback")
             Task { @MainActor in
                 await self?.finishRecording()
             }
         }
 
-        fnKeyMonitor.onQuickTranslation = { [weak self] in
-            debugLog("Fn quick translation callback")
+        triggerKeyMonitor.onQuickTranslation = { [weak self] in
+            debugLog("Trigger key quick translation callback")
             Task { @MainActor in
                 await self?.beginRecording(mode: .quickTranslationZhToEn)
             }
         }
 
-        fnKeyMonitor.start()
+        triggerKeyMonitor.start()
+    }
+
+    private func configureTriggerKeyMonitoringIfNeeded() {
+        guard permissionCoordinator.isAccessibilityTrusted else { return }
+        guard !triggerKeyMonitor.isRunning else {
+            debugLog("configureTriggerKeyMonitoringIfNeeded alreadyRunning=true")
+            return
+        }
+        configureTriggerKeyMonitoring()
+    }
+
+    private func applyTriggerKey() {
+        debugLog("applyTriggerKey key=\(settings.triggerKey.rawValue)")
+        triggerKeyMonitor.setTriggerKey(settings.triggerKey)
+        triggerKeyMonitor.setSessionMode(triggerKeySessionMode)
+        configureTriggerKeyMonitoringIfNeeded()
+    }
+
+    func handleApplicationDidBecomeActive() {
+        guard !isRunningUnderXCTest() else { return }
+        debugLog(
+            "handleApplicationDidBecomeActive trusted=\(permissionCoordinator.isAccessibilityTrusted) triggerKey=\(settings.triggerKey.rawValue) monitorRunning=\(triggerKeyMonitor.isRunning)"
+        )
+        configureTriggerKeyMonitoringIfNeeded()
     }
 
     private func setOverlay(text: String, rmsLevel: Float, phase: OverlayPhase) {
@@ -419,11 +521,13 @@ final class AppController: NSObject {
         guard currentPhase == .idle else { return }
         debugLog("beginRecording mode=\(mode.debugName)")
         if mode == .quickTranslationZhToEn, !settings.isTextRefinementConfigured {
+            triggerKeyMonitor.setSessionMode(.idle)
             await showTransientMessage("Set up a text model in Settings first.")
             return
         }
 
         guard await ensureRecordingPermissions(for: settings.selectedASRProvider) else {
+            triggerKeyMonitor.setSessionMode(.idle)
             return
         }
 
@@ -436,6 +540,7 @@ final class AppController: NSObject {
         currentResidentSession = nil
         currentSpeechCaptureEnabled = false
         currentPendingRealtimeAppendCount = 0
+        triggerKeyMonitor.setSessionMode(mode == .dictation ? .dictating : .translating)
         setOverlay(text: "", rmsLevel: 0, phase: .recording)
 
         do {
@@ -482,6 +587,7 @@ final class AppController: NSObject {
             currentPendingRealtimeAppendCount = 0
             currentSessionMode = nil
             currentOverlayControls = .none
+            triggerKeyMonitor.setSessionMode(.idle)
             overlayController.hide()
             currentPhase = .idle
             currentSessionStartedAt = nil
@@ -492,6 +598,7 @@ final class AppController: NSObject {
         guard currentPhase == .recording || currentPhase == .recordingPartial else { return }
         guard let sessionMode = currentSessionMode else { return }
         debugLog("finishRecording mode=\(sessionMode.debugName)")
+        triggerKeyMonitor.setSessionMode(.suspended)
 
         setOverlay(text: currentText, rmsLevel: smoothedRMS, phase: .transcribing)
         audioCaptureService.stop()
@@ -616,6 +723,7 @@ final class AppController: NSObject {
     private func cancelCurrentSession() async {
         guard currentSessionMode == .quickTranslationZhToEn else { return }
         debugLog("cancelCurrentSession()")
+        triggerKeyMonitor.setSessionMode(.suspended)
         audioCaptureService.stop()
         await cleanupCurrentSession(hideOverlay: true)
     }
@@ -641,9 +749,28 @@ final class AppController: NSObject {
         currentPhase = .idle
         currentSessionStartedAt = nil
         smoothedRMS = 0
+        triggerKeyMonitor.setSessionMode(.idle)
 
         if hideOverlay {
             overlayController.hide()
+        }
+    }
+
+    private var triggerKeySessionMode: TriggerKeySessionMode {
+        switch currentPhase {
+        case .idle:
+            return .idle
+        case .recording, .recordingPartial:
+            switch currentSessionMode {
+            case .dictation:
+                return .dictating
+            case .quickTranslationZhToEn:
+                return .translating
+            case .none:
+                return .idle
+            }
+        case .transcribing, .refining, .translating, .injecting:
+            return .suspended
         }
     }
 
@@ -655,17 +782,22 @@ final class AppController: NSObject {
         }
     }
 
-    private func requestSystemPermissionWhileFnMonitoringPaused(_ request: @escaping () async -> Bool) async -> Bool {
-        debugLog("Pausing Fn monitoring for system permission prompt")
-        fnKeyMonitor.stop()
+    private func showPermissionGuidance(_ text: String) async {
+        showSettingsWindow()
+        await showTransientMessage(text)
+    }
+
+    private func requestSystemPermissionWhileTriggerKeyMonitoringPaused(_ request: @escaping () async -> Bool) async -> Bool {
+        debugLog("Pausing trigger key monitoring for system permission prompt")
+        triggerKeyMonitor.stop()
         overlayController.hide()
         NSApp.activate(ignoringOtherApps: true)
         try? await Task.sleep(for: .milliseconds(150))
 
         let granted = await request()
 
-        debugLog("Resuming Fn monitoring after system permission prompt granted=\(granted)")
-        fnKeyMonitor.start()
+        debugLog("Resuming trigger key monitoring after system permission prompt granted=\(granted)")
+        triggerKeyMonitor.start()
         return granted
     }
 
@@ -674,20 +806,18 @@ final class AppController: NSObject {
         case .authorized:
             break
         case .notDetermined:
-            let granted = await requestSystemPermissionWhileFnMonitoringPaused { [permissionCoordinator] in
+            let granted = await requestSystemPermissionWhileTriggerKeyMonitoringPaused { [permissionCoordinator] in
                 await permissionCoordinator.requestMicrophoneIfNeeded()
             }
-            if granted {
-                await showTransientMessage("Microphone access granted. Hold Fn again to start recording.")
-            } else {
-                await showTransientMessage("Allow microphone access to start recording.")
+            if !granted {
+                await showPermissionGuidance("Enable Microphone access in System Settings to start recording.")
+                return false
             }
-            return false
         case .denied, .restricted:
-            await showTransientMessage("Allow microphone access to start recording.")
+            await showPermissionGuidance("Enable Microphone access in System Settings to start recording.")
             return false
         @unknown default:
-            await showTransientMessage("Allow microphone access to start recording.")
+            await showPermissionGuidance("Enable Microphone access in System Settings to start recording.")
             return false
         }
 
@@ -699,20 +829,19 @@ final class AppController: NSObject {
         case .authorized:
             return true
         case .notDetermined:
-            let granted = await requestSystemPermissionWhileFnMonitoringPaused { [permissionCoordinator] in
+            let granted = await requestSystemPermissionWhileTriggerKeyMonitoringPaused { [permissionCoordinator] in
                 await permissionCoordinator.requestSpeechRecognitionIfNeeded()
             }
-            if granted {
-                await showTransientMessage("Speech Recognition access granted. Hold Fn again to start recording.")
-            } else {
-                await showTransientMessage("Allow Speech Recognition to use the system transcription fallback.")
+            if !granted {
+                await showPermissionGuidance("Enable Speech Recognition in System Settings to use the system transcription fallback.")
+                return false
             }
-            return false
+            return true
         case .denied, .restricted:
-            await showTransientMessage("Allow Speech Recognition to use the system transcription fallback.")
+            await showPermissionGuidance("Enable Speech Recognition in System Settings to use the system transcription fallback.")
             return false
         @unknown default:
-            await showTransientMessage("Allow Speech Recognition to use the system transcription fallback.")
+            await showPermissionGuidance("Enable Speech Recognition in System Settings to use the system transcription fallback.")
             return false
         }
     }

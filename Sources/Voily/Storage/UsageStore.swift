@@ -90,7 +90,7 @@ final class UsageStore {
     }
 
     private enum Constants {
-        static let recentSessionLimit = 500
+        static let recentSessionLimit = 100
         static let trendDayCount = 7
         static let heatmapDayCount = 84
     }

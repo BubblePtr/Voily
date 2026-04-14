@@ -1,95 +1,104 @@
 import AppKit
 import Carbon.HIToolbox
+import IOKit.hidsystem
 import QuartzCore
 
-enum FnGestureAction: Equatable {
+enum TriggerKeyGestureAction: Equatable {
     case startDictation
     case finishDictation
     case startQuickTranslation
 }
 
-struct FnShortcutStateMachine {
+enum TriggerKeySessionMode: Equatable {
+    case idle
+    case dictating
+    case translating
+    case suspended
+}
+
+struct TriggerKeyGestureStateMachine {
+    static let defaultLongPressThreshold: TimeInterval = 0.8
+
     enum State: Equatable {
         case idle
-        case firstPressing(startedAt: TimeInterval)
-        case waitingForSecondPress(releasedAt: TimeInterval)
-        case dictating
+        case pressing(startedAt: TimeInterval, sessionModeAtPress: TriggerKeySessionMode)
+        case ignoringUntilRelease
     }
 
     let longPressThreshold: TimeInterval
-    let doubleTapWindow: TimeInterval
 
     private(set) var state: State = .idle
 
-    init(longPressThreshold: TimeInterval = 0.18, doubleTapWindow: TimeInterval = 0.3) {
+    init(longPressThreshold: TimeInterval = Self.defaultLongPressThreshold) {
         self.longPressThreshold = longPressThreshold
-        self.doubleTapWindow = doubleTapWindow
     }
 
-    var pendingLongPressFireAt: TimeInterval? {
-        guard case let .firstPressing(startedAt) = state else { return nil }
+    var pendingGestureResolutionFireAt: TimeInterval? {
+        guard case let .pressing(startedAt, _) = state else { return nil }
         return startedAt + longPressThreshold
     }
 
-    var pendingDoubleTapExpiryAt: TimeInterval? {
-        guard case let .waitingForSecondPress(releasedAt) = state else { return nil }
-        return releasedAt + doubleTapWindow
+    var hasPendingGesture: Bool {
+        if case .pressing = state {
+            return true
+        }
+        return false
     }
 
-    mutating func handleKeyDown(at time: TimeInterval) -> [FnGestureAction] {
+    mutating func handleKeyDown(sessionMode: TriggerKeySessionMode, at time: TimeInterval) -> [TriggerKeyGestureAction] {
         switch state {
         case .idle:
-            state = .firstPressing(startedAt: time)
-            return []
-        case let .waitingForSecondPress(releasedAt):
-            if time - releasedAt <= doubleTapWindow {
-                state = .idle
-                return [.startQuickTranslation]
+            switch sessionMode {
+            case .idle, .dictating:
+                state = .pressing(startedAt: time, sessionModeAtPress: sessionMode)
+            case .translating, .suspended:
+                state = .ignoringUntilRelease
             }
-
-            state = .firstPressing(startedAt: time)
             return []
-        case .firstPressing, .dictating:
+        case .pressing, .ignoringUntilRelease:
             return []
         }
     }
 
-    mutating func handleKeyUp(at time: TimeInterval) -> [FnGestureAction] {
+    mutating func handleKeyUp() -> [TriggerKeyGestureAction] {
         switch state {
         case .idle:
             return []
-        case let .firstPressing(startedAt):
-            if time - startedAt >= longPressThreshold {
-                state = .idle
-                return [.startDictation, .finishDictation]
-            }
-
-            state = .waitingForSecondPress(releasedAt: time)
-            return []
-        case .waitingForSecondPress:
-            return []
-        case .dictating:
+        case let .pressing(_, sessionModeAtPress):
             state = .idle
-            return [.finishDictation]
+            switch sessionModeAtPress {
+            case .idle:
+                return [.startDictation]
+            case .dictating:
+                return [.finishDictation]
+            case .translating, .suspended:
+                return []
+            }
+        case .ignoringUntilRelease:
+            state = .idle
+            return []
         }
     }
 
-    mutating func handleLongPressTimer(at time: TimeInterval) -> [FnGestureAction] {
-        guard case let .firstPressing(startedAt) = state, time - startedAt >= longPressThreshold else {
+    mutating func handleLongPressTimer(at time: TimeInterval) -> [TriggerKeyGestureAction] {
+        guard case let .pressing(startedAt, sessionModeAtPress) = state,
+              time - startedAt >= longPressThreshold
+        else {
             return []
         }
 
-        state = .dictating
-        return [.startDictation]
+        state = .ignoringUntilRelease
+        switch sessionModeAtPress {
+        case .idle:
+            return [.startQuickTranslation]
+        case .dictating, .translating, .suspended:
+            return []
+        }
     }
 
-    mutating func handleDoubleTapTimer(at time: TimeInterval) -> [FnGestureAction] {
-        guard case let .waitingForSecondPress(releasedAt) = state, time - releasedAt >= doubleTapWindow else {
-            return []
-        }
-
+    mutating func cancelPendingGesture() {
+        guard state != .idle else { return }
         state = .idle
-        return []
     }
 
     mutating func reset() {
@@ -97,27 +106,105 @@ struct FnShortcutStateMachine {
     }
 }
 
-final class FnKeyMonitor: @unchecked Sendable {
+struct TriggerKeyMonitorCore {
+    private(set) var stateMachine = TriggerKeyGestureStateMachine()
+    private(set) var sessionMode: TriggerKeySessionMode = .idle
+    private(set) var isTriggerPressed = false
+    private(set) var suppressCurrentTriggerRelease = false
+
+    init(longPressThreshold: TimeInterval = TriggerKeyGestureStateMachine.defaultLongPressThreshold) {
+        stateMachine = TriggerKeyGestureStateMachine(longPressThreshold: longPressThreshold)
+    }
+
+    mutating func setSessionMode(_ mode: TriggerKeySessionMode) {
+        sessionMode = mode
+    }
+
+    mutating func handleTriggerPressChange(_ pressed: Bool, at time: TimeInterval) -> [TriggerKeyGestureAction] {
+        guard pressed != isTriggerPressed else { return [] }
+
+        isTriggerPressed = pressed
+        if pressed {
+            suppressCurrentTriggerRelease = false
+            return stateMachine.handleKeyDown(sessionMode: sessionMode, at: time)
+        }
+
+        guard !suppressCurrentTriggerRelease else {
+            suppressCurrentTriggerRelease = false
+            return []
+        }
+
+        return stateMachine.handleKeyUp()
+    }
+
+    mutating func handleNonTriggerKeyDown() {
+        cancelGestureDueToChord()
+    }
+
+    mutating func handleNonTriggerModifierChange() {
+        cancelGestureDueToChord()
+    }
+
+    mutating func handleLongPressTimer(at time: TimeInterval) -> [TriggerKeyGestureAction] {
+        stateMachine.handleLongPressTimer(at: time)
+    }
+
+    mutating func reset() {
+        stateMachine.reset()
+        sessionMode = .idle
+        isTriggerPressed = false
+        suppressCurrentTriggerRelease = false
+    }
+
+    private mutating func cancelGestureDueToChord() {
+        guard isTriggerPressed || stateMachine.hasPendingGesture else { return }
+
+        if isTriggerPressed {
+            suppressCurrentTriggerRelease = true
+        }
+        stateMachine.cancelPendingGesture()
+    }
+}
+
+final class TriggerKeyMonitor: @unchecked Sendable {
     private static let systemDefinedRawValue: UInt32 = 14
 
     var onDictationStart: (@Sendable () -> Void)?
     var onDictationFinish: (@Sendable () -> Void)?
     var onQuickTranslation: (@Sendable () -> Void)?
 
-    private let stateQueue = DispatchQueue(label: "Voily.FnKeyMonitor.State")
+    private let stateQueue = DispatchQueue(label: "Voily.TriggerKeyMonitor.State")
     private var eventTap: CFMachPort?
     private var runLoopSource: CFRunLoopSource?
     private var tapThread: Thread?
     private var tapRunLoop: CFRunLoop?
-    private var isFnPressed = false
     private var tapRequested = false
-    private var stateMachine = FnShortcutStateMachine()
-    private var longPressWorkItem: DispatchWorkItem?
-    private var doubleTapWorkItem: DispatchWorkItem?
+    private var triggerKey: TriggerKey = .fn
+    private var core = TriggerKeyMonitorCore()
+    private var gestureResolutionWorkItem: DispatchWorkItem?
+
+    var isRunning: Bool {
+        stateQueue.sync { tapRequested }
+    }
+
+    func setTriggerKey(_ key: TriggerKey) {
+        stateQueue.sync {
+            triggerKey = key
+            cancelTimers()
+            core.reset()
+        }
+    }
+
+    func setSessionMode(_ mode: TriggerKeySessionMode) {
+        stateQueue.sync {
+            core.setSessionMode(mode)
+            syncTimers()
+        }
+    }
 
     func start() {
         guard tapThread == nil else { return }
-        debugLog("FnKeyMonitor.start()")
+        debugLog("TriggerKeyMonitor.start() triggerKey=\(triggerKey.rawValue)")
         stateQueue.sync {
             tapRequested = true
         }
@@ -143,18 +230,17 @@ final class FnKeyMonitor: @unchecked Sendable {
 
             CFRunLoopRun()
         }
-        thread.name = "Voily.FnKeyMonitor"
+        thread.name = "Voily.TriggerKeyMonitor"
         thread.qualityOfService = .userInteractive
         tapThread = thread
         thread.start()
     }
 
     func stop() {
-        debugLog("FnKeyMonitor.stop()")
+        debugLog("TriggerKeyMonitor.stop()")
         stateQueue.sync {
             cancelTimers()
-            stateMachine.reset()
-            isFnPressed = false
+            core.reset()
             tapRequested = false
         }
 
@@ -176,13 +262,17 @@ final class FnKeyMonitor: @unchecked Sendable {
     private func setupEventTap() {
         guard eventTap == nil else { return }
 
-        let mask = (1 << CGEventType.flagsChanged.rawValue) | (1 << Self.systemDefinedRawValue)
+        let mask =
+            (1 << CGEventType.flagsChanged.rawValue) |
+            (1 << CGEventType.keyDown.rawValue) |
+            (1 << Self.systemDefinedRawValue)
+
         let callback: CGEventTapCallBack = { proxy, type, event, refcon in
             guard let refcon else {
                 return Unmanaged.passUnretained(event)
             }
 
-            let monitor = Unmanaged<FnKeyMonitor>.fromOpaque(refcon).takeUnretainedValue()
+            let monitor = Unmanaged<TriggerKeyMonitor>.fromOpaque(refcon).takeUnretainedValue()
             return monitor.handle(proxy: proxy, type: type, event: event)
         }
 
@@ -207,7 +297,7 @@ final class FnKeyMonitor: @unchecked Sendable {
         }
 
         CGEvent.tapEnable(tap: tap, enable: true)
-        debugLog("FnKeyMonitor event tap enabled")
+        debugLog("TriggerKeyMonitor event tap enabled")
     }
 
     private func invalidateEventTap() {
@@ -223,7 +313,7 @@ final class FnKeyMonitor: @unchecked Sendable {
 
     private func handle(proxy: CGEventTapProxy, type: CGEventType, event: CGEvent) -> Unmanaged<CGEvent>? {
         if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
-            debugLog("FnKeyMonitor tap disabled by system, reenabling")
+            debugLog("TriggerKeyMonitor tap disabled by system, reenabling")
             if let eventTap {
                 CGEvent.tapEnable(tap: eventTap, enable: true)
             }
@@ -233,6 +323,8 @@ final class FnKeyMonitor: @unchecked Sendable {
         switch type {
         case .flagsChanged:
             return handleFlagsChanged(event)
+        case .keyDown:
+            return handleKeyDown(event)
         default:
             if type.rawValue == Self.systemDefinedRawValue {
                 return handleSystemDefined(event)
@@ -242,19 +334,50 @@ final class FnKeyMonitor: @unchecked Sendable {
     }
 
     private func handleFlagsChanged(_ event: CGEvent) -> Unmanaged<CGEvent>? {
-        let keyCode = event.getIntegerValueField(.keyboardEventKeycode)
-        guard keyCode == kVK_Function else {
+        let keyCode = Int(event.getIntegerValueField(.keyboardEventKeycode))
+
+        if keyCode == monitoredKeyCode {
+            let pressed = isTriggerPressed(event: event, keyCode: keyCode)
+            let actions = stateQueue.sync { () -> [TriggerKeyGestureAction] in
+                let actions = core.handleTriggerPressChange(pressed, at: CACurrentMediaTime())
+                syncTimers()
+                return actions
+            }
+            dispatch(actions)
+
+            if triggerKey == .fn {
+                return nil
+            }
             return Unmanaged.passUnretained(event)
         }
 
-        let pressed = event.flags.contains(.maskSecondaryFn)
-        stateQueue.sync {
-            handlePhysicalPressChange(pressed)
+        if isModifierKey(keyCode) {
+            stateQueue.sync {
+                core.handleNonTriggerModifierChange()
+                syncTimers()
+            }
         }
-        return nil
+
+        return Unmanaged.passUnretained(event)
+    }
+
+    private func handleKeyDown(_ event: CGEvent) -> Unmanaged<CGEvent>? {
+        let keyCode = Int(event.getIntegerValueField(.keyboardEventKeycode))
+        guard keyCode != monitoredKeyCode else {
+            return Unmanaged.passUnretained(event)
+        }
+
+        stateQueue.sync {
+            core.handleNonTriggerKeyDown()
+            syncTimers()
+        }
+        return Unmanaged.passUnretained(event)
     }
 
     private func handleSystemDefined(_ event: CGEvent) -> Unmanaged<CGEvent>? {
+        guard triggerKey == .fn else {
+            return Unmanaged.passUnretained(event)
+        }
         guard let nsEvent = NSEvent(cgEvent: event) else {
             return Unmanaged.passUnretained(event)
         }
@@ -266,87 +389,95 @@ final class FnKeyMonitor: @unchecked Sendable {
             return Unmanaged.passUnretained(event)
         }
 
-        switch state {
-        case 0x0A:
-            stateQueue.sync {
-                handlePhysicalPressChange(true)
+        let actions = stateQueue.sync { () -> [TriggerKeyGestureAction] in
+            let actions: [TriggerKeyGestureAction]
+            switch state {
+            case 0x0A:
+                actions = core.handleTriggerPressChange(true, at: CACurrentMediaTime())
+            case 0x0B:
+                actions = core.handleTriggerPressChange(false, at: CACurrentMediaTime())
+            default:
+                return []
             }
-            return nil
-        case 0x0B:
-            stateQueue.sync {
-                handlePhysicalPressChange(false)
-            }
-            return nil
-        default:
-            return Unmanaged.passUnretained(event)
+            syncTimers()
+            return actions
+        }
+        dispatch(actions)
+        return nil
+    }
+
+    private var monitoredKeyCode: Int {
+        switch triggerKey {
+        case .fn:
+            return Int(kVK_Function)
+        case .rightCommand:
+            return Int(kVK_RightCommand)
         }
     }
 
-    private func handlePhysicalPressChange(_ pressed: Bool) {
-        guard pressed != isFnPressed else {
-            return
+    private func isTriggerPressed(event: CGEvent, keyCode: Int) -> Bool {
+        switch triggerKey {
+        case .fn:
+            return event.flags.contains(.maskSecondaryFn)
+        case .rightCommand:
+            if keyCode != Int(kVK_RightCommand) {
+                return false
+            }
+            return (event.flags.rawValue & UInt64(NX_DEVICERCMDKEYMASK)) != 0
         }
+    }
 
-        isFnPressed = pressed
-        let now = CACurrentMediaTime()
-        let actions = if pressed {
-            stateMachine.handleKeyDown(at: now)
-        } else {
-            stateMachine.handleKeyUp(at: now)
+    private func isModifierKey(_ keyCode: Int) -> Bool {
+        switch keyCode {
+        case Int(kVK_Function),
+             Int(kVK_Command),
+             Int(kVK_RightCommand),
+             Int(kVK_Shift),
+             Int(kVK_RightShift),
+             Int(kVK_Option),
+             Int(kVK_RightOption),
+             Int(kVK_Control),
+             Int(kVK_RightControl),
+             Int(kVK_CapsLock):
+            return true
+        default:
+            return false
         }
-
-        syncTimers()
-        dispatch(actions)
     }
 
     private func syncTimers() {
-        longPressWorkItem?.cancel()
-        longPressWorkItem = nil
+        gestureResolutionWorkItem?.cancel()
+        gestureResolutionWorkItem = nil
 
-        if let fireAt = stateMachine.pendingLongPressFireAt {
+        if let fireAt = core.stateMachine.pendingGestureResolutionFireAt {
             let workItem = DispatchWorkItem { [weak self] in
                 guard let self else { return }
-                let actions = self.stateMachine.handleLongPressTimer(at: CACurrentMediaTime())
+                let actions = self.core.handleLongPressTimer(at: CACurrentMediaTime())
                 self.syncTimers()
                 self.dispatch(actions)
             }
-            longPressWorkItem = workItem
-            stateQueue.asyncAfter(deadline: .now() + max(0, fireAt - CACurrentMediaTime()), execute: workItem)
-        }
-
-        doubleTapWorkItem?.cancel()
-        doubleTapWorkItem = nil
-
-        if let fireAt = stateMachine.pendingDoubleTapExpiryAt {
-            let workItem = DispatchWorkItem { [weak self] in
-                guard let self else { return }
-                _ = self.stateMachine.handleDoubleTapTimer(at: CACurrentMediaTime())
-                self.syncTimers()
-            }
-            doubleTapWorkItem = workItem
+            gestureResolutionWorkItem = workItem
             stateQueue.asyncAfter(deadline: .now() + max(0, fireAt - CACurrentMediaTime()), execute: workItem)
         }
     }
 
     private func cancelTimers() {
-        longPressWorkItem?.cancel()
-        longPressWorkItem = nil
-        doubleTapWorkItem?.cancel()
-        doubleTapWorkItem = nil
+        gestureResolutionWorkItem?.cancel()
+        gestureResolutionWorkItem = nil
     }
 
-    private func dispatch(_ actions: [FnGestureAction]) {
+    private func dispatch(_ actions: [TriggerKeyGestureAction]) {
         for action in actions {
             let callback: (@Sendable () -> Void)?
             switch action {
             case .startDictation:
-                debugLog("FnKeyMonitor start dictation")
+                debugLog("TriggerKeyMonitor start dictation")
                 callback = onDictationStart
             case .finishDictation:
-                debugLog("FnKeyMonitor finish dictation")
+                debugLog("TriggerKeyMonitor finish dictation")
                 callback = onDictationFinish
             case .startQuickTranslation:
-                debugLog("FnKeyMonitor start quick translation")
+                debugLog("TriggerKeyMonitor start quick translation")
                 callback = onQuickTranslation
             }
 

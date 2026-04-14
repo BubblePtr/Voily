@@ -11,6 +11,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         guard !isRunningInXcodePreview() else { return }
         try? FileManager.default.removeItem(atPath: "/tmp/voily.log")
         debugLog("AppDelegate.applicationDidFinishLaunching")
+        guard !isRunningUnderXCTest() else {
+            debugLog("AppDelegate.applicationDidFinishLaunching skipping app startup under XCTest")
+            return
+        }
         appController.start()
     }
 
@@ -49,6 +53,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidBecomeActive(_ notification: Notification) {
         debugLog("AppDelegate.applicationDidBecomeActive")
+        appController.handleApplicationDidBecomeActive()
     }
 
     func applicationWillResignActive(_ notification: Notification) {

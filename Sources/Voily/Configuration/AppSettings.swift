@@ -117,6 +117,31 @@ enum AppIconVariant: String, CaseIterable, Codable, Identifiable {
     }
 }
 
+enum TriggerKey: String, CaseIterable, Codable, Identifiable {
+    case fn
+    case rightCommand
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .fn:
+            return "Fn"
+        case .rightCommand:
+            return "右 Command"
+        }
+    }
+
+    var summary: String {
+        switch self {
+        case .fn:
+            return "单击 Fn 开始普通听写，再单击一次 Fn 结束；长按 Fn 0.8 秒启动快捷翻译。"
+        case .rightCommand:
+            return "单击右 Command 开始普通听写，再单击一次右 Command 结束；长按右 Command 0.8 秒启动快捷翻译。"
+        }
+    }
+}
+
 struct ASRProviderConfig: Codable, Equatable {
     var executablePath: String
     var modelPath: String
@@ -195,6 +220,7 @@ struct ModelSettingsSnapshot: Codable, Equatable {
     var selectedASRProvider: ASRProvider
     var selectedTextProvider: TextRefinementProvider
     var textRefinementEnabled: Bool
+    var triggerKey: TriggerKey
     var dockIconVisible: Bool
     var preferredMicrophoneUID: String?
     var enabledDictationSkills: [DictationProcessingSkill]
@@ -205,6 +231,7 @@ struct ModelSettingsSnapshot: Codable, Equatable {
         selectedASRProvider: .senseVoice,
         selectedTextProvider: .deepSeek,
         textRefinementEnabled: false,
+        triggerKey: .fn,
         dockIconVisible: true,
         preferredMicrophoneUID: nil,
         enabledDictationSkills: [],
@@ -231,6 +258,7 @@ struct ModelSettingsSnapshot: Codable, Equatable {
         case selectedASRProvider
         case selectedTextProvider
         case textRefinementEnabled
+        case triggerKey
         case dockIconVisible
         case preferredMicrophoneUID
         case enabledDictationSkills
@@ -242,6 +270,7 @@ struct ModelSettingsSnapshot: Codable, Equatable {
         selectedASRProvider: ASRProvider,
         selectedTextProvider: TextRefinementProvider,
         textRefinementEnabled: Bool,
+        triggerKey: TriggerKey,
         dockIconVisible: Bool,
         preferredMicrophoneUID: String?,
         enabledDictationSkills: [DictationProcessingSkill],
@@ -251,6 +280,7 @@ struct ModelSettingsSnapshot: Codable, Equatable {
         self.selectedASRProvider = selectedASRProvider
         self.selectedTextProvider = selectedTextProvider
         self.textRefinementEnabled = textRefinementEnabled
+        self.triggerKey = triggerKey
         self.dockIconVisible = dockIconVisible
         self.preferredMicrophoneUID = preferredMicrophoneUID
         self.enabledDictationSkills = enabledDictationSkills
@@ -264,6 +294,7 @@ struct ModelSettingsSnapshot: Codable, Equatable {
         selectedASRProvider = Self.migratedSelectedASRProvider(from: selectedASRRawValue)
         selectedTextProvider = try container.decodeIfPresent(TextRefinementProvider.self, forKey: .selectedTextProvider) ?? .deepSeek
         textRefinementEnabled = try container.decode(Bool.self, forKey: .textRefinementEnabled)
+        triggerKey = try container.decodeIfPresent(TriggerKey.self, forKey: .triggerKey) ?? .fn
         dockIconVisible = try container.decodeIfPresent(Bool.self, forKey: .dockIconVisible) ?? true
         preferredMicrophoneUID = try container.decodeIfPresent(String.self, forKey: .preferredMicrophoneUID)
         enabledDictationSkills = try container.decodeIfPresent([DictationProcessingSkill].self, forKey: .enabledDictationSkills) ?? []
@@ -287,6 +318,7 @@ struct ModelSettingsSnapshot: Codable, Equatable {
         try container.encode(selectedASRProvider.rawValue, forKey: .selectedASRProvider)
         try container.encode(selectedTextProvider, forKey: .selectedTextProvider)
         try container.encode(textRefinementEnabled, forKey: .textRefinementEnabled)
+        try container.encode(triggerKey, forKey: .triggerKey)
         try container.encode(dockIconVisible, forKey: .dockIconVisible)
         try container.encodeIfPresent(preferredMicrophoneUID, forKey: .preferredMicrophoneUID)
         try container.encode(enabledDictationSkills, forKey: .enabledDictationSkills)
@@ -570,6 +602,10 @@ final class AppSettings {
         didSet { persistSnapshot() }
     }
 
+    var triggerKey: TriggerKey {
+        didSet { persistSnapshot() }
+    }
+
     var dockIconVisible: Bool {
         didSet { persistSnapshot() }
     }
@@ -635,6 +671,7 @@ final class AppSettings {
         self.selectedASRProvider = snapshot.selectedASRProvider
         self.selectedTextProvider = snapshot.selectedTextProvider
         self.textRefinementEnabled = snapshot.textRefinementEnabled
+        self.triggerKey = snapshot.triggerKey
         self.dockIconVisible = snapshot.dockIconVisible
         self.preferredMicrophoneUID = snapshot.preferredMicrophoneUID?.trimmed.nilIfEmpty
         self.enabledDictationSkills = snapshot.enabledDictationSkills
@@ -800,6 +837,7 @@ final class AppSettings {
             selectedASRProvider: selectedASRProvider,
             selectedTextProvider: selectedTextProvider,
             textRefinementEnabled: textRefinementEnabled,
+            triggerKey: triggerKey,
             dockIconVisible: dockIconVisible,
             preferredMicrophoneUID: preferredMicrophoneUID?.trimmed.nilIfEmpty,
             enabledDictationSkills: enabledDictationSkills,
