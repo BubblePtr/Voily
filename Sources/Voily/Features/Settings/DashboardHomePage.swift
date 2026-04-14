@@ -31,11 +31,6 @@ struct DashboardHomePage: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 24) {
-                SettingsPageHeader(
-                    title: "首页",
-                    subtitle: "今天的语音输入情况、趋势变化和完整历史都集中放在这里。"
-                )
-
                 TodayMetricsSection(
                     summary: usageStore.todaySummary,
                     asrSummary: usageStore.todayASRSummary

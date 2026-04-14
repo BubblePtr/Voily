@@ -11,6 +11,5 @@ struct VoilyApp: App {
         }
         .defaultLaunchBehavior(.presented)
         .defaultSize(width: 1120, height: 760)
-        .windowResizability(.contentMinSize)
     }
 }

@@ -22,10 +22,8 @@ struct SettingsWindowSceneView: View {
             llmService: llmService,
             managedASRModels: managedASRModels
         )
-        .frame(minWidth: 1120, minHeight: 760)
+        .frame(minHeight: 760)
         .background(SettingsWindowLifecycleObserver(registerWindow: registerWindow, onHide: onWindowHide))
-        .toolbar(removing: .title)
-        .toolbarBackgroundVisibility(.hidden, for: .windowToolbar)
         .onAppear {
             debugLog("SettingsWindowSceneView.onAppear")
             onInitialAppearance()
@@ -155,6 +153,19 @@ private enum SettingsPage: String, CaseIterable, Identifiable, Hashable {
         }
     }
 
+    var subtitle: String {
+        switch self {
+        case .home:
+            return "今天的语音输入情况、趋势变化和完整历史都集中放在这里。"
+        case .model:
+            return "按模型角色选择默认 provider。触发键单击用于普通听写，长按用于快捷翻译；触发键可在“设置”页调整。"
+        case .glossary:
+            return "选择默认术语包，并维护自定义词条。该词库会参与 LLM 文本润色。"
+        case .settings:
+            return "在这里管理输入语言和 app 的通用行为说明。模型、文本处理和词库配置分别保留在各自页面。"
+        }
+    }
+
     var sidebarIcon: Image {
         switch self {
         case .home:
@@ -167,6 +178,7 @@ private enum SettingsPage: String, CaseIterable, Identifiable, Hashable {
             return Ph.gear.regular
         }
     }
+
 }
 
 private struct SettingsRootView: View {
@@ -176,67 +188,60 @@ private struct SettingsRootView: View {
     let managedASRModels: ManagedASRModelStore
 
     @State private var selection: SettingsPage? = .home
-    @State private var columnVisibility: NavigationSplitViewVisibility = .all
+
+    private var currentPage: SettingsPage {
+        selection ?? .home
+    }
 
     var body: some View {
-        NavigationSplitView(columnVisibility: $columnVisibility) {
-            SettingsSidebar(settings: settings, selection: $selection)
-                .navigationSplitViewColumnWidth(min: 196, ideal: 196, max: 196)
+        NavigationSplitView {
+            List(selection: $selection) {
+                Section {
+                    SidebarHeader(settings: settings)
+                        .tag(nil as SettingsPage?)
+                        .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 12, trailing: 16))
+                        .listRowBackground(Color.clear)
+                        .allowsHitTesting(false)
+                }
+
+                Section {
+                    ForEach(SettingsPage.allCases) { page in
+                        HStack(spacing: 12) {
+                            page.sidebarIcon
+                                .renderingMode(.template)
+                                .scaledToFit()
+                                .frame(width: 18, height: 18)
+
+                            Text(page.title)
+                                .font(.system(size: 14, weight: .medium))
+                        }
+                        .tag(page)
+                    }
+                }
+            }
+            .listStyle(.sidebar)
+            .navigationSplitViewColumnWidth(min: 180, ideal: 196, max: 220)
         } detail: {
             Group {
-                switch selection ?? .home {
+                switch currentPage {
                 case .home:
                     DashboardHomePage(usageStore: usageStore)
                 case .model:
-                    ModelSettingsPage(settings: settings, llmService: llmService, managedASRModels: managedASRModels)
+                    ModelSettingsPage(
+                        settings: settings,
+                        llmService: llmService,
+                        managedASRModels: managedASRModels
+                    )
                 case .glossary:
                     GlossarySettingsPage(settings: settings)
                 case .settings:
                     GeneralSettingsPage(settings: settings)
                 }
             }
-            .id(selection ?? .home)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(Color(nsColor: .windowBackgroundColor))
+            .navigationTitle(currentPage.title)
+            .navigationSubtitle(currentPage.subtitle)
         }
-    }
-}
-
-private struct SettingsSidebar: View {
-    let settings: AppSettings
-    @Binding var selection: SettingsPage?
-
-    var body: some View {
-        List(selection: $selection) {
-            Section {
-                SidebarHeader(settings: settings)
-                    .tag(nil as SettingsPage?)
-                    .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 12, trailing: 16))
-                    .listRowBackground(Color.clear)
-                    .allowsHitTesting(false)
-            }
-
-            Section {
-                sidebarRow(.home)
-                sidebarRow(.model)
-                sidebarRow(.glossary)
-                sidebarRow(.settings)
-            }
-        }
-        .listStyle(.sidebar)
-    }
-
-    private func sidebarRow(_ page: SettingsPage) -> some View {
-        HStack(spacing: 12) {
-            page.sidebarIcon
-                .renderingMode(.template)
-                .scaledToFit()
-                .frame(width: 24, height: 24)
-
-            Text(page.title)
-                .font(.system(size: 14, weight: .medium))
-        }
-        .tag(page)
     }
 }
 
@@ -447,11 +452,6 @@ private struct ModelSettingsPage: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 30) {
-                SettingsPageHeader(
-                    title: "模型",
-                    subtitle: "按模型角色选择默认 provider。触发键单击用于普通听写，长按用于快捷翻译；触发键可在“设置”页调整。"
-                )
-
                 DefaultModelsOverviewCard(
                     selectedASRProvider: $draftSelectedASRProvider,
                     selectedTextProvider: $draftSelectedTextProvider,
@@ -1351,11 +1351,6 @@ private struct GlossarySettingsPage: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 24) {
-                SettingsPageHeader(
-                    title: "词库",
-                    subtitle: "选择默认术语包，并维护自定义词条。该词库会参与 LLM 文本润色。"
-                )
-
                 SettingsCard(title: "默认术语包", subtitle: "按行业和场景启用内置词库，点击即可切换") {
                     VStack(alignment: .leading, spacing: 18) {
                         ForEach(GlossaryPresetDefinition.categories) { category in
@@ -1503,11 +1498,6 @@ private struct GeneralSettingsPage: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 24) {
-                SettingsPageHeader(
-                    title: "设置",
-                    subtitle: "在这里管理输入语言和 app 的通用行为说明。模型、文本处理和词库配置分别保留在各自页面。"
-                )
-
                 SettingsCard(title: "输入语言", subtitle: "普通听写默认使用这里选择的语言") {
                     VStack(alignment: .leading, spacing: 14) {
                         Picker("输入语言", selection: $settings.selectedLanguage) {
@@ -1788,22 +1778,6 @@ private struct EditableGlossaryTag: View {
             RoundedRectangle(cornerRadius: 14, style: .continuous)
                 .stroke(Color.primary.opacity(0.06), lineWidth: 1)
         )
-    }
-}
-
-struct SettingsPageHeader: View {
-    let title: String
-    let subtitle: String
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text(title)
-                .font(.system(size: 30, weight: .semibold))
-
-            Text(subtitle)
-                .font(.system(size: 13))
-                .foregroundStyle(.secondary)
-        }
     }
 }
 
