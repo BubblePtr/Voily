@@ -760,7 +760,6 @@ final class AppController: NSObject {
         currentFirstPartialMs = nil
         currentPartialCount = 0
         currentPendingRealtimeAppendCount = 0
-        currentAudioOutputMuteToken = nil
         currentOverlayControls = .none
         currentText = ""
         currentPhase = .idle
