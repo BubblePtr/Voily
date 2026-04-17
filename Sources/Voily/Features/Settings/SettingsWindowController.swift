@@ -1542,6 +1542,17 @@ private struct GeneralSettingsPage: View {
                     }
                 }
 
+                SettingsCard(title: "系统输出", subtitle: "控制语音任务期间对系统输出声音的处理") {
+                    VStack(alignment: .leading, spacing: 14) {
+                        Toggle("语音输入时自动静音系统输出，结束后恢复", isOn: $settings.interruptSystemMediaPlayback)
+                            .toggleStyle(.switch)
+
+                        Text("统一作用于普通听写和快捷翻译。Voily 会在任务开始时临时静音当前默认输出设备，并在会话结束时恢复；如果你中途切换了输出设备，则不会改动新的设备。")
+                            .font(.system(size: 12))
+                            .foregroundStyle(.secondary)
+                    }
+                }
+
                 SettingsCard(title: "App 外观", subtitle: "控制 Dock 与 menu bar 的展示方式") {
                     VStack(alignment: .leading, spacing: 14) {
                         Toggle("显示 Dock 图标", isOn: $settings.dockIconVisible)
