@@ -36,6 +36,8 @@
 		A001001D0000000000000000 /* AppSettingsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00200200000000000000000 /* AppSettingsTests.swift */; };
 		A001001E0000000000000000 /* LLMRefinementServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00200210000000000000000 /* LLMRefinementServiceTests.swift */; };
 		A001001F0000000000000000 /* AppSettingsPersistenceIntegrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00200220000000000000000 /* AppSettingsPersistenceIntegrationTests.swift */; };
+		A00100200000000000000000 /* SystemMediaPlaybackService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00200230000000000000000 /* SystemMediaPlaybackService.swift */; };
+		A00100210000000000000000 /* SystemMediaPlaybackServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00200240000000000000000 /* SystemMediaPlaybackServiceTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -81,6 +83,8 @@
 		A00200200000000000000000 /* AppSettingsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppSettingsTests.swift; sourceTree = "<group>"; };
 		A00200210000000000000000 /* LLMRefinementServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LLMRefinementServiceTests.swift; sourceTree = "<group>"; };
 		A00200220000000000000000 /* AppSettingsPersistenceIntegrationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppSettingsPersistenceIntegrationTests.swift; sourceTree = "<group>"; };
+		A00200230000000000000000 /* SystemMediaPlaybackService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemMediaPlaybackService.swift; sourceTree = "<group>"; };
+		A00200240000000000000000 /* SystemMediaPlaybackServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemMediaPlaybackServiceTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -179,6 +183,7 @@
 			isa = PBXGroup;
 			children = (
 				A004000C0000000000000000 /* Audio */,
+				A00400130000000000000000 /* Media */,
 				A004000D0000000000000000 /* Text */,
 			);
 			path = Services;
@@ -204,6 +209,14 @@
 				A002000D0000000000000000 /* TextInjectionService.swift */,
 			);
 			path = Text;
+			sourceTree = "<group>";
+		};
+		A00400130000000000000000 /* Media */ = {
+			isa = PBXGroup;
+			children = (
+				A00200230000000000000000 /* SystemMediaPlaybackService.swift */,
+			);
+			path = Media;
 			sourceTree = "<group>";
 		};
 		A004000E0000000000000000 /* Storage */ = {
@@ -263,6 +276,7 @@
 			isa = PBXGroup;
 			children = (
 				A00200210000000000000000 /* LLMRefinementServiceTests.swift */,
+				A00200240000000000000000 /* SystemMediaPlaybackServiceTests.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -389,6 +403,7 @@
 				A001000A0000000000000000 /* SettingsWindowController.swift in Sources */,
 				A001000B0000000000000000 /* SpeechTranscriptionService.swift in Sources */,
 				A001000C0000000000000000 /* SupportedLanguage.swift in Sources */,
+				A00100200000000000000000 /* SystemMediaPlaybackService.swift in Sources */,
 				A001000D0000000000000000 /* TextInjectionService.swift in Sources */,
 				A00100130000000000000000 /* UsageStore.swift in Sources */,
 				A001000E0000000000000000 /* VoilyApp.swift in Sources */,
@@ -403,6 +418,7 @@
 				A001001F0000000000000000 /* AppSettingsPersistenceIntegrationTests.swift in Sources */,
 				A001001E0000000000000000 /* LLMRefinementServiceTests.swift in Sources */,
 				A00100180000000000000000 /* LocalASRServiceTests.swift in Sources */,
+				A00100210000000000000000 /* SystemMediaPlaybackServiceTests.swift in Sources */,
 				A00100140000000000000000 /* UsageStoreTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

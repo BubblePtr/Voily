@@ -112,6 +112,7 @@ final class AppController: NSObject {
     private let overlayController = OverlayPanelController()
     private let textInjectionService = TextInjectionService()
     private let llmRefinementService = LLMRefinementService()
+    private let audioOutputMuteService = SystemAudioOutputMuteService()
 
     private var statusItem: NSStatusItem?
     private var statusMenu: NSMenu?
@@ -129,6 +130,7 @@ final class AppController: NSObject {
     private var currentPartialCount = 0
     private var currentSpeechCaptureEnabled = false
     private var currentPendingRealtimeAppendCount = 0
+    private var currentAudioOutputMuteToken: AudioOutputMuteInterruptionToken?
     private var hasStopped = false
     private var hasStartedStartupPermissionGuidance = false
     private var hasCompletedInitialSettingsWindowAppearance = false
@@ -160,6 +162,7 @@ final class AppController: NSObject {
         }
         try? await qwenRealtimeASRService.cancelSession()
         await senseVoiceResidentService.stop()
+        await restoreAudioOutputIfNeeded()
         currentResidentSession = nil
         localAudioWriter?.cancel()
         localAudioWriter = nil
@@ -531,6 +534,14 @@ final class AppController: NSObject {
             return
         }
 
+        if settings.interruptSystemMediaPlayback {
+            debugLog("System output mute enabled; attempting mute before \(mode.debugName)")
+            currentAudioOutputMuteToken = await audioOutputMuteService.muteIfNeeded()
+            debugLog("System output mute tokenCreated=\(currentAudioOutputMuteToken != nil)")
+        } else {
+            currentAudioOutputMuteToken = nil
+        }
+
         currentSessionMode = mode
         currentText = ""
         smoothedRMS = 0
@@ -591,6 +602,7 @@ final class AppController: NSObject {
             overlayController.hide()
             currentPhase = .idle
             currentSessionStartedAt = nil
+            await restoreAudioOutputIfNeeded()
         }
     }
 
@@ -729,6 +741,9 @@ final class AppController: NSObject {
     }
 
     private func cleanupCurrentSession(hideOverlay: Bool) async {
+        debugLog(
+            "cleanupCurrentSession hideOverlay=\(hideOverlay) outputMuteTokenPresent=\(currentAudioOutputMuteToken != nil)"
+        )
         speechService.cancel()
         localAudioWriter?.cancel()
         localAudioWriter = nil
@@ -738,12 +753,14 @@ final class AppController: NSObject {
         }
         currentResidentSession = nil
         try? await qwenRealtimeASRService.cancelSession()
+        await restoreAudioOutputIfNeeded()
 
         currentSessionMode = nil
         currentSpeechCaptureEnabled = false
         currentFirstPartialMs = nil
         currentPartialCount = 0
         currentPendingRealtimeAppendCount = 0
+        currentAudioOutputMuteToken = nil
         currentOverlayControls = .none
         currentText = ""
         currentPhase = .idle
@@ -1064,6 +1081,17 @@ final class AppController: NSObject {
         if currentPendingRealtimeAppendCount > 0 {
             debugLog("Realtime pending appends timed out count=\(currentPendingRealtimeAppendCount)")
         }
+    }
+
+    private func restoreAudioOutputIfNeeded() async {
+        guard let token = currentAudioOutputMuteToken else {
+            debugLog("restoreAudioOutputIfNeeded skipped tokenPresent=false")
+            return
+        }
+
+        debugLog("restoreAudioOutputIfNeeded tokenPresent=true")
+        currentAudioOutputMuteToken = nil
+        await audioOutputMuteService.restoreIfNeeded(token)
     }
 
     @objc

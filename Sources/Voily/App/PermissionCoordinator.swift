@@ -31,12 +31,20 @@ final class PermissionCoordinator {
     }
 
     func promptForAccessibilityIfNeeded(force: Bool = false) {
+        guard !isRunningUnderXCTest() else {
+            debugLog("PermissionCoordinator.promptForAccessibilityIfNeeded skipped under XCTest")
+            return
+        }
         guard !isAccessibilityTrusted else { return }
         let options = ["AXTrustedCheckOptionPrompt": true] as CFDictionary
         _ = AXIsProcessTrustedWithOptions(options)
     }
 
     func waitForAccessibilityGrant(onGranted: @escaping @MainActor () -> Void) {
+        guard !isRunningUnderXCTest() else {
+            debugLog("PermissionCoordinator.waitForAccessibilityGrant skipped under XCTest")
+            return
+        }
         accessibilityPollTimer?.invalidate()
         onAccessibilityGranted = onGranted
         accessibilityPollTimer = Timer(
@@ -66,6 +74,10 @@ final class PermissionCoordinator {
     }
 
     func requestMicrophoneIfNeeded() async -> Bool {
+        guard !isRunningUnderXCTest() else {
+            debugLog("PermissionCoordinator.requestMicrophoneIfNeeded skipped under XCTest")
+            return false
+        }
         switch AVCaptureDevice.authorizationStatus(for: .audio) {
         case .authorized:
             return true
@@ -83,6 +95,10 @@ final class PermissionCoordinator {
     }
 
     func requestSpeechRecognitionIfNeeded() async -> Bool {
+        guard !isRunningUnderXCTest() else {
+            debugLog("PermissionCoordinator.requestSpeechRecognitionIfNeeded skipped under XCTest")
+            return false
+        }
         switch SFSpeechRecognizer.authorizationStatus() {
         case .authorized:
             return true

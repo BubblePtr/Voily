@@ -221,6 +221,7 @@ struct ModelSettingsSnapshot: Codable, Equatable {
     var selectedTextProvider: TextRefinementProvider
     var textRefinementEnabled: Bool
     var triggerKey: TriggerKey
+    var interruptSystemMediaPlayback: Bool
     var dockIconVisible: Bool
     var preferredMicrophoneUID: String?
     var enabledDictationSkills: [DictationProcessingSkill]
@@ -232,6 +233,7 @@ struct ModelSettingsSnapshot: Codable, Equatable {
         selectedTextProvider: .deepSeek,
         textRefinementEnabled: false,
         triggerKey: .fn,
+        interruptSystemMediaPlayback: false,
         dockIconVisible: true,
         preferredMicrophoneUID: nil,
         enabledDictationSkills: [],
@@ -259,6 +261,7 @@ struct ModelSettingsSnapshot: Codable, Equatable {
         case selectedTextProvider
         case textRefinementEnabled
         case triggerKey
+        case interruptSystemMediaPlayback
         case dockIconVisible
         case preferredMicrophoneUID
         case enabledDictationSkills
@@ -271,6 +274,7 @@ struct ModelSettingsSnapshot: Codable, Equatable {
         selectedTextProvider: TextRefinementProvider,
         textRefinementEnabled: Bool,
         triggerKey: TriggerKey,
+        interruptSystemMediaPlayback: Bool,
         dockIconVisible: Bool,
         preferredMicrophoneUID: String?,
         enabledDictationSkills: [DictationProcessingSkill],
@@ -281,6 +285,7 @@ struct ModelSettingsSnapshot: Codable, Equatable {
         self.selectedTextProvider = selectedTextProvider
         self.textRefinementEnabled = textRefinementEnabled
         self.triggerKey = triggerKey
+        self.interruptSystemMediaPlayback = interruptSystemMediaPlayback
         self.dockIconVisible = dockIconVisible
         self.preferredMicrophoneUID = preferredMicrophoneUID
         self.enabledDictationSkills = enabledDictationSkills
@@ -295,6 +300,7 @@ struct ModelSettingsSnapshot: Codable, Equatable {
         selectedTextProvider = try container.decodeIfPresent(TextRefinementProvider.self, forKey: .selectedTextProvider) ?? .deepSeek
         textRefinementEnabled = try container.decode(Bool.self, forKey: .textRefinementEnabled)
         triggerKey = try container.decodeIfPresent(TriggerKey.self, forKey: .triggerKey) ?? .fn
+        interruptSystemMediaPlayback = try container.decodeIfPresent(Bool.self, forKey: .interruptSystemMediaPlayback) ?? false
         dockIconVisible = try container.decodeIfPresent(Bool.self, forKey: .dockIconVisible) ?? true
         preferredMicrophoneUID = try container.decodeIfPresent(String.self, forKey: .preferredMicrophoneUID)
         enabledDictationSkills = try container.decodeIfPresent([DictationProcessingSkill].self, forKey: .enabledDictationSkills) ?? []
@@ -319,6 +325,7 @@ struct ModelSettingsSnapshot: Codable, Equatable {
         try container.encode(selectedTextProvider, forKey: .selectedTextProvider)
         try container.encode(textRefinementEnabled, forKey: .textRefinementEnabled)
         try container.encode(triggerKey, forKey: .triggerKey)
+        try container.encode(interruptSystemMediaPlayback, forKey: .interruptSystemMediaPlayback)
         try container.encode(dockIconVisible, forKey: .dockIconVisible)
         try container.encodeIfPresent(preferredMicrophoneUID, forKey: .preferredMicrophoneUID)
         try container.encode(enabledDictationSkills, forKey: .enabledDictationSkills)
@@ -606,6 +613,10 @@ final class AppSettings {
         didSet { persistSnapshot() }
     }
 
+    var interruptSystemMediaPlayback: Bool {
+        didSet { persistSnapshot() }
+    }
+
     var dockIconVisible: Bool {
         didSet { persistSnapshot() }
     }
@@ -672,6 +683,7 @@ final class AppSettings {
         self.selectedTextProvider = snapshot.selectedTextProvider
         self.textRefinementEnabled = snapshot.textRefinementEnabled
         self.triggerKey = snapshot.triggerKey
+        self.interruptSystemMediaPlayback = snapshot.interruptSystemMediaPlayback
         self.dockIconVisible = snapshot.dockIconVisible
         self.preferredMicrophoneUID = snapshot.preferredMicrophoneUID?.trimmed.nilIfEmpty
         self.enabledDictationSkills = snapshot.enabledDictationSkills
@@ -838,6 +850,7 @@ final class AppSettings {
             selectedTextProvider: selectedTextProvider,
             textRefinementEnabled: textRefinementEnabled,
             triggerKey: triggerKey,
+            interruptSystemMediaPlayback: interruptSystemMediaPlayback,
             dockIconVisible: dockIconVisible,
             preferredMicrophoneUID: preferredMicrophoneUID?.trimmed.nilIfEmpty,
             enabledDictationSkills: enabledDictationSkills,

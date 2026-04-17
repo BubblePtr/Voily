@@ -28,6 +28,7 @@ final class AppSettingsPersistenceIntegrationTests: XCTestCase {
         first.selectedTextProvider = .dashScope
         first.textRefinementEnabled = true
         first.triggerKey = .rightCommand
+        first.interruptSystemMediaPlayback = true
         first.dockIconVisible = false
         first.preferredMicrophoneUID = "usb-mic"
         first.setEnabledDictationSkills([.removeFillers, .formalize])
@@ -50,6 +51,7 @@ final class AppSettingsPersistenceIntegrationTests: XCTestCase {
         XCTAssertEqual(second.selectedTextProvider, .dashScope)
         XCTAssertTrue(second.textRefinementEnabled)
         XCTAssertEqual(second.triggerKey, .rightCommand)
+        XCTAssertTrue(second.interruptSystemMediaPlayback)
         XCTAssertFalse(second.dockIconVisible)
         XCTAssertEqual(second.preferredMicrophoneUID, "usb-mic")
         XCTAssertEqual(second.enabledDictationSkills, [.removeFillers, .formalize])
@@ -74,6 +76,7 @@ final class AppSettingsPersistenceIntegrationTests: XCTestCase {
         )
         settings.selectedTextProvider = .dashScope
         settings.triggerKey = .rightCommand
+        settings.interruptSystemMediaPlayback = true
         settings.preferredMicrophoneUID = "usb-mic"
         settings.setTextRefinementConfig(
             TextRefinementProviderConfig(
@@ -92,6 +95,7 @@ final class AppSettingsPersistenceIntegrationTests: XCTestCase {
         XCTAssertNotNil(asrConfigs["qwenASR"])
         XCTAssertNotNil(textConfigs["dashScope"])
         XCTAssertEqual(object["triggerKey"] as? String, "rightCommand")
+        XCTAssertEqual(object["interruptSystemMediaPlayback"] as? Bool, true)
         XCTAssertEqual(object["preferredMicrophoneUID"] as? String, "usb-mic")
         XCTAssertFalse(object["asrConfigsByProvider"] is [Any])
         XCTAssertFalse(object["textConfigsByProvider"] is [Any])

@@ -91,6 +91,15 @@ final class AppSettingsTests: XCTestCase {
         XCTAssertEqual(settings.triggerKey, .fn)
     }
 
+    func testLegacyModelSnapshotWithoutMediaInterruptionDefaultsToDisabled() throws {
+        let defaults = makeDefaults()
+        defaults.set(try legacyModelSnapshotData(), forKey: "modelSettingsSnapshot")
+
+        let settings = AppSettings(defaults: defaults)
+
+        XCTAssertFalse(settings.interruptSystemMediaPlayback)
+    }
+
     func testTriggerKeyPersistsAcrossReload() {
         let defaults = makeDefaults()
         let settings = AppSettings(defaults: defaults)
@@ -99,6 +108,16 @@ final class AppSettingsTests: XCTestCase {
 
         let reloaded = AppSettings(defaults: defaults)
         XCTAssertEqual(reloaded.triggerKey, .rightCommand)
+    }
+
+    func testMediaInterruptionPreferencePersistsAcrossReload() {
+        let defaults = makeDefaults()
+        let settings = AppSettings(defaults: defaults)
+
+        settings.interruptSystemMediaPlayback = true
+
+        let reloaded = AppSettings(defaults: defaults)
+        XCTAssertTrue(reloaded.interruptSystemMediaPlayback)
     }
 
     func testDockIconVisibilityDefaultsToVisibleForLegacySnapshots() throws {
