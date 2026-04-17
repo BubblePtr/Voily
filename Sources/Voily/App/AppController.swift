@@ -596,13 +596,13 @@ final class AppController: NSObject {
             }
             currentResidentSession = nil
             currentPendingRealtimeAppendCount = 0
+            await restoreAudioOutputIfNeeded()
             currentSessionMode = nil
             currentOverlayControls = .none
             triggerKeyMonitor.setSessionMode(.idle)
             overlayController.hide()
             currentPhase = .idle
             currentSessionStartedAt = nil
-            await restoreAudioOutputIfNeeded()
         }
     }
 
@@ -1089,8 +1089,8 @@ final class AppController: NSObject {
         }
 
         debugLog("restoreAudioOutputIfNeeded tokenPresent=true")
-        currentAudioOutputMuteToken = nil
         await audioOutputMuteService.restoreIfNeeded(token)
+        currentAudioOutputMuteToken = nil
     }
 
     @objc
