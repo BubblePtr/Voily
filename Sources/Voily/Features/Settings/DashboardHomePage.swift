@@ -16,7 +16,6 @@ private enum DashboardFormatters {
     }()
 }
 
-@available(macOS 26.0, *)
 struct DashboardHomePage: View {
     let usageStore: UsageStore
 
@@ -100,7 +99,6 @@ struct DashboardHomePage: View {
     }
 }
 
-@available(macOS 26.0, *)
 private struct TodayMetricsSection: View {
     let summary: TodayUsageSummary
     let asrSummary: TodayASRPerformanceSummary
@@ -173,7 +171,6 @@ private struct TodayMetricsSection: View {
     }
 }
 
-@available(macOS 26.0, *)
 private struct MetricCard: View {
     let title: String
     let value: String
@@ -217,7 +214,6 @@ private struct MetricCard: View {
     }
 }
 
-@available(macOS 26.0, *)
 private struct TrendChartsSection: View {
     let title: String
     let subtitle: String
@@ -256,7 +252,6 @@ private struct TrendChartsSection: View {
     }
 }
 
-@available(macOS 26.0, *)
 private struct SparklineChart: View {
     let summaries: [DailyUsageSummary]
     let value: KeyPath<DailyUsageSummary, Int>
@@ -316,7 +311,6 @@ private struct SparklineChart: View {
     }
 }
 
-@available(macOS 26.0, *)
 private struct HistoryListSection: View {
     let usageStore: UsageStore
     let sessions: [HistorySessionRow]
@@ -343,7 +337,6 @@ private struct HistoryListSection: View {
     }
 }
 
-@available(macOS 26.0, *)
 private struct HistorySessionRowView: View {
     let usageStore: UsageStore
     let session: HistorySessionRow
@@ -452,7 +445,6 @@ private struct HistorySessionRowView: View {
     }
 }
 
-@available(macOS 26.0, *)
 private struct CopyToastView: View {
     var body: some View {
         HStack(spacing: 10) {
@@ -474,7 +466,6 @@ private struct CopyToastView: View {
     }
 }
 
-@available(macOS 26.0, *)
 private struct StatusPill: View {
     let session: HistorySessionRow
 
@@ -505,7 +496,6 @@ private struct StatusPill: View {
     }
 }
 
-@available(macOS 26.0, *)
 private struct SmallPill: View {
     let text: String
     var tint: Color = .secondary

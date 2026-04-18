@@ -1,6 +1,5 @@
 import AppKit
 
-@available(macOS 26.0, *)
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
     let windowActions = WindowActions()
