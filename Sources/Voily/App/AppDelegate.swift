@@ -15,6 +15,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             return
         }
         appController.start()
+        Task { @MainActor in
+            self.appController.showSettingsWindow()
+        }
     }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {

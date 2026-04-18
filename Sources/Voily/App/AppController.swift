@@ -137,6 +137,7 @@ final class AppController: NSObject {
     private var hasStopped = false
     private var hasStartedStartupPermissionGuidance = false
     private var hasCompletedInitialSettingsWindowAppearance = false
+    private var openSettingsWindowAction: (@MainActor () -> Void)?
 
     init(windowActions: WindowActions) {
         self.windowActions = windowActions
@@ -150,6 +151,10 @@ final class AppController: NSObject {
         observeAppIconPreference()
         observeTriggerKeyPreference()
         configureOverlayActions()
+    }
+
+    func registerOpenSettingsWindowAction(_ action: @escaping @MainActor () -> Void) {
+        openSettingsWindowAction = action
     }
 
     func stop() async {
@@ -188,6 +193,11 @@ final class AppController: NSObject {
         debugLog("showSettingsWindow() activated isActive=\(NSApp.isActive)")
         if windowActions.showSettingsWindow() {
             debugLog("showSettingsWindow() dispatched action")
+            return
+        }
+        if let openSettingsWindowAction {
+            debugLog("showSettingsWindow() opening settings scene")
+            openSettingsWindowAction()
             return
         }
         debugLog("showSettingsWindow() noRegisteredWindowYet")
