@@ -10,6 +10,7 @@ struct SettingsWindowSceneView: View {
     let settings: AppSettings
     let usageStore: UsageStore
     let llmService: LLMRefinementService
+    let asrConnectionTester: ASRConnectionTester
     let managedASRModels: ManagedASRModelStore
     let registerWindow: (NSWindow) -> Void
     let onInitialAppearance: () -> Void
@@ -20,6 +21,7 @@ struct SettingsWindowSceneView: View {
             settings: settings,
             usageStore: usageStore,
             llmService: llmService,
+            asrConnectionTester: asrConnectionTester,
             managedASRModels: managedASRModels
         )
         .frame(minHeight: 760)
@@ -185,6 +187,7 @@ private struct SettingsRootView: View {
     @Bindable var settings: AppSettings
     let usageStore: UsageStore
     let llmService: LLMRefinementService
+    let asrConnectionTester: ASRConnectionTester
     let managedASRModels: ManagedASRModelStore
 
     @State private var selection: SettingsPage? = .home
@@ -230,6 +233,7 @@ private struct SettingsRootView: View {
                     ModelSettingsPage(
                         settings: settings,
                         llmService: llmService,
+                        asrConnectionTester: asrConnectionTester,
                         managedASRModels: managedASRModels
                     )
                 case .glossary:
@@ -432,6 +436,7 @@ private struct ProviderSheet: Identifiable {
 private struct ModelSettingsPage: View {
     @Bindable var settings: AppSettings
     let llmService: LLMRefinementService
+    let asrConnectionTester: ASRConnectionTester
     @Bindable var managedASRModels: ManagedASRModelStore
 
     @State private var draftSelectedASRProvider: ASRProvider = .senseVoice
@@ -480,6 +485,7 @@ private struct ModelSettingsPage: View {
                                 title: provider.displayName,
                                 subtitle: provider.providerSummary,
                                 logoName: provider.logoAssetName,
+                                logoFallbackText: provider.logoFallbackText,
                                 tag: "云端",
                                 isSelected: draftSelectedTextProvider == provider,
                                 isConfigured: isConfigured,
@@ -524,6 +530,8 @@ private struct ModelSettingsPage: View {
                 ASRProviderConfigSheet(
                     provider: provider,
                     config: asrDrafts[provider] ?? .empty,
+                    languageCode: settings.selectedLanguageCode,
+                    connectionTester: asrConnectionTester,
                     managedState: managedASRModels.state(for: provider),
                     estimatedDownload: managedASRModels.estimatedDownload(for: provider),
                     onInstall: { managedASRModels.install(provider: provider) },
@@ -566,6 +574,7 @@ private struct ModelSettingsPage: View {
             title: provider.displayName,
             subtitle: provider.providerSummary,
             logoName: provider.logoAssetName,
+            logoFallbackText: provider.logoFallbackText,
             tag: provider.category.displayName,
             isSelected: draftSelectedASRProvider == provider,
             isConfigured: status.isConfigured,
@@ -832,6 +841,7 @@ private struct ProviderServiceCard: View {
     let title: String
     let subtitle: String
     let logoName: String
+    let logoFallbackText: String?
     let tag: String
     let isSelected: Bool
     let isConfigured: Bool
@@ -842,7 +852,7 @@ private struct ProviderServiceCard: View {
         Button(action: onOpen) {
             VStack(alignment: .leading, spacing: 0) {
                 HStack(alignment: .center, spacing: 14) {
-                    ProviderLogoIcon(name: logoName)
+                    ProviderLogoIcon(name: logoName, fallbackText: logoFallbackText)
 
                     VStack(alignment: .leading, spacing: 6) {
                         HStack(spacing: 10) {
@@ -924,6 +934,8 @@ private struct TagBadge: View {
 private struct ASRProviderConfigSheet: View {
     let provider: ASRProvider
     let config: ASRProviderConfig
+    let languageCode: String
+    let connectionTester: ASRConnectionTester
     let managedState: ManagedASRInstallState
     let estimatedDownload: String
     let onInstall: () -> Void
@@ -934,11 +946,14 @@ private struct ASRProviderConfigSheet: View {
 
     @State private var showingInstallConfirmation = false
     @State private var draftConfig = ASRProviderConfig.empty
+    @State private var statusMessage = ""
+    @State private var isTesting = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 22) {
             SheetHeader(
                 logoName: provider.logoAssetName,
+                logoFallbackText: provider.logoFallbackText,
                 title: provider.displayName,
                 subtitle: provider.providerSummary
             )
@@ -957,13 +972,29 @@ private struct ASRProviderConfigSheet: View {
                     config: $draftConfig,
                     modelPlaceholder: provider.defaultModelPlaceholder
                 )
+
+                HStack(spacing: 12) {
+                    Button("测试连接") {
+                        testConnection()
+                    }
+                    .disabled(isTesting || !draftConfig.isConfigured(for: provider))
+
+                    if isTesting {
+                        ProgressView()
+                            .controlSize(.small)
+                    }
+
+                    Text(statusMessage.isEmpty ? defaultTestingHint : statusMessage)
+                        .font(.system(size: 12))
+                        .foregroundStyle(.secondary)
+                }
             }
 
             SheetFooter(
                 statusText: provider.category == .local ? "本地模型由应用托管下载和卸载。" : provider.cloudStatusText,
                 onCancel: { dismiss() },
                 onSave: {
-                    onSave(draftConfig)
+                    onSave(normalizedConfig(draftConfig))
                     dismiss()
                 }
             )
@@ -979,6 +1010,13 @@ private struct ASRProviderConfigSheet: View {
                 if draftConfig.model.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                     draftConfig.model = "qwen3-asr-flash-realtime"
                 }
+            } else if provider == .doubaoStreaming {
+                if draftConfig.baseURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    draftConfig.baseURL = "wss://openspeech.bytedance.com/api/v3/sauc/bigmodel_async"
+                }
+                if draftConfig.model.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    draftConfig.model = "volc.seedasr.sauc.duration"
+                }
             }
         }
         .alert("下载 \(provider.displayName)", isPresented: $showingInstallConfirmation) {
@@ -989,6 +1027,44 @@ private struct ASRProviderConfigSheet: View {
         } message: {
             Text("会在首次安装时下载 SenseVoice Small 的 MLX 模型文件。安装完成后只走本地常驻识别。")
         }
+    }
+
+    private var defaultTestingHint: String {
+        "会使用当前表单内容发起一次真实握手。"
+    }
+
+    private func testConnection() {
+        isTesting = true
+        statusMessage = "正在测试连接..."
+        draftConfig = normalizedConfig(draftConfig)
+
+        Task {
+            defer { isTesting = false }
+
+            do {
+                try await connectionTester.testConnection(
+                    provider: provider,
+                    config: draftConfig,
+                    languageCode: languageCode
+                )
+                statusMessage = "连接成功，可以用于实时识别。"
+            } catch {
+                statusMessage = "测试失败：\(error.localizedDescription)"
+            }
+        }
+    }
+
+    private func normalizedConfig(_ config: ASRProviderConfig) -> ASRProviderConfig {
+        guard provider == .doubaoStreaming else {
+            return config
+        }
+
+        var normalized = config
+        normalized.baseURL = DoubaoStreamingASRService.normalizedSingleLineValue(config.baseURL)
+        normalized.apiKey = DoubaoStreamingASRService.normalizedSingleLineValue(config.apiKey)
+        normalized.model = DoubaoStreamingASRService.normalizedSingleLineValue(config.model)
+        normalized.appID = DoubaoStreamingASRService.normalizedSingleLineValue(config.appID)
+        return normalized
     }
 }
 
@@ -1009,6 +1085,7 @@ private struct TextRefinementProviderConfigSheet: View {
         VStack(alignment: .leading, spacing: 22) {
             SheetHeader(
                 logoName: provider.logoAssetName,
+                logoFallbackText: provider.logoFallbackText,
                 title: provider.displayName,
                 subtitle: provider.providerSummary
             )
@@ -1077,12 +1154,13 @@ private struct TextRefinementProviderConfigSheet: View {
 
 private struct SheetHeader: View {
     let logoName: String
+    let logoFallbackText: String?
     let title: String
     let subtitle: String
 
     var body: some View {
         HStack(spacing: 14) {
-            ProviderLogoIcon(name: logoName, size: 50)
+            ProviderLogoIcon(name: logoName, fallbackText: logoFallbackText, size: 50)
 
             VStack(alignment: .leading, spacing: 6) {
                 Text(title)
@@ -1120,10 +1198,11 @@ private struct SheetFooter: View {
 
 private struct ProviderLogoIcon: View {
     let name: String
+    let fallbackText: String?
     var size: CGFloat = 44
 
     var body: some View {
-        BrandIconImage(resourceName: name)
+        BrandIconImage(resourceName: name, fallbackText: fallbackText)
             .frame(width: size - 12, height: size - 12)
             .frame(width: size, height: size)
     }
@@ -1131,6 +1210,7 @@ private struct ProviderLogoIcon: View {
 
 private struct BrandIconImage: View {
     let resourceName: String
+    let fallbackText: String?
 
     var body: some View {
         Group {
@@ -1140,11 +1220,13 @@ private struct BrandIconImage: View {
                     .interpolation(.high)
                     .aspectRatio(contentMode: .fit)
             } else {
-                Image(systemName: "photo")
-                    .resizable()
-                    .scaledToFit()
-                    .foregroundStyle(.secondary)
-                    .padding(6)
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(Color.primary.opacity(0.08))
+                    .overlay {
+                        Text(fallbackText ?? "AI")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(.secondary)
+                    }
             }
         }
     }
@@ -1228,22 +1310,34 @@ private struct CloudProviderFields: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            SettingsFormField(title: "API Base URL") {
+            SettingsFormField(title: provider.cloudBaseURLTitle) {
                 TextField(provider.cloudBaseURLPlaceholder, text: $config.baseURL)
                     .textFieldStyle(.roundedBorder)
             }
 
-            SettingsFormField(title: "API Key") {
+            if provider == .doubaoStreaming {
+                SettingsFormField(title: "App ID") {
+                    TextField("填写火山控制台中的 App ID", text: $config.appID)
+                        .textFieldStyle(.roundedBorder)
+                }
+            }
+
+            SettingsFormField(title: provider.cloudAPIKeyTitle) {
                 APIKeyField(text: $config.apiKey)
             }
 
-            SettingsFormField(title: "Model") {
+            SettingsFormField(title: provider.cloudModelTitle) {
                 TextField(modelPlaceholder, text: $config.model)
                     .textFieldStyle(.roundedBorder)
             }
 
             if provider == .qwenASR {
                 Text("北京区：wss://dashscope.aliyuncs.com/api-ws/v1/realtime\n国际区：wss://dashscope-intl.aliyuncs.com/api-ws/v1/realtime")
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            } else if provider == .doubaoStreaming {
+                Text("推荐地址：wss://openspeech.bytedance.com/api/v3/sauc/bigmodel_async\nResource ID 示例：volc.seedasr.sauc.duration（小时版）\nResource ID 示例：volc.seedasr.sauc.concurrent（并发版）")
                     .font(.system(size: 12))
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -1282,6 +1376,12 @@ private struct TextRefinementProviderFields: View {
             return "https://dashscope.aliyuncs.com/compatible-mode/v1"
         case .volcengine:
             return "https://ark.cn-beijing.volces.com/api/v3"
+        case .minimax:
+            return "https://api.minimax.io/v1"
+        case .kimi:
+            return "https://api.moonshot.cn/v1"
+        case .zhipu:
+            return "https://open.bigmodel.cn/api/paas/v4"
         }
     }
 
@@ -1293,6 +1393,12 @@ private struct TextRefinementProviderFields: View {
             return "qwen-plus"
         case .volcengine:
             return "doubao-1.5-pro"
+        case .minimax:
+            return "MiniMax-M2.5"
+        case .kimi:
+            return "kimi-k2.5"
+        case .zhipu:
+            return "glm-4.7-flash"
         }
     }
 }
@@ -1888,9 +1994,10 @@ enum SettingsPreviewData {
                 executablePath: "",
                 modelPath: "",
                 additionalArguments: "",
-                baseURL: "https://openspeech.bytedance.com/api/v1",
+                baseURL: "wss://openspeech.bytedance.com/api/v3/sauc/bigmodel_async",
                 apiKey: "volc-asr-key",
-                model: "doubao-speech-realtime"
+                model: "volc.seedasr.sauc.duration",
+                appID: "doubao-preview-app"
             ),
             for: .doubaoStreaming
         )
@@ -1901,7 +2008,8 @@ enum SettingsPreviewData {
                 additionalArguments: "--vad true",
                 baseURL: "",
                 apiKey: "",
-                model: ""
+                model: "",
+                appID: ""
             ),
             for: .senseVoice
         )
@@ -2007,7 +2115,7 @@ private extension ASRProvider {
         case .senseVoice:
             return "本地常驻识别，偏向中文输入。"
         case .doubaoStreaming:
-            return "流式识别优先，适合低延迟输入。"
+            return "豆包大模型流式识别，适合低延迟输入。"
         case .qwenASR:
             return "阿里云实时识别，支持流式返回。"
         }
@@ -2024,12 +2132,23 @@ private extension ASRProvider {
         }
     }
 
+    var logoFallbackText: String? {
+        switch self {
+        case .senseVoice:
+            return "SV"
+        case .doubaoStreaming:
+            return "豆"
+        case .qwenASR:
+            return "QW"
+        }
+    }
+
     var defaultModelPlaceholder: String {
         switch self {
         case .senseVoice:
             return "SenseVoice Small"
         case .doubaoStreaming:
-            return "doubao-speech-realtime"
+            return "volc.seedasr.sauc.duration"
         case .qwenASR:
             return "qwen3-asr-flash-realtime"
         }
@@ -2038,9 +2157,35 @@ private extension ASRProvider {
     var cloudBaseURLPlaceholder: String {
         switch self {
         case .doubaoStreaming:
-            return "wss://openspeech.bytedance.com/api/v3/realtime"
+            return "wss://openspeech.bytedance.com/api/v3/sauc/bigmodel_async"
         case .qwenASR:
             return "wss://dashscope.aliyuncs.com/api-ws/v1/realtime"
+        case .senseVoice:
+            return ""
+        }
+    }
+
+    var cloudBaseURLTitle: String {
+        "WebSocket URL"
+    }
+
+    var cloudAPIKeyTitle: String {
+        switch self {
+        case .doubaoStreaming:
+            return "Token"
+        case .qwenASR:
+            return "API Key"
+        case .senseVoice:
+            return ""
+        }
+    }
+
+    var cloudModelTitle: String {
+        switch self {
+        case .doubaoStreaming:
+            return "Resource ID"
+        case .qwenASR:
+            return "Model"
         case .senseVoice:
             return ""
         }
@@ -2051,7 +2196,7 @@ private extension ASRProvider {
         case .qwenASR:
             return "云端流式 provider 会直接建立阿里云实时 ASR WebSocket 会话。"
         case .doubaoStreaming:
-            return "云端 provider 仅保存连接参数，真实转写接入在后续版本完成。"
+            return "云端流式 provider 会直接建立豆包大模型流式识别 WebSocket 会话。"
         case .senseVoice:
             return "本地模型由应用托管下载和卸载。"
         }
@@ -2078,6 +2223,12 @@ private extension TextRefinementProvider {
             return "阿里云百炼通道，便于后续扩展 Qwen 系列。"
         case .volcengine:
             return "火山引擎通道，适合后续接入豆包大模型。"
+        case .minimax:
+            return "MiniMax OpenAI 兼容通道，适合低成本文本处理。"
+        case .kimi:
+            return "Kimi OpenAI 兼容通道，适合中文文本纠错。"
+        case .zhipu:
+            return "智谱 OpenAI 兼容通道，便于接入 GLM 系列。"
         }
     }
 
@@ -2089,6 +2240,29 @@ private extension TextRefinementProvider {
             return "bailian"
         case .volcengine:
             return "volcengine"
+        case .minimax:
+            return "minimax"
+        case .kimi:
+            return "kimi"
+        case .zhipu:
+            return "zhipu"
+        }
+    }
+
+    var logoFallbackText: String? {
+        switch self {
+        case .deepSeek:
+            return "DS"
+        case .dashScope:
+            return "百"
+        case .volcengine:
+            return "火"
+        case .minimax:
+            return "MM"
+        case .kimi:
+            return "Ki"
+        case .zhipu:
+            return "智"
         }
     }
 
@@ -2109,6 +2283,7 @@ private extension TextRefinementProvider {
     ModelSettingsPage(
         settings: SettingsPreviewData.configuredSettings(),
         llmService: LLMRefinementService(),
+        asrConnectionTester: ASRConnectionTester.live(),
         managedASRModels: ManagedASRModelStore()
     )
     .frame(width: 1120, height: 760)

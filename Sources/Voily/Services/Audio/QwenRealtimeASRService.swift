@@ -56,6 +56,11 @@ actor QwenRealtimeASRService {
         self.session = session
     }
 
+    func testConnection(config: ASRProviderConfig, languageCode: String) async throws {
+        try await startSession(config: config, languageCode: languageCode) { _ in }
+        try await cancelSession()
+    }
+
     func startSession(
         config: ASRProviderConfig,
         languageCode: String,

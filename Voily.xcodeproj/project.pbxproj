@@ -38,6 +38,10 @@
 		A001001F0000000000000000 /* AppSettingsPersistenceIntegrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00200220000000000000000 /* AppSettingsPersistenceIntegrationTests.swift */; };
 		A00100200000000000000000 /* SystemMediaPlaybackService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00200230000000000000000 /* SystemMediaPlaybackService.swift */; };
 		A00100210000000000000000 /* SystemMediaPlaybackServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00200240000000000000000 /* SystemMediaPlaybackServiceTests.swift */; };
+		A00100220000000000000000 /* DoubaoStreamingASRServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00200250000000000000000 /* DoubaoStreamingASRServiceTests.swift */; };
+		A00100230000000000000000 /* DoubaoStreamingASRService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00200260000000000000000 /* DoubaoStreamingASRService.swift */; };
+		A00100240000000000000000 /* ASRConnectionTesterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00200270000000000000000 /* ASRConnectionTesterTests.swift */; };
+		A00100250000000000000000 /* ASRConnectionTester.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00200280000000000000000 /* ASRConnectionTester.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -85,6 +89,10 @@
 		A00200220000000000000000 /* AppSettingsPersistenceIntegrationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppSettingsPersistenceIntegrationTests.swift; sourceTree = "<group>"; };
 		A00200230000000000000000 /* SystemMediaPlaybackService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemMediaPlaybackService.swift; sourceTree = "<group>"; };
 		A00200240000000000000000 /* SystemMediaPlaybackServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemMediaPlaybackServiceTests.swift; sourceTree = "<group>"; };
+		A00200250000000000000000 /* DoubaoStreamingASRServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DoubaoStreamingASRServiceTests.swift; sourceTree = "<group>"; };
+		A00200260000000000000000 /* DoubaoStreamingASRService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DoubaoStreamingASRService.swift; sourceTree = "<group>"; };
+		A00200270000000000000000 /* ASRConnectionTesterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ASRConnectionTesterTests.swift; sourceTree = "<group>"; };
+		A00200280000000000000000 /* ASRConnectionTester.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ASRConnectionTester.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -192,7 +200,9 @@
 		A004000C0000000000000000 /* Audio */ = {
 			isa = PBXGroup;
 			children = (
+				A00200280000000000000000 /* ASRConnectionTester.swift */,
 				A00200040000000000000000 /* AudioCaptureService.swift */,
+				A00200260000000000000000 /* DoubaoStreamingASRService.swift */,
 				A002001A0000000000000000 /* LocalASRService.swift */,
 				A002001C0000000000000000 /* ManagedASRModelStore.swift */,
 				A002001E0000000000000000 /* QwenRealtimeASRService.swift */,
@@ -258,6 +268,8 @@
 		A004000F0000000000000000 /* Audio */ = {
 			isa = PBXGroup;
 			children = (
+				A00200270000000000000000 /* ASRConnectionTesterTests.swift */,
+				A00200250000000000000000 /* DoubaoStreamingASRServiceTests.swift */,
 				A002001B0000000000000000 /* LocalASRServiceTests.swift */,
 			);
 			path = Audio;
@@ -389,9 +401,11 @@
 					A00100010000000000000000 /* AppController.swift in Sources */,
 					A00100020000000000000000 /* AppDelegate.swift in Sources */,
 				A00100030000000000000000 /* AppSettings.swift in Sources */,
-				A00100040000000000000000 /* AudioCaptureService.swift in Sources */,
-				A00100050000000000000000 /* FnKeyMonitor.swift in Sources */,
-				A00100060000000000000000 /* LLMRefinementService.swift in Sources */,
+					A00100040000000000000000 /* AudioCaptureService.swift in Sources */,
+					A00100250000000000000000 /* ASRConnectionTester.swift in Sources */,
+					A00100050000000000000000 /* FnKeyMonitor.swift in Sources */,
+					A00100060000000000000000 /* LLMRefinementService.swift in Sources */,
+					A00100230000000000000000 /* DoubaoStreamingASRService.swift in Sources */,
 					A00100170000000000000000 /* LocalASRService.swift in Sources */,
 					A00100190000000000000000 /* ManagedASRModelStore.swift in Sources */,
 					A00100070000000000000000 /* OverlayPanelController.swift in Sources */,
@@ -416,6 +430,8 @@
 			files = (
 				A001001D0000000000000000 /* AppSettingsTests.swift in Sources */,
 				A001001F0000000000000000 /* AppSettingsPersistenceIntegrationTests.swift in Sources */,
+				A00100240000000000000000 /* ASRConnectionTesterTests.swift in Sources */,
+				A00100220000000000000000 /* DoubaoStreamingASRServiceTests.swift in Sources */,
 				A001001E0000000000000000 /* LLMRefinementServiceTests.swift in Sources */,
 				A00100180000000000000000 /* LocalASRServiceTests.swift in Sources */,
 				A00100210000000000000000 /* SystemMediaPlaybackServiceTests.swift in Sources */,

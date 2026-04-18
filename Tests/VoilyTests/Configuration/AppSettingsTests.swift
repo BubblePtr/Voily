@@ -179,34 +179,36 @@ final class AppSettingsTests: XCTestCase {
         let defaults = makeDefaults()
         let settings = AppSettings(defaults: defaults)
 
-        settings.selectedASRProvider = .qwenASR
+        settings.selectedASRProvider = .doubaoStreaming
         settings.setASRConfig(
             ASRProviderConfig(
                 executablePath: "",
                 modelPath: "",
                 additionalArguments: "",
-                baseURL: "wss://dashscope.aliyuncs.com/api-ws/v1/realtime",
-                apiKey: "dashscope-key",
-                model: "qwen3-asr-flash-realtime"
+                baseURL: "wss://openspeech.bytedance.com/api/v3/sauc/bigmodel_async",
+                apiKey: "volc-token",
+                model: "volc.seedasr.sauc.duration",
+                appID: "doubao-app-id"
             ),
-            for: .qwenASR
+            for: .doubaoStreaming
         )
-        settings.selectedTextProvider = .dashScope
+        settings.selectedTextProvider = .kimi
         settings.setTextRefinementConfig(
             TextRefinementProviderConfig(
-                baseURL: "https://dashscope.aliyuncs.com/compatible-mode/v1",
-                apiKey: "dashscope-text-key",
-                model: "qwen-plus"
+                baseURL: "https://api.moonshot.cn/v1",
+                apiKey: "moonshot-key",
+                model: "kimi-k2.5"
             ),
-            for: .dashScope
+            for: .kimi
         )
 
         let reloaded = AppSettings(defaults: defaults)
 
-        XCTAssertEqual(reloaded.selectedASRProvider, .qwenASR)
-        XCTAssertEqual(reloaded.selectedTextProvider, .dashScope)
-        XCTAssertEqual(reloaded.asrConfig(for: .qwenASR).apiKey, "dashscope-key")
-        XCTAssertEqual(reloaded.textRefinementConfig(for: .dashScope).apiKey, "dashscope-text-key")
+        XCTAssertEqual(reloaded.selectedASRProvider, .doubaoStreaming)
+        XCTAssertEqual(reloaded.selectedTextProvider, .kimi)
+        XCTAssertEqual(reloaded.asrConfig(for: .doubaoStreaming).apiKey, "volc-token")
+        XCTAssertEqual(reloaded.asrConfig(for: .doubaoStreaming).appID, "doubao-app-id")
+        XCTAssertEqual(reloaded.textRefinementConfig(for: .kimi).apiKey, "moonshot-key")
     }
 
     func testArrayEncodedProviderSnapshotMigratesAcrossReload() throws {
@@ -226,6 +228,19 @@ final class AppSettingsTests: XCTestCase {
         XCTAssertEqual(reloaded.selectedTextProvider, .dashScope)
         XCTAssertEqual(reloaded.asrConfig(for: .qwenASR).model, "qwen3-asr-flash-realtime")
         XCTAssertEqual(reloaded.textRefinementConfig(for: .dashScope).model, "qwen-plus")
+    }
+
+    func testLegacyASRConfigWithoutAppIDMigratesWithEmptyAppID() throws {
+        let defaults = makeDefaults()
+        defaults.set(try legacyDoubaoSnapshotData(), forKey: "modelSettingsSnapshot")
+
+        let settings = AppSettings(defaults: defaults)
+
+        XCTAssertEqual(settings.selectedASRProvider, .doubaoStreaming)
+        XCTAssertEqual(settings.asrConfig(for: .doubaoStreaming).baseURL, "wss://openspeech.bytedance.com/api/v2/asr")
+        XCTAssertEqual(settings.asrConfig(for: .doubaoStreaming).apiKey, "legacy-volc-token")
+        XCTAssertEqual(settings.asrConfig(for: .doubaoStreaming).model, "volcengine_streaming_common")
+        XCTAssertEqual(settings.asrConfig(for: .doubaoStreaming).appID, "")
     }
 
     private func makeDefaults() -> UserDefaults {
@@ -298,6 +313,34 @@ final class AppSettingsTests: XCTestCase {
               "model": "qwen-plus"
             }
           ]
+        }
+        """
+        return try XCTUnwrap(json.data(using: .utf8))
+    }
+
+    private func legacyDoubaoSnapshotData() throws -> Data {
+        let json = """
+        {
+          "selectedASRProvider": "doubaoStreaming",
+          "selectedTextProvider": "deepSeek",
+          "textRefinementEnabled": false,
+          "asrConfigsByProvider": {
+            "doubaoStreaming": {
+              "executablePath": "",
+              "modelPath": "",
+              "additionalArguments": "",
+              "baseURL": "wss://openspeech.bytedance.com/api/v2/asr",
+              "apiKey": "legacy-volc-token",
+              "model": "volcengine_streaming_common"
+            }
+          },
+          "textConfigsByProvider": {
+            "deepSeek": {
+              "baseURL": "https://api.deepseek.com/v1",
+              "apiKey": "sk-legacy",
+              "model": "deepseek-chat"
+            }
+          }
         }
         """
         return try XCTUnwrap(json.data(using: .utf8))
