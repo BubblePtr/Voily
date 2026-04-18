@@ -23,7 +23,6 @@ func overlayWidth(for state: OverlayState) -> CGFloat {
     return min(max(textWidth + chromeWidth, overlayMinimumWidth), overlayMaximumWidth)
 }
 
-@available(macOS 26.0, *)
 @MainActor
 final class OverlayPanelController {
     private let model = OverlayViewModel()
@@ -175,43 +174,43 @@ struct OverlayRootView: View {
     }
 
     var body: some View {
-        GlassEffectContainer(spacing: 0) {
-            HStack(spacing: overlayWaveformSpacing) {
-                WaveformView(
-                    rms: model.state.rmsLevel,
-                    animateInPreview: animateInPreview,
-                    previewTime: previewTime
-                )
-                    .frame(width: overlayWaveformWidth, height: 32)
+        HStack(spacing: overlayWaveformSpacing) {
+            WaveformView(
+                rms: model.state.rmsLevel,
+                animateInPreview: animateInPreview,
+                previewTime: previewTime
+            )
+            .frame(width: overlayWaveformWidth, height: 32)
 
-                SlidingPreviewText(text: displayText, isPartial: model.state.phase == .recordingPartial)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+            SlidingPreviewText(text: displayText, isPartial: model.state.phase == .recordingPartial)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
 
-                if model.state.controls == .confirmCancel {
-                    OverlayActionButtons(
-                        onConfirm: model.confirm,
-                        onCancel: model.cancel
-                    )
-                }
-            }
-            .padding(.horizontal, overlayHorizontalPadding)
-            .frame(height: overlayHeight)
-            .overlay {
-                OverlayGlassChrome(shape: capsuleShape)
-                    .allowsHitTesting(false)
-            }
-            .overlay {
-                FlowingHighlightView(
-                    animateInPreview: animateInPreview,
-                    previewTime: previewTime
+            if model.state.controls == .confirmCancel {
+                OverlayActionButtons(
+                    onConfirm: model.confirm,
+                    onCancel: model.cancel
                 )
-                    .clipShape(capsuleShape)
-                    .blendMode(.screen)
-                    .allowsHitTesting(false)
             }
-            .shadow(color: .black.opacity(0.08), radius: 12, y: 7)
-            .glassEffect(.clear.tint(.white.opacity(0.003)), in: capsuleShape)
         }
+        .padding(.horizontal, overlayHorizontalPadding)
+        .frame(height: overlayHeight)
+        .background {
+            OverlayCapsuleBackground(shape: capsuleShape)
+        }
+        .overlay {
+            OverlayGlassChrome(shape: capsuleShape)
+                .allowsHitTesting(false)
+        }
+        .overlay {
+            FlowingHighlightView(
+                animateInPreview: animateInPreview,
+                previewTime: previewTime
+            )
+            .clipShape(capsuleShape)
+            .blendMode(.screen)
+            .allowsHitTesting(false)
+        }
+        .shadow(color: .black.opacity(0.14), radius: 14, y: 8)
     }
 
     fileprivate var displayText: String {
@@ -244,7 +243,6 @@ struct OverlayRootView: View {
     }
 }
 
-@available(macOS 26.0, *)
 private struct OverlayActionButtons: View {
     let onConfirm: () -> Void
     let onCancel: () -> Void
@@ -278,7 +276,6 @@ private struct OverlayActionButtons: View {
     }
 }
 
-@available(macOS 26.0, *)
 private struct SlidingPreviewText: View {
     let text: String
     let isPartial: Bool
@@ -359,7 +356,6 @@ private struct SlidingPreviewText: View {
     }
 }
 
-@available(macOS 26.0, *)
 private struct SlidingPreviewFadeMask: View {
     let width: CGFloat
     let fadeWidth: CGFloat
@@ -397,7 +393,6 @@ private struct SlidingPreviewFadeMask: View {
     }
 }
 
-@available(macOS 26.0, *)
 private struct WidthReader: View {
     @Binding var width: CGFloat
 
@@ -414,7 +409,6 @@ private struct WidthReader: View {
     }
 }
 
-@available(macOS 26.0, *)
 private struct OverlayGlassChrome<S: InsettableShape>: View {
     let shape: S
 
@@ -436,7 +430,6 @@ private struct OverlayGlassChrome<S: InsettableShape>: View {
     }
 }
 
-@available(macOS 26.0, *)
 private struct FlowingHighlightView: View {
     let animateInPreview: Bool
     let previewTime: TimeInterval?
@@ -481,6 +474,42 @@ private struct FlowingHighlightView: View {
             )
             .opacity(0.8)
         }
+    }
+}
+
+private struct OverlayCapsuleBackground<S: InsettableShape>: View {
+    let shape: S
+
+    var body: some View {
+        shape
+            .fill(
+                LinearGradient(
+                    colors: [
+                        Color.white.opacity(0.16),
+                        Color.white.opacity(0.08),
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+            )
+            .background {
+                shape
+                    .fill(Color.black.opacity(0.42))
+            }
+            .overlay {
+                shape
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                Color.white.opacity(0.10),
+                                Color.clear,
+                            ],
+                            startPoint: .top,
+                            endPoint: .center
+                        )
+                    )
+                    .clipShape(shape)
+            }
     }
 }
 
@@ -533,7 +562,6 @@ private struct WaveformView: View {
     }
 }
 
-@available(macOS 26.0, *)
 private struct OverlayPreviewScene: View {
     @State private var model: OverlayViewModel
 
@@ -576,7 +604,6 @@ private struct OverlayPreviewScene: View {
     }
 }
 
-@available(macOS 26.0, *)
 #Preview("Overlay Listening") {
     OverlayPreviewScene(
         state: OverlayState(
@@ -587,7 +614,6 @@ private struct OverlayPreviewScene: View {
     )
 }
 
-@available(macOS 26.0, *)
 #Preview("Overlay Long Text") {
     OverlayPreviewScene(
         state: OverlayState(
