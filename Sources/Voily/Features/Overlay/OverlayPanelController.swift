@@ -197,20 +197,6 @@ struct OverlayRootView: View {
         .background {
             OverlayCapsuleBackground(shape: capsuleShape)
         }
-        .overlay {
-            OverlayGlassChrome(shape: capsuleShape)
-                .allowsHitTesting(false)
-        }
-        .overlay {
-            FlowingHighlightView(
-                animateInPreview: animateInPreview,
-                previewTime: previewTime
-            )
-            .clipShape(capsuleShape)
-            .blendMode(.screen)
-            .allowsHitTesting(false)
-        }
-        .shadow(color: .black.opacity(0.14), radius: 14, y: 8)
     }
 
     fileprivate var displayText: String {
@@ -293,7 +279,7 @@ private struct SlidingPreviewText: View {
             HStack(spacing: 0) {
                 Text(text)
                     .font(.system(size: 16, weight: .medium))
-                    .foregroundStyle(.white.opacity(isPartial ? 0.82 : 0.98))
+                    .foregroundStyle(.white)
                     .lineLimit(1)
                     .fixedSize(horizontal: true, vertical: false)
                     .offset(x: offset)
@@ -409,107 +395,12 @@ private struct WidthReader: View {
     }
 }
 
-private struct OverlayGlassChrome<S: InsettableShape>: View {
-    let shape: S
-
-    var body: some View {
-        shape
-            .inset(by: 1)
-            .strokeBorder(
-                LinearGradient(
-                    colors: [
-                        .white.opacity(0.3),
-                        .white.opacity(0.08),
-                        .white.opacity(0.015),
-                    ],
-                    startPoint: .top,
-                    endPoint: .bottom
-                ),
-                lineWidth: 1
-            )
-    }
-}
-
-private struct FlowingHighlightView: View {
-    let animateInPreview: Bool
-    let previewTime: TimeInterval?
-
-    var body: some View {
-        if let previewTime {
-            shimmer(cycle: previewTime.truncatingRemainder(dividingBy: 4.8) / 4.8)
-        } else if isRunningInXcodePreview() && !animateInPreview {
-            shimmer(cycle: 0.36)
-        } else {
-            TimelineView(.animation) { timeline in
-                let time = timeline.date.timeIntervalSinceReferenceDate
-                let cycle = time.truncatingRemainder(dividingBy: 4.8) / 4.8
-                shimmer(cycle: cycle)
-            }
-        }
-    }
-
-    private func shimmer(cycle: Double) -> some View {
-        let travel = CGFloat(cycle) * 1.85 - 0.45
-
-        return GeometryReader { proxy in
-            let shimmerWidth = max(72, proxy.size.width * 0.22)
-
-            LinearGradient(
-                colors: [
-                    .white.opacity(0.0),
-                    .white.opacity(0.03),
-                    .white.opacity(0.12),
-                    .white.opacity(0.04),
-                    .white.opacity(0.0),
-                ],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-            .frame(width: shimmerWidth, height: proxy.size.height * 1.25)
-            .rotationEffect(.degrees(12))
-            .blur(radius: 10)
-            .offset(
-                x: (proxy.size.width * travel) - (shimmerWidth / 2),
-                y: -proxy.size.height * 0.06
-            )
-            .opacity(0.8)
-        }
-    }
-}
-
 private struct OverlayCapsuleBackground<S: InsettableShape>: View {
     let shape: S
 
     var body: some View {
         shape
-            .fill(
-                LinearGradient(
-                    colors: [
-                        Color.white.opacity(0.16),
-                        Color.white.opacity(0.08),
-                    ],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-            )
-            .background {
-                shape
-                    .fill(Color.black.opacity(0.42))
-            }
-            .overlay {
-                shape
-                    .fill(
-                        LinearGradient(
-                            colors: [
-                                Color.white.opacity(0.10),
-                                Color.clear,
-                            ],
-                            startPoint: .top,
-                            endPoint: .center
-                        )
-                    )
-                    .clipShape(shape)
-            }
+            .fill(Color.black)
     }
 }
 
@@ -554,7 +445,7 @@ private struct WaveformView: View {
         let secondary = (sin((localPhase * 2) - .pi / 6) + 1) * 0.5
         let envelope = (primary * 0.82) + (secondary * 0.18)
         let minHeight: CGFloat = 9
-        let maxHeight: CGFloat = 24
+        let maxHeight: CGFloat = 30
         let normalizedRMS = min(max(CGFloat(rms), 0), 1)
         let activity = max(0.18, normalizedRMS)
         let range = (maxHeight - minHeight) * weight * activity
