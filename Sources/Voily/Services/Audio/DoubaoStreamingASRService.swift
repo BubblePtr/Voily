@@ -69,10 +69,30 @@ enum DoubaoWireCompression {
 
 struct DoubaoDecodedMessage: Equatable {
     let text: String?
+    let resultText: String?
+    let lastUtteranceText: String?
+    let utteranceCount: Int
+    let sequence: Int?
     let isDefinite: Bool
     let isFinal: Bool
     let code: Int?
     let message: String?
+
+    var debugSummary: String {
+        "sequence=\(sequence.map(String.init) ?? "nil") final=\(isFinal) definite=\(isDefinite) utteranceCount=\(utteranceCount) selectedTextLength=\(text?.count ?? 0) resultTextLength=\(resultText?.count ?? 0) lastUtteranceLength=\(lastUtteranceText?.count ?? 0) selectedTextPreview=\"\(Self.preview(text))\" resultTextPreview=\"\(Self.preview(resultText))\" lastUtterancePreview=\"\(Self.preview(lastUtteranceText))\""
+    }
+
+    private static func preview(_ text: String?) -> String {
+        guard let text else { return "" }
+        let normalized = text
+            .replacingOccurrences(of: "\n", with: "\\n")
+            .replacingOccurrences(of: "\r", with: "\\r")
+        if normalized.count <= 24 {
+            return normalized
+        }
+        let endIndex = normalized.index(normalized.startIndex, offsetBy: 24)
+        return "\(normalized[..<endIndex])..."
+    }
 }
 
 struct DoubaoPacketDiagnostics: Equatable {
@@ -230,11 +250,17 @@ enum DoubaoWireCodec {
         let response = try JSONDecoder().decode(DoubaoServerResponse.self, from: payload)
         let bestResult = response.result?.values.first
         let bestUtterance = bestResult?.utterances?.last
-        let text = bestUtterance?.text ?? bestResult?.text
+        let resultText = bestResult?.text
+        let lastUtteranceText = bestUtterance?.text
+        let text = resultText ?? lastUtteranceText
         let sequence = packetSequence.map(Int.init) ?? response.sequence ?? 0
         let isFinal = sequence < 0 || flags == 0x3 || flags == 0x2
         return DoubaoDecodedMessage(
             text: text?.trimmingCharacters(in: .whitespacesAndNewlines),
+            resultText: resultText?.trimmingCharacters(in: .whitespacesAndNewlines),
+            lastUtteranceText: lastUtteranceText?.trimmingCharacters(in: .whitespacesAndNewlines),
+            utteranceCount: bestResult?.utterances?.count ?? 0,
+            sequence: packetSequence.map(Int.init) ?? response.sequence,
             isDefinite: bestUtterance?.definite ?? isFinal,
             isFinal: isFinal,
             code: response.code,
@@ -286,6 +312,10 @@ enum DoubaoWireCodec {
 
         return DoubaoDecodedMessage(
             text: nil,
+            resultText: nil,
+            lastUtteranceText: nil,
+            utteranceCount: 0,
+            sequence: nil,
             isDefinite: false,
             isFinal: true,
             code: code,
@@ -527,6 +557,7 @@ actor DoubaoStreamingASRService {
 
             createdContinuation?.resume()
             createdContinuation = nil
+            debugLog("Doubao realtime decoded \(decoded.debugSummary)")
 
             if let text = decoded.text, !text.isEmpty {
                 let displayText = decoded.isDefinite
