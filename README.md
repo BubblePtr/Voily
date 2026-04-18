@@ -18,7 +18,7 @@ Voily is an open-source macOS dictation app. Hold the Fn key to record your voic
 - **Fn-key triggered dictation** — Hold Fn to record, release to transcribe and paste. Double-press Fn for quick Chinese-to-English translation.
 - **Multiple ASR engines** — Choose between local (SenseVoice) or cloud (Doubao Streaming, Qwen ASR) speech recognition providers.
 - **Real-time partial results** — See transcription text appear in a floating overlay while you speak.
-- **LLM text refinement** — Optionally post-process transcriptions with LLM providers (DeepSeek, Alibaba Cloud, Volcengine) to remove filler words, formalize tone, or organize into lists.
+- **LLM text refinement** — Optionally post-process transcriptions with LLM providers (DeepSeek, Alibaba Cloud, Volcengine, MiniMax, Kimi, Zhipu) to remove filler words, formalize tone, or organize into lists.
 - **Glossary support** — Define custom terms and enable built-in glossary presets to improve recognition accuracy for domain-specific vocabulary.
 - **Quick translation** — Double-press Fn to dictate in Chinese and get English output.
 - **Menu bar dashboard** — View today's usage stats (duration, session count, character count) and a weekly sparkline chart from the menu bar.
@@ -59,10 +59,10 @@ On first launch, Voily will ask for **Microphone** and **Accessibility** permiss
 
 1. **ASR Provider** — Select a speech recognition engine:
    - **SenseVoice Small** (local) — Requires downloading the ONNX model. No API key needed.
-   - **Doubao Streaming** (cloud) — Requires Base URL, API Key, and Model.
+   - **Doubao Streaming** (cloud) — Requires WebSocket URL, App ID, Token, and Resource ID.
    - **Qwen ASR** (cloud) — Requires API Key. Pre-configured with default endpoint and model.
 
-2. **Text Refinement** (optional) — Enable LLM post-processing and configure a provider (DeepSeek / Alibaba Cloud DashScope / Volcengine).
+2. **Text Refinement** (optional) — Enable LLM post-processing and configure a provider (DeepSeek / Alibaba Cloud DashScope / Volcengine / MiniMax / Kimi / Zhipu).
 
 3. **Dictation Skills** — Toggle processing skills like filler-word removal, formalization, or ordered-list formatting.
 

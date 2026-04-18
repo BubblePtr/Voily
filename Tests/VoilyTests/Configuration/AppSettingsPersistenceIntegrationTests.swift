@@ -21,11 +21,12 @@ final class AppSettingsPersistenceIntegrationTests: XCTestCase {
                 additionalArguments: "",
                 baseURL: "wss://dashscope.aliyuncs.com/api-ws/v1/realtime",
                 apiKey: "dashscope-key",
-                model: "qwen3-asr-flash-realtime"
+                model: "qwen3-asr-flash-realtime",
+                appID: ""
             ),
             for: .qwenASR
         )
-        first.selectedTextProvider = .dashScope
+        first.selectedTextProvider = .zhipu
         first.textRefinementEnabled = true
         first.triggerKey = .rightCommand
         first.interruptSystemMediaPlayback = true
@@ -34,11 +35,11 @@ final class AppSettingsPersistenceIntegrationTests: XCTestCase {
         first.setEnabledDictationSkills([.removeFillers, .formalize])
         first.setTextRefinementConfig(
             TextRefinementProviderConfig(
-                baseURL: "https://dashscope.aliyuncs.com/compatible-mode/v1",
-                apiKey: "dashscope-text-key",
-                model: "qwen-plus"
+                baseURL: "https://open.bigmodel.cn/api/paas/v4",
+                apiKey: "zhipu-text-key",
+                model: "glm-4.7-flash"
             ),
-            for: .dashScope
+            for: .zhipu
         )
 
         let second = AppSettings(defaults: defaults)
@@ -48,14 +49,14 @@ final class AppSettingsPersistenceIntegrationTests: XCTestCase {
         XCTAssertEqual(second.customGlossaryTerms, ["Voily", "DeepSeek"])
         XCTAssertEqual(second.selectedASRProvider, .qwenASR)
         XCTAssertEqual(second.asrConfig(for: .qwenASR).apiKey, "dashscope-key")
-        XCTAssertEqual(second.selectedTextProvider, .dashScope)
+        XCTAssertEqual(second.selectedTextProvider, .zhipu)
         XCTAssertTrue(second.textRefinementEnabled)
         XCTAssertEqual(second.triggerKey, .rightCommand)
         XCTAssertTrue(second.interruptSystemMediaPlayback)
         XCTAssertFalse(second.dockIconVisible)
         XCTAssertEqual(second.preferredMicrophoneUID, "usb-mic")
         XCTAssertEqual(second.enabledDictationSkills, [.removeFillers, .formalize])
-        XCTAssertEqual(second.textRefinementConfig(for: .dashScope).apiKey, "dashscope-text-key")
+        XCTAssertEqual(second.textRefinementConfig(for: .zhipu).apiKey, "zhipu-text-key")
     }
 
     func testPersistedModelSnapshotUsesKeyedProviderMaps() throws {
@@ -70,21 +71,22 @@ final class AppSettingsPersistenceIntegrationTests: XCTestCase {
                 additionalArguments: "",
                 baseURL: "wss://dashscope.aliyuncs.com/api-ws/v1/realtime",
                 apiKey: "dashscope-key",
-                model: "qwen3-asr-flash-realtime"
+                model: "qwen3-asr-flash-realtime",
+                appID: ""
             ),
             for: .qwenASR
         )
-        settings.selectedTextProvider = .dashScope
+        settings.selectedTextProvider = .minimax
         settings.triggerKey = .rightCommand
         settings.interruptSystemMediaPlayback = true
         settings.preferredMicrophoneUID = "usb-mic"
         settings.setTextRefinementConfig(
             TextRefinementProviderConfig(
-                baseURL: "https://dashscope.aliyuncs.com/compatible-mode/v1",
-                apiKey: "dashscope-text-key",
-                model: "qwen-plus"
+                baseURL: "https://api.minimax.io/v1",
+                apiKey: "minimax-text-key",
+                model: "MiniMax-M2.5"
             ),
-            for: .dashScope
+            for: .minimax
         )
 
         let data = try XCTUnwrap(defaults.data(forKey: "modelSettingsSnapshot"))
@@ -93,7 +95,7 @@ final class AppSettingsPersistenceIntegrationTests: XCTestCase {
         let textConfigs = try XCTUnwrap(object["textConfigsByProvider"] as? [String: Any])
 
         XCTAssertNotNil(asrConfigs["qwenASR"])
-        XCTAssertNotNil(textConfigs["dashScope"])
+        XCTAssertNotNil(textConfigs["minimax"])
         XCTAssertEqual(object["triggerKey"] as? String, "rightCommand")
         XCTAssertEqual(object["interruptSystemMediaPlayback"] as? Bool, true)
         XCTAssertEqual(object["preferredMicrophoneUID"] as? String, "usb-mic")

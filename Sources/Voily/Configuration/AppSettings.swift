@@ -33,6 +33,9 @@ enum TextRefinementProvider: String, CaseIterable, Codable, Identifiable {
     case deepSeek
     case dashScope
     case volcengine
+    case minimax
+    case kimi
+    case zhipu
 
     var id: String { rawValue }
 
@@ -44,6 +47,12 @@ enum TextRefinementProvider: String, CaseIterable, Codable, Identifiable {
             return "阿里云百炼"
         case .volcengine:
             return "火山引擎"
+        case .minimax:
+            return "MiniMax"
+        case .kimi:
+            return "Kimi"
+        case .zhipu:
+            return "智谱"
         }
     }
 }
@@ -149,6 +158,7 @@ struct ASRProviderConfig: Codable, Equatable {
     var baseURL: String
     var apiKey: String
     var model: String
+    var appID: String
 
     static let empty = ASRProviderConfig(
         executablePath: "",
@@ -156,7 +166,8 @@ struct ASRProviderConfig: Codable, Equatable {
         additionalArguments: "",
         baseURL: "",
         apiKey: "",
-        model: ""
+        model: "",
+        appID: ""
     )
 
     private enum CodingKeys: String, CodingKey {
@@ -166,6 +177,7 @@ struct ASRProviderConfig: Codable, Equatable {
         case baseURL
         case apiKey
         case model
+        case appID
     }
 
     init(
@@ -174,7 +186,8 @@ struct ASRProviderConfig: Codable, Equatable {
         additionalArguments: String,
         baseURL: String,
         apiKey: String,
-        model: String
+        model: String,
+        appID: String = ""
     ) {
         self.executablePath = executablePath
         self.modelPath = modelPath
@@ -182,6 +195,7 @@ struct ASRProviderConfig: Codable, Equatable {
         self.baseURL = baseURL
         self.apiKey = apiKey
         self.model = model
+        self.appID = appID
     }
 
     init(from decoder: Decoder) throws {
@@ -192,14 +206,20 @@ struct ASRProviderConfig: Codable, Equatable {
         baseURL = try container.decodeIfPresent(String.self, forKey: .baseURL) ?? ""
         apiKey = try container.decodeIfPresent(String.self, forKey: .apiKey) ?? ""
         model = try container.decodeIfPresent(String.self, forKey: .model) ?? ""
+        appID = try container.decodeIfPresent(String.self, forKey: .appID) ?? ""
     }
 
     func isConfigured(for provider: ASRProvider) -> Bool {
-        switch provider.category {
-        case .local:
+        switch provider {
+        case .senseVoice:
             return !modelPath.trimmed.isEmpty || !executablePath.trimmed.isEmpty
-        case .cloud:
+        case .qwenASR:
             return !baseURL.trimmed.isEmpty && !apiKey.trimmed.isEmpty && !model.trimmed.isEmpty
+        case .doubaoStreaming:
+            return !baseURL.trimmed.isEmpty
+                && !apiKey.trimmed.isEmpty
+                && !model.trimmed.isEmpty
+                && !appID.trimmed.isEmpty
         }
     }
 }
@@ -247,7 +267,17 @@ struct ModelSettingsSnapshot: Codable, Equatable {
                 additionalArguments: "",
                 baseURL: "wss://dashscope.aliyuncs.com/api-ws/v1/realtime",
                 apiKey: "",
-                model: "qwen3-asr-flash-realtime"
+                model: "qwen3-asr-flash-realtime",
+                appID: ""
+            )
+            configs[.doubaoStreaming] = ASRProviderConfig(
+                executablePath: "",
+                modelPath: "",
+                additionalArguments: "",
+                baseURL: "wss://openspeech.bytedance.com/api/v3/sauc/bigmodel_async",
+                apiKey: "",
+                model: "volc.seedasr.sauc.duration",
+                appID: ""
             )
             return configs
         }(),

@@ -23,6 +23,7 @@ final class LLMRefinementService {
 
     @MainActor
     func process(_ request: TextProcessingRequest, settings: AppSettings) async throws -> String {
+        let provider = settings.selectedTextProvider
         let config = settings.selectedTextProviderConfig
         let trimmedBaseURL = config.baseURL.trimmingCharacters(in: .whitespacesAndNewlines)
         guard let baseURL = URL(string: trimmedBaseURL) else {
@@ -64,7 +65,7 @@ final class LLMRefinementService {
             throw LLMError.invalidResponse
         }
 
-        return content.trimmingCharacters(in: .whitespacesAndNewlines)
+        return Self.normalizedResponseText(content, provider: provider)
     }
 
     @MainActor
@@ -86,6 +87,29 @@ final class LLMRefinementService {
         case let .translateZhToEn(style):
             return translationPrompt(languageCode: request.languageCode, style: style)
         }
+    }
+
+    static func normalizedResponseText(_ text: String, provider: TextRefinementProvider? = nil) -> String {
+        let output = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard shouldStripLeadingThinkBlock(for: provider),
+              let range = leadingThinkBlockRange(in: output)
+        else {
+            return output
+        }
+
+        let suffix = output[range.upperBound...].trimmingCharacters(in: .whitespacesAndNewlines)
+        return suffix.isEmpty ? output : suffix
+    }
+
+    private static func shouldStripLeadingThinkBlock(for provider: TextRefinementProvider?) -> Bool {
+        provider != nil
+    }
+
+    private static func leadingThinkBlockRange(in text: String) -> Range<String.Index>? {
+        text.range(
+            of: #"(?is)^\s*<think>.*?</think>"#,
+            options: .regularExpression
+        )
     }
 
     private static func dictationPrompt(

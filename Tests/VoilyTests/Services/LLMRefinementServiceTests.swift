@@ -3,6 +3,42 @@ import XCTest
 
 @MainActor
 final class LLMRefinementServiceTests: XCTestCase {
+    func testNormalizedResponseTextStripsLeadingThinkBlockForProvider() {
+        let output = LLMRefinementService.normalizedResponseText("""
+        <think>
+        先判断用户意图，再执行纠错。
+        </think>
+
+        把 JSON 字段补齐。
+        """, provider: .deepSeek)
+
+        XCTAssertEqual(output, "把 JSON 字段补齐。")
+    }
+
+    func testNormalizedResponseTextPreservesPlainContent() {
+        let output = LLMRefinementService.normalizedResponseText("把 Python 版本升到 3.12。")
+
+        XCTAssertEqual(output, "把 Python 版本升到 3.12。")
+    }
+
+    func testNormalizedResponseTextPreservesInlineThinkMarkup() {
+        let output = LLMRefinementService.normalizedResponseText(
+            "示例 XML：<think>literal</think><answer>done</answer>",
+            provider: .deepSeek
+        )
+
+        XCTAssertEqual(output, "示例 XML：<think>literal</think><answer>done</answer>")
+    }
+
+    func testNormalizedResponseTextPreservesLeadingThinkBlockWithoutProviderContext() {
+        let output = LLMRefinementService.normalizedResponseText("""
+        <think>literal</think>
+        <answer>done</answer>
+        """)
+
+        XCTAssertEqual(output, "<think>literal</think>\n<answer>done</answer>")
+    }
+
     func testSystemPromptIncludesGlossarySectionsWhenAvailable() {
         let settings = AppSettings(defaults: makeDefaults())
         settings.setGlossaryState(

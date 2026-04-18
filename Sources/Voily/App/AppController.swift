@@ -108,6 +108,7 @@ final class AppController: NSObject {
     private let speechService = SpeechTranscriptionService()
     private let senseVoiceResidentService = SenseVoiceResidentService()
     private let qwenRealtimeASRService = QwenRealtimeASRService()
+    private let doubaoStreamingASRService = DoubaoStreamingASRService()
     private let managedASRModels = ManagedASRModelStore()
     private let overlayController = OverlayPanelController()
     private let textInjectionService = TextInjectionService()
@@ -161,6 +162,7 @@ final class AppController: NSObject {
             await senseVoiceResidentService.cancelSession(currentResidentSession)
         }
         try? await qwenRealtimeASRService.cancelSession()
+        try? await doubaoStreamingASRService.cancelSession()
         await senseVoiceResidentService.stop()
         await restoreAudioOutputIfNeeded()
         currentResidentSession = nil
@@ -286,6 +288,10 @@ final class AppController: NSObject {
             settings: settings,
             usageStore: usageStore,
             llmService: llmRefinementService,
+            asrConnectionTester: ASRConnectionTester.live(
+                qwenService: qwenRealtimeASRService,
+                doubaoService: doubaoStreamingASRService
+            ),
             managedASRModels: managedASRModels,
             registerWindow: registerSettingsWindow(_:),
             onInitialAppearance: handleSettingsWindowInitialAppearance,
@@ -562,6 +568,8 @@ final class AppController: NSObject {
             } else {
                 if selectedASRProvider == .qwenASR {
                     try await startQwenRealtimeSession()
+                } else if selectedASRProvider == .doubaoStreaming {
+                    try await startDoubaoRealtimeSession()
                 } else if selectedASRProvider.category == .cloud {
                     debugLog("Cloud ASR provider not implemented provider=\(selectedASRProvider.rawValue) fallback=true")
                     try speechService.start(localeIdentifier: activeInputLanguageCode) { [weak self] text in
@@ -595,6 +603,8 @@ final class AppController: NSObject {
                 }
             }
             currentResidentSession = nil
+            try? await qwenRealtimeASRService.cancelSession()
+            try? await doubaoStreamingASRService.cancelSession()
             currentPendingRealtimeAppendCount = 0
             await restoreAudioOutputIfNeeded()
             currentSessionMode = nil
@@ -753,6 +763,7 @@ final class AppController: NSObject {
         }
         currentResidentSession = nil
         try? await qwenRealtimeASRService.cancelSession()
+        try? await doubaoStreamingASRService.cancelSession()
         await restoreAudioOutputIfNeeded()
 
         currentSessionMode = nil
@@ -837,29 +848,7 @@ final class AppController: NSObject {
             return false
         }
 
-        guard provider == .doubaoStreaming else {
-            return true
-        }
-
-        switch permissionCoordinator.speechRecognitionAuthorizationStatus {
-        case .authorized:
-            return true
-        case .notDetermined:
-            let granted = await requestSystemPermissionWhileTriggerKeyMonitoringPaused { [permissionCoordinator] in
-                await permissionCoordinator.requestSpeechRecognitionIfNeeded()
-            }
-            if !granted {
-                await showPermissionGuidance("Enable Speech Recognition in System Settings to use the system transcription fallback.")
-                return false
-            }
-            return true
-        case .denied, .restricted:
-            await showPermissionGuidance("Enable Speech Recognition in System Settings to use the system transcription fallback.")
-            return false
-        @unknown default:
-            await showPermissionGuidance("Enable Speech Recognition in System Settings to use the system transcription fallback.")
-            return false
-        }
+        return true
     }
 
     private func recognizeText() async -> RecognitionOutcome {
@@ -951,6 +940,40 @@ final class AppController: NSObject {
                         partialCount: currentPartialCount
                     )
                 }
+            } else if provider == .doubaoStreaming {
+                do {
+                    let startedAt = Date()
+                    let result = try await doubaoStreamingASRService.finishSession()
+                    let durationMs = Int(Date().timeIntervalSince(startedAt) * 1000)
+                    let totalDurationMs = Int(Date().timeIntervalSince(recognitionStartedAt) * 1000)
+                    let text = result.text.trimmingCharacters(in: CharacterSet.whitespacesAndNewlines)
+                    debugLog(
+                        "ASR finished provider=\(provider.rawValue) source=cloud-realtime totalMs=\(totalDurationMs) realtimeMs=\(durationMs) textLength=\(text.count) command=\(result.commandSummary)"
+                    )
+                    return RecognitionOutcome(
+                        text: text,
+                        provider: provider,
+                        source: "cloud-realtime",
+                        totalDurationMs: totalDurationMs,
+                        engineDurationMs: durationMs,
+                        firstPartialMs: currentFirstPartialMs,
+                        partialCount: currentPartialCount
+                    )
+                } catch {
+                    let totalDurationMs = Int(Date().timeIntervalSince(recognitionStartedAt) * 1000)
+                    debugLog(
+                        "ASR finished provider=\(provider.rawValue) source=cloud-realtime-failed totalMs=\(totalDurationMs) reason=\(error.localizedDescription)"
+                    )
+                    return RecognitionOutcome(
+                        text: "",
+                        provider: provider,
+                        source: "cloud-realtime-failed",
+                        totalDurationMs: totalDurationMs,
+                        engineDurationMs: nil,
+                        firstPartialMs: currentFirstPartialMs,
+                        partialCount: currentPartialCount
+                    )
+                }
             }
 
             let speechStartedAt = Date()
@@ -985,13 +1008,13 @@ final class AppController: NSObject {
         localAudioWriter?.append(buffer)
 
         let provider = settings.selectedASRProvider
-        guard provider == .senseVoice || provider == .qwenASR else {
+        guard provider == .senseVoice || provider == .qwenASR || provider == .doubaoStreaming else {
             return
         }
 
         let pcmData: Data
         do {
-            let targetSampleRate = provider == .qwenASR ? 16_000.0 : buffer.format.sampleRate
+            let targetSampleRate = (provider == .qwenASR || provider == .doubaoStreaming) ? 16_000.0 : buffer.format.sampleRate
             pcmData = try TemporaryAudioCaptureWriter.pcm16MonoData(from: buffer, targetSampleRate: targetSampleRate)
         } catch {
             debugLog("\(provider.rawValue) chunk encode failed error=\(error.localizedDescription)")
@@ -1001,8 +1024,10 @@ final class AppController: NSObject {
         Task { @MainActor in
             if provider == .senseVoice {
                 await appendSenseVoiceChunk(pcmData, sampleRate: buffer.format.sampleRate)
-            } else {
+            } else if provider == .qwenASR {
                 await appendQwenRealtimeChunk(pcmData)
+            } else {
+                await appendDoubaoRealtimeChunk(pcmData)
             }
         }
     }
@@ -1043,6 +1068,18 @@ final class AppController: NSObject {
         debugLog("Qwen realtime session started")
     }
 
+    private func startDoubaoRealtimeSession() async throws {
+        try await doubaoStreamingASRService.startSession(
+            config: settings.selectedASRConfig,
+            languageCode: activeInputLanguageCode
+        ) { [weak self] partialText in
+            Task { @MainActor in
+                self?.handleDoubaoPartialText(partialText)
+            }
+        }
+        debugLog("Doubao realtime session started")
+    }
+
     private func appendQwenRealtimeChunk(_ pcmData: Data) async {
         guard currentPhase == .recording || currentPhase == .recordingPartial else { return }
         currentPendingRealtimeAppendCount += 1
@@ -1052,6 +1089,18 @@ final class AppController: NSObject {
             try await qwenRealtimeASRService.appendAudioChunk(pcmData)
         } catch {
             debugLog("Qwen realtime append failed error=\(error.localizedDescription)")
+        }
+    }
+
+    private func appendDoubaoRealtimeChunk(_ pcmData: Data) async {
+        guard currentPhase == .recording || currentPhase == .recordingPartial else { return }
+        currentPendingRealtimeAppendCount += 1
+        defer { currentPendingRealtimeAppendCount = max(0, currentPendingRealtimeAppendCount - 1) }
+
+        do {
+            try await doubaoStreamingASRService.appendAudioChunk(pcmData)
+        } catch {
+            debugLog("Doubao realtime append failed error=\(error.localizedDescription)")
         }
     }
 
@@ -1071,8 +1120,15 @@ final class AppController: NSObject {
         setOverlay(text: trimmed, rmsLevel: smoothedRMS, phase: .recordingPartial)
     }
 
+    private func handleDoubaoPartialText(_ partialText: String) {
+        handleQwenPartialText(partialText)
+    }
+
     private func waitForPendingRealtimeAppends() async {
-        guard settings.selectedASRProvider == .senseVoice || settings.selectedASRProvider == .qwenASR else { return }
+        guard settings.selectedASRProvider == .senseVoice
+            || settings.selectedASRProvider == .qwenASR
+            || settings.selectedASRProvider == .doubaoStreaming
+        else { return }
         let deadline = Date().addingTimeInterval(1.5)
         while currentPendingRealtimeAppendCount > 0, Date() < deadline {
             try? await Task.sleep(for: .milliseconds(20))
