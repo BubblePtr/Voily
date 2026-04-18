@@ -132,6 +132,34 @@ final class DoubaoStreamingASRServiceTests: XCTestCase {
         XCTAssertEqual(response.code, 20000000)
     }
 
+    func testDecodeServerResponseFallsBackToTrimmedLastUtteranceWhenResultTextIsWhitespace() throws {
+        let payload = """
+        {
+          "code": 20000000,
+          "message": "success",
+          "sequence": -1,
+          "result": {
+            "text": "   ",
+            "utterances": [
+              {
+                "text": "  保留这段有效文本  ",
+                "definite": true
+              }
+            ]
+          }
+        }
+        """
+
+        let packet = DoubaoStreamingASRServiceTests.makeServerResponsePacket(payload: Data(payload.utf8))
+        let response = try DoubaoWireCodec.decodeServerMessage(packet)
+
+        XCTAssertEqual(response.text, "保留这段有效文本")
+        XCTAssertEqual(response.resultText, "")
+        XCTAssertEqual(response.lastUtteranceText, "保留这段有效文本")
+        XCTAssertTrue(response.isFinal)
+        XCTAssertEqual(response.code, 20000000)
+    }
+
     func testDecodeSequencedServerResponseExtractsPartialText() throws {
         let payload = """
         {

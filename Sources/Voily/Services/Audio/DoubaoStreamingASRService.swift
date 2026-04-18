@@ -79,19 +79,7 @@ struct DoubaoDecodedMessage: Equatable {
     let message: String?
 
     var debugSummary: String {
-        "sequence=\(sequence.map(String.init) ?? "nil") final=\(isFinal) definite=\(isDefinite) utteranceCount=\(utteranceCount) selectedTextLength=\(text?.count ?? 0) resultTextLength=\(resultText?.count ?? 0) lastUtteranceLength=\(lastUtteranceText?.count ?? 0) selectedTextPreview=\"\(Self.preview(text))\" resultTextPreview=\"\(Self.preview(resultText))\" lastUtterancePreview=\"\(Self.preview(lastUtteranceText))\""
-    }
-
-    private static func preview(_ text: String?) -> String {
-        guard let text else { return "" }
-        let normalized = text
-            .replacingOccurrences(of: "\n", with: "\\n")
-            .replacingOccurrences(of: "\r", with: "\\r")
-        if normalized.count <= 24 {
-            return normalized
-        }
-        let endIndex = normalized.index(normalized.startIndex, offsetBy: 24)
-        return "\(normalized[..<endIndex])..."
+        "sequence=\(sequence.map(String.init) ?? "nil") final=\(isFinal) definite=\(isDefinite) utteranceCount=\(utteranceCount) selectedTextLength=\(text?.count ?? 0) resultTextLength=\(resultText?.count ?? 0) lastUtteranceLength=\(lastUtteranceText?.count ?? 0)"
     }
 }
 
@@ -250,15 +238,18 @@ enum DoubaoWireCodec {
         let response = try JSONDecoder().decode(DoubaoServerResponse.self, from: payload)
         let bestResult = response.result?.values.first
         let bestUtterance = bestResult?.utterances?.last
-        let resultText = bestResult?.text
-        let lastUtteranceText = bestUtterance?.text
-        let text = resultText ?? lastUtteranceText
+        let resultText = bestResult?.text?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let lastUtteranceText = bestUtterance?.text?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let text = [resultText, lastUtteranceText].first { value in
+            guard let value else { return false }
+            return !value.isEmpty
+        } ?? nil
         let sequence = packetSequence.map(Int.init) ?? response.sequence ?? 0
         let isFinal = sequence < 0 || flags == 0x3 || flags == 0x2
         return DoubaoDecodedMessage(
-            text: text?.trimmingCharacters(in: .whitespacesAndNewlines),
-            resultText: resultText?.trimmingCharacters(in: .whitespacesAndNewlines),
-            lastUtteranceText: lastUtteranceText?.trimmingCharacters(in: .whitespacesAndNewlines),
+            text: text,
+            resultText: resultText,
+            lastUtteranceText: lastUtteranceText,
             utteranceCount: bestResult?.utterances?.count ?? 0,
             sequence: packetSequence.map(Int.init) ?? response.sequence,
             isDefinite: bestUtterance?.definite ?? isFinal,
