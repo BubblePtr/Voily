@@ -21,7 +21,7 @@
 		A001000C0000000000000000 /* SupportedLanguage.swift in Sources */ = {isa = PBXBuildFile; fileRef = A002000C0000000000000000 /* SupportedLanguage.swift */; };
 		A001000D0000000000000000 /* TextInjectionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A002000D0000000000000000 /* TextInjectionService.swift */; };
 		A001000E0000000000000000 /* VoilyApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A002000E0000000000000000 /* VoilyApp.swift */; };
-			A00100110000000000000000 /* BrandIcons in Resources */ = {isa = PBXBuildFile; fileRef = A00200130000000000000000 /* BrandIcons */; };
+		A00100110000000000000000 /* Resources/BrandIcons in Resources */ = {isa = PBXBuildFile; fileRef = A00200130000000000000000 /* Resources/BrandIcons */; };
 		A00100120000000000000000 /* DashboardHomePage.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00200140000000000000000 /* DashboardHomePage.swift */; };
 		A00100130000000000000000 /* UsageStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00200150000000000000000 /* UsageStore.swift */; };
 		A00100140000000000000000 /* UsageStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00200160000000000000000 /* UsageStoreTests.swift */; };
@@ -29,10 +29,10 @@
 		A00100160000000000000000 /* AppIntents.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A00200190000000000000000 /* AppIntents.framework */; };
 		A00100170000000000000000 /* LocalASRService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A002001A0000000000000000 /* LocalASRService.swift */; };
 		A00100180000000000000000 /* LocalASRServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A002001B0000000000000000 /* LocalASRServiceTests.swift */; };
-		A001001C0000000000000000 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A002001F0000000000000000 /* Assets.xcassets */; };
 		A00100190000000000000000 /* ManagedASRModelStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A002001C0000000000000000 /* ManagedASRModelStore.swift */; };
 		A001001A0000000000000000 /* SenseVoiceResidentService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A002001D0000000000000000 /* SenseVoiceResidentService.swift */; };
 		A001001B0000000000000000 /* QwenRealtimeASRService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A002001E0000000000000000 /* QwenRealtimeASRService.swift */; };
+		A001001C0000000000000000 /* Resources/Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A002001F0000000000000000 /* Resources/Assets.xcassets */; };
 		A001001D0000000000000000 /* AppSettingsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00200200000000000000000 /* AppSettingsTests.swift */; };
 		A001001E0000000000000000 /* LLMRefinementServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00200210000000000000000 /* LLMRefinementServiceTests.swift */; };
 		A001001F0000000000000000 /* AppSettingsPersistenceIntegrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00200220000000000000000 /* AppSettingsPersistenceIntegrationTests.swift */; };
@@ -42,6 +42,7 @@
 		A00100230000000000000000 /* DoubaoStreamingASRService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00200260000000000000000 /* DoubaoStreamingASRService.swift */; };
 		A00100240000000000000000 /* ASRConnectionTesterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00200270000000000000000 /* ASRConnectionTesterTests.swift */; };
 		A00100250000000000000000 /* ASRConnectionTester.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00200280000000000000000 /* ASRConnectionTester.swift */; };
+		A00100260000000000000000 /* StepRealtimeASRService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00200290000000000000000 /* StepRealtimeASRService.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -71,7 +72,7 @@
 		A002000E0000000000000000 /* VoilyApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoilyApp.swift; sourceTree = "<group>"; };
 		A002000F0000000000000000 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		A00200100000000000000000 /* Voily.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Voily.app; sourceTree = BUILT_PRODUCTS_DIR; };
-			A00200130000000000000000 /* BrandIcons */ = {isa = PBXFileReference; lastKnownFileType = folder; path = Resources/BrandIcons; sourceTree = "<group>"; };
+		A00200130000000000000000 /* Resources/BrandIcons */ = {isa = PBXFileReference; lastKnownFileType = folder; path = Resources/BrandIcons; sourceTree = "<group>"; };
 		A00200140000000000000000 /* DashboardHomePage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardHomePage.swift; sourceTree = "<group>"; };
 		A00200150000000000000000 /* UsageStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UsageStore.swift; sourceTree = "<group>"; };
 		A00200160000000000000000 /* UsageStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UsageStoreTests.swift; sourceTree = "<group>"; };
@@ -83,7 +84,7 @@
 		A002001C0000000000000000 /* ManagedASRModelStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ManagedASRModelStore.swift; sourceTree = "<group>"; };
 		A002001D0000000000000000 /* SenseVoiceResidentService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SenseVoiceResidentService.swift; sourceTree = "<group>"; };
 		A002001E0000000000000000 /* QwenRealtimeASRService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QwenRealtimeASRService.swift; sourceTree = "<group>"; };
-		A002001F0000000000000000 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Resources/Assets.xcassets; sourceTree = SOURCE_ROOT; };
+		A002001F0000000000000000 /* Resources/Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Resources/Assets.xcassets; sourceTree = SOURCE_ROOT; };
 		A00200200000000000000000 /* AppSettingsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppSettingsTests.swift; sourceTree = "<group>"; };
 		A00200210000000000000000 /* LLMRefinementServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LLMRefinementServiceTests.swift; sourceTree = "<group>"; };
 		A00200220000000000000000 /* AppSettingsPersistenceIntegrationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppSettingsPersistenceIntegrationTests.swift; sourceTree = "<group>"; };
@@ -93,6 +94,7 @@
 		A00200260000000000000000 /* DoubaoStreamingASRService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DoubaoStreamingASRService.swift; sourceTree = "<group>"; };
 		A00200270000000000000000 /* ASRConnectionTesterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ASRConnectionTesterTests.swift; sourceTree = "<group>"; };
 		A00200280000000000000000 /* ASRConnectionTester.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ASRConnectionTester.swift; sourceTree = "<group>"; };
+		A00200290000000000000000 /* StepRealtimeASRService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StepRealtimeASRService.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -115,21 +117,31 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		75A5D1952F9328CC00667CCE /* Recovered References */ = {
+			isa = PBXGroup;
+			children = (
+				A00200190000000000000000 /* AppIntents.framework */,
+				A00200180000000000000000 /* XCTest.framework */,
+			);
+			name = "Recovered References";
+			sourceTree = "<group>";
+		};
 		A00400010000000000000000 = {
 			isa = PBXGroup;
 			children = (
 				A00400020000000000000000 /* Sources/Voily */,
 				A00400050000000000000000 /* Tests/VoilyTests */,
-				A002001F0000000000000000 /* Assets.xcassets */,
+				A002001F0000000000000000 /* Resources/Assets.xcassets */,
 				A00400030000000000000000 /* Config */,
 				A00400040000000000000000 /* Products */,
+				75A5D1952F9328CC00667CCE /* Recovered References */,
 			);
 			sourceTree = "<group>";
 		};
 		A00400020000000000000000 /* Sources/Voily */ = {
 			isa = PBXGroup;
 			children = (
-				A00200130000000000000000 /* BrandIcons */,
+				A00200130000000000000000 /* Resources/BrandIcons */,
 				A00400060000000000000000 /* App */,
 				A00400070000000000000000 /* Configuration */,
 				A00400080000000000000000 /* Features */,
@@ -137,6 +149,34 @@
 				A004000E0000000000000000 /* Storage */,
 			);
 			path = Sources/Voily;
+			sourceTree = SOURCE_ROOT;
+		};
+		A00400030000000000000000 /* Config */ = {
+			isa = PBXGroup;
+			children = (
+				A002000F0000000000000000 /* Info.plist */,
+			);
+			path = Config;
+			sourceTree = SOURCE_ROOT;
+		};
+		A00400040000000000000000 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				A00200100000000000000000 /* Voily.app */,
+				A00200170000000000000000 /* VoilyTests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		A00400050000000000000000 /* Tests/VoilyTests */ = {
+			isa = PBXGroup;
+			children = (
+				A004000F0000000000000000 /* Audio */,
+				A00400100000000000000000 /* Configuration */,
+				A00400110000000000000000 /* Services */,
+				A00400120000000000000000 /* Storage */,
+			);
+			path = Tests/VoilyTests;
 			sourceTree = SOURCE_ROOT;
 		};
 		A00400060000000000000000 /* App */ = {
@@ -208,6 +248,7 @@
 				A002001E0000000000000000 /* QwenRealtimeASRService.swift */,
 				A002001D0000000000000000 /* SenseVoiceResidentService.swift */,
 				A002000B0000000000000000 /* SpeechTranscriptionService.swift */,
+				A00200290000000000000000 /* StepRealtimeASRService.swift */,
 			);
 			path = Audio;
 			sourceTree = "<group>";
@@ -221,14 +262,6 @@
 			path = Text;
 			sourceTree = "<group>";
 		};
-		A00400130000000000000000 /* Media */ = {
-			isa = PBXGroup;
-			children = (
-				A00200230000000000000000 /* SystemMediaPlaybackService.swift */,
-			);
-			path = Media;
-			sourceTree = "<group>";
-		};
 		A004000E0000000000000000 /* Storage */ = {
 			isa = PBXGroup;
 			children = (
@@ -236,34 +269,6 @@
 			);
 			path = Storage;
 			sourceTree = "<group>";
-		};
-		A00400030000000000000000 /* Config */ = {
-			isa = PBXGroup;
-			children = (
-				A002000F0000000000000000 /* Info.plist */,
-			);
-			path = Config;
-			sourceTree = SOURCE_ROOT;
-		};
-		A00400040000000000000000 /* Products */ = {
-			isa = PBXGroup;
-			children = (
-				A00200100000000000000000 /* Voily.app */,
-				A00200170000000000000000 /* VoilyTests.xctest */,
-			);
-			name = Products;
-			sourceTree = "<group>";
-		};
-		A00400050000000000000000 /* Tests/VoilyTests */ = {
-			isa = PBXGroup;
-			children = (
-				A004000F0000000000000000 /* Audio */,
-				A00400100000000000000000 /* Configuration */,
-				A00400110000000000000000 /* Services */,
-				A00400120000000000000000 /* Storage */,
-			);
-			path = Tests/VoilyTests;
-			sourceTree = SOURCE_ROOT;
 		};
 		A004000F0000000000000000 /* Audio */ = {
 			isa = PBXGroup;
@@ -299,6 +304,14 @@
 				A00200160000000000000000 /* UsageStoreTests.swift */,
 			);
 			path = Storage;
+			sourceTree = "<group>";
+		};
+		A00400130000000000000000 /* Media */ = {
+			isa = PBXGroup;
+			children = (
+				A00200230000000000000000 /* SystemMediaPlaybackService.swift */,
+			);
+			path = Media;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -350,7 +363,7 @@
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
 				LastSwiftUpdateCheck = 2611;
-				LastUpgradeCheck = 2611;
+				LastUpgradeCheck = 2640;
 				TargetAttributes = {
 					A00500010000000000000000 = {
 						CreatedOnToolsVersion = 26.1.1;
@@ -386,8 +399,8 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				A001001C0000000000000000 /* Assets.xcassets in Resources */,
-				A00100110000000000000000 /* BrandIcons in Resources */,
+				A001001C0000000000000000 /* Resources/Assets.xcassets in Resources */,
+				A00100110000000000000000 /* Resources/BrandIcons in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -397,25 +410,26 @@
 		A00300020000000000000000 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
-				files = (
-					A00100010000000000000000 /* AppController.swift in Sources */,
-					A00100020000000000000000 /* AppDelegate.swift in Sources */,
+			files = (
+				A00100010000000000000000 /* AppController.swift in Sources */,
+				A00100020000000000000000 /* AppDelegate.swift in Sources */,
 				A00100030000000000000000 /* AppSettings.swift in Sources */,
-					A00100040000000000000000 /* AudioCaptureService.swift in Sources */,
-					A00100250000000000000000 /* ASRConnectionTester.swift in Sources */,
-					A00100050000000000000000 /* FnKeyMonitor.swift in Sources */,
-					A00100060000000000000000 /* LLMRefinementService.swift in Sources */,
-					A00100230000000000000000 /* DoubaoStreamingASRService.swift in Sources */,
-					A00100170000000000000000 /* LocalASRService.swift in Sources */,
-					A00100190000000000000000 /* ManagedASRModelStore.swift in Sources */,
-					A00100070000000000000000 /* OverlayPanelController.swift in Sources */,
-					A00100080000000000000000 /* OverlayState.swift in Sources */,
-					A00100090000000000000000 /* PermissionCoordinator.swift in Sources */,
-					A001001B0000000000000000 /* QwenRealtimeASRService.swift in Sources */,
-					A001001A0000000000000000 /* SenseVoiceResidentService.swift in Sources */,
+				A00100040000000000000000 /* AudioCaptureService.swift in Sources */,
+				A00100250000000000000000 /* ASRConnectionTester.swift in Sources */,
+				A00100050000000000000000 /* FnKeyMonitor.swift in Sources */,
+				A00100060000000000000000 /* LLMRefinementService.swift in Sources */,
+				A00100230000000000000000 /* DoubaoStreamingASRService.swift in Sources */,
+				A00100170000000000000000 /* LocalASRService.swift in Sources */,
+				A00100190000000000000000 /* ManagedASRModelStore.swift in Sources */,
+				A00100070000000000000000 /* OverlayPanelController.swift in Sources */,
+				A00100080000000000000000 /* OverlayState.swift in Sources */,
+				A00100090000000000000000 /* PermissionCoordinator.swift in Sources */,
+				A001001B0000000000000000 /* QwenRealtimeASRService.swift in Sources */,
+				A001001A0000000000000000 /* SenseVoiceResidentService.swift in Sources */,
 				A00100120000000000000000 /* DashboardHomePage.swift in Sources */,
 				A001000A0000000000000000 /* SettingsWindowController.swift in Sources */,
 				A001000B0000000000000000 /* SpeechTranscriptionService.swift in Sources */,
+				A00100260000000000000000 /* StepRealtimeASRService.swift in Sources */,
 				A001000C0000000000000000 /* SupportedLanguage.swift in Sources */,
 				A00100200000000000000000 /* SystemMediaPlaybackService.swift in Sources */,
 				A001000D0000000000000000 /* TextInjectionService.swift in Sources */,
@@ -455,19 +469,50 @@
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CLDANG_ENABLE_MODULES = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
+				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = 9KZ32XLVQW;
 				ENABLE_APP_SANDBOX = NO;
 				ENABLE_HARDENED_RUNTIME = NO;
 				ENABLE_PREVIEWS = YES;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
 				GCC_NO_COMMON_BLOCKS = YES;
 				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				ONLY_ACTIVE_ARCH = YES;
 				PRODUCT_BUNDLE_IDENTIFIER = com.tokendance.voily;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = macosx;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
@@ -480,17 +525,46 @@
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CLDANG_ENABLE_MODULES = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
+				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = 9KZ32XLVQW;
 				ENABLE_APP_SANDBOX = NO;
 				ENABLE_HARDENED_RUNTIME = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
 				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.tokendance.voily;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = macosx;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_COMPILATION_MODE = wholemodule;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_OPTIMIZATION_LEVEL = "-O";
@@ -502,10 +576,12 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CLANG_ENABLE_OBJC_WEAK = YES;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = 9KZ32XLVQW;
+				DEAD_CODE_STRIPPING = YES;
 				DEFINES_MODULE = YES;
+				ENABLE_MODULE_VERIFIER = YES;
 				ENABLE_TESTABILITY = YES;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Config/Info.plist;
@@ -515,6 +591,7 @@
 				);
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
 				MARKETING_VERSION = 1.0;
+				MODULE_VERIFIER_SUPPORTED_LANGUAGE_STANDARDS = "gnu17 gnu++14";
 				PRODUCT_BUNDLE_IDENTIFIER = com.tokendance.voily;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = macosx;
@@ -527,10 +604,12 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CLANG_ENABLE_OBJC_WEAK = YES;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = 9KZ32XLVQW;
+				DEAD_CODE_STRIPPING = YES;
 				DEFINES_MODULE = YES;
+				ENABLE_MODULE_VERIFIER = YES;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Config/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -539,6 +618,7 @@
 				);
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
 				MARKETING_VERSION = 1.0;
+				MODULE_VERIFIER_SUPPORTED_LANGUAGE_STANDARDS = "gnu17 gnu++14";
 				PRODUCT_BUNDLE_IDENTIFIER = com.tokendance.voily;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = macosx;
@@ -551,12 +631,13 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
-				CODE_SIGN_IDENTITY = "-";
-				CODE_SIGN_STYLE = Manual;
+				CLANG_ENABLE_OBJC_WEAK = YES;
 				CODE_SIGNING_ALLOWED = YES;
 				CODE_SIGNING_REQUIRED = YES;
+				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_STYLE = Manual;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = 9KZ32XLVQW;
+				DEAD_CODE_STRIPPING = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -579,12 +660,13 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
-				CODE_SIGN_IDENTITY = "-";
-				CODE_SIGN_STYLE = Manual;
+				CLANG_ENABLE_OBJC_WEAK = YES;
 				CODE_SIGNING_ALLOWED = YES;
 				CODE_SIGNING_REQUIRED = YES;
+				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_STYLE = Manual;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = 9KZ32XLVQW;
+				DEAD_CODE_STRIPPING = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",

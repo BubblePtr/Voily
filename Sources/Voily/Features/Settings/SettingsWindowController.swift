@@ -815,6 +815,8 @@ extension ASRProvider: ProviderPresentable {
             return "豆包语音识别 2.0"
         case .qwenASR:
             return "Qwen3 ASR Flash"
+        case .stepfunASR:
+            return "Step-ASR-1.1-Stream"
         }
     }
 
@@ -1010,6 +1012,13 @@ private struct ASRProviderConfigSheet: View {
                 if draftConfig.model.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                     draftConfig.model = "qwen3-asr-flash-realtime"
                 }
+            } else if provider == .stepfunASR {
+                if draftConfig.baseURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    draftConfig.baseURL = "wss://api.stepfun.com/v1/realtime/asr/stream"
+                }
+                if draftConfig.model.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    draftConfig.model = "step-asr-1.1-stream"
+                }
             } else if provider == .doubaoStreaming {
                 if draftConfig.baseURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                     draftConfig.baseURL = "wss://openspeech.bytedance.com/api/v3/sauc/bigmodel_async"
@@ -1055,15 +1064,22 @@ private struct ASRProviderConfigSheet: View {
     }
 
     private func normalizedConfig(_ config: ASRProviderConfig) -> ASRProviderConfig {
-        guard provider == .doubaoStreaming else {
+        guard provider == .doubaoStreaming || provider == .stepfunASR else {
             return config
         }
 
         var normalized = config
-        normalized.baseURL = DoubaoStreamingASRService.normalizedSingleLineValue(config.baseURL)
-        normalized.apiKey = DoubaoStreamingASRService.normalizedSingleLineValue(config.apiKey)
-        normalized.model = DoubaoStreamingASRService.normalizedSingleLineValue(config.model)
-        normalized.appID = DoubaoStreamingASRService.normalizedSingleLineValue(config.appID)
+        if provider == .doubaoStreaming {
+            normalized.baseURL = DoubaoStreamingASRService.normalizedSingleLineValue(config.baseURL)
+            normalized.apiKey = DoubaoStreamingASRService.normalizedSingleLineValue(config.apiKey)
+            normalized.model = DoubaoStreamingASRService.normalizedSingleLineValue(config.model)
+            normalized.appID = DoubaoStreamingASRService.normalizedSingleLineValue(config.appID)
+        } else {
+            normalized.baseURL = StepRealtimeASRService.normalizedSingleLineValue(config.baseURL)
+            normalized.apiKey = StepRealtimeASRService.normalizedSingleLineValue(config.apiKey)
+            normalized.model = StepRealtimeASRService.normalizedSingleLineValue(config.model)
+            normalized.appID = ""
+        }
         return normalized
     }
 }
@@ -1333,6 +1349,11 @@ private struct CloudProviderFields: View {
 
             if provider == .qwenASR {
                 Text("北京区：wss://dashscope.aliyuncs.com/api-ws/v1/realtime\n国际区：wss://dashscope-intl.aliyuncs.com/api-ws/v1/realtime")
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            } else if provider == .stepfunASR {
+                Text("推荐地址：wss://api.stepfun.com/v1/realtime/asr/stream\n模型示例：step-asr-1.1-stream\n当前只支持中文或英文。")
                     .font(.system(size: 12))
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -2118,6 +2139,8 @@ private extension ASRProvider {
             return "豆包大模型流式识别，适合低延迟输入。"
         case .qwenASR:
             return "阿里云实时识别，支持流式返回。"
+        case .stepfunASR:
+            return "跃阶星辰流式识别，当前按官方文档只接中文/英文。"
         }
     }
 
@@ -2129,6 +2152,8 @@ private extension ASRProvider {
             return "doubao"
         case .qwenASR:
             return "bailian"
+        case .stepfunASR:
+            return "stepfun"
         }
     }
 
@@ -2140,6 +2165,8 @@ private extension ASRProvider {
             return "豆"
         case .qwenASR:
             return "QW"
+        case .stepfunASR:
+            return "跃"
         }
     }
 
@@ -2151,6 +2178,8 @@ private extension ASRProvider {
             return "volc.seedasr.sauc.duration"
         case .qwenASR:
             return "qwen3-asr-flash-realtime"
+        case .stepfunASR:
+            return "step-asr-1.1-stream"
         }
     }
 
@@ -2160,6 +2189,8 @@ private extension ASRProvider {
             return "wss://openspeech.bytedance.com/api/v3/sauc/bigmodel_async"
         case .qwenASR:
             return "wss://dashscope.aliyuncs.com/api-ws/v1/realtime"
+        case .stepfunASR:
+            return "wss://api.stepfun.com/v1/realtime/asr/stream"
         case .senseVoice:
             return ""
         }
@@ -2173,7 +2204,7 @@ private extension ASRProvider {
         switch self {
         case .doubaoStreaming:
             return "Token"
-        case .qwenASR:
+        case .qwenASR, .stepfunASR:
             return "API Key"
         case .senseVoice:
             return ""
@@ -2184,7 +2215,7 @@ private extension ASRProvider {
         switch self {
         case .doubaoStreaming:
             return "Resource ID"
-        case .qwenASR:
+        case .qwenASR, .stepfunASR:
             return "Model"
         case .senseVoice:
             return ""
@@ -2197,6 +2228,8 @@ private extension ASRProvider {
             return "云端流式 provider 会直接建立阿里云实时 ASR WebSocket 会话。"
         case .doubaoStreaming:
             return "云端流式 provider 会直接建立豆包大模型流式识别 WebSocket 会话。"
+        case .stepfunASR:
+            return "云端流式 provider 会直接建立跃阶星辰实时 ASR WebSocket 会话。"
         case .senseVoice:
             return "本地模型由应用托管下载和卸载。"
         }

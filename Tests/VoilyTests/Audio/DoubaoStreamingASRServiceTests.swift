@@ -192,6 +192,72 @@ final class DoubaoStreamingASRServiceTests: XCTestCase {
         XCTAssertEqual(normalized, "wss://openspeech.bytedance.com/api/v3/sauc/bigmodel_async")
     }
 
+    func testStepSessionUpdatePayloadIncludesModelAndLanguage() throws {
+        let payload = try StepRealtimeASRService.makeSessionUpdatePayload(
+            model: "step-asr-1.1-stream",
+            languageCode: "zh-CN"
+        )
+        let json = try XCTUnwrap(JSONSerialization.jsonObject(with: payload) as? [String: Any])
+        let session = try XCTUnwrap(json["session"] as? [String: Any])
+        let audio = try XCTUnwrap(session["audio"] as? [String: Any])
+        let input = try XCTUnwrap(audio["input"] as? [String: Any])
+        let format = try XCTUnwrap(input["format"] as? [String: Any])
+        let transcription = try XCTUnwrap(input["transcription"] as? [String: Any])
+
+        XCTAssertEqual(json["type"] as? String, "session.update")
+        XCTAssertEqual(format["type"] as? String, "pcm")
+        XCTAssertEqual(format["codec"] as? String, "pcm_s16le")
+        XCTAssertEqual(format["rate"] as? Int, 16_000)
+        XCTAssertEqual(transcription["model"] as? String, "step-asr-1.1-stream")
+        XCTAssertEqual(transcription["language"] as? String, "zh")
+        XCTAssertEqual(transcription["full_rerun_on_commit"] as? Bool, true)
+        XCTAssertEqual(transcription["enable_itn"] as? Bool, true)
+        XCTAssertNil(input["turn_detection"])
+    }
+
+    func testStepSessionUpdatePayloadRejectsUnsupportedLanguage() {
+        XCTAssertThrowsError(
+            try StepRealtimeASRService.makeSessionUpdatePayload(
+                model: "step-asr-1.1-stream",
+                languageCode: "ja-JP"
+            )
+        ) { error in
+            guard case let StepRealtimeASRServiceError.unsupportedLanguage(value) = error else {
+                return XCTFail("unexpected error: \(error)")
+            }
+            XCTAssertEqual(value, "ja-JP")
+        }
+    }
+
+    func testStepPartialAndFinalTextExtractorsReadOfficialEventShapes() {
+        let partialPayload: [String: Any] = [
+            "type": "conversation.item.input_audio_transcription.delta",
+            "text": "你好，世界"
+        ]
+        let finalPayload: [String: Any] = [
+            "type": "conversation.item.input_audio_transcription.completed",
+            "transcript": "你好，世界"
+        ]
+
+        XCTAssertEqual(StepRealtimeASRService.partialText(from: partialPayload), "你好，世界")
+        XCTAssertEqual(StepRealtimeASRService.finalTranscript(from: finalPayload), "你好，世界")
+    }
+
+    func testStepWithTimeoutThrowsWhenOperationDoesNotFinish() async {
+        do {
+            _ = try await StepRealtimeASRService.withTimeout(.milliseconds(20)) {
+                try await Task.sleep(for: .milliseconds(100))
+                return "late"
+            }
+            XCTFail("expected timeout")
+        } catch {
+            guard case let StepRealtimeASRServiceError.finishTimedOut(timeout) = error else {
+                return XCTFail("unexpected error: \(error)")
+            }
+            XCTAssertEqual(timeout, .milliseconds(20))
+        }
+    }
+
     private static func makeServerResponsePacket(payload: Data) -> Data {
         var packet = Data([0x11, 0x90, 0x10, 0x00])
         var size = UInt32(payload.count).bigEndian

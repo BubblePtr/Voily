@@ -33,6 +33,18 @@ struct TranscriptAccumulator {
     }
 
     @discardableResult
+    mutating func appendDelta(_ text: String) -> String {
+        let normalized = Self.normalize(text)
+        guard !normalized.isEmpty else { return displayText }
+
+        let existing = Self.normalize(liveText)
+        liveText = existing.isEmpty
+            ? normalized
+            : Self.merge(base: existing, incoming: normalized)
+        return displayText
+    }
+
+    @discardableResult
     mutating func commit(_ text: String) -> String {
         let normalized = Self.normalize(text)
         if !normalized.isEmpty {
@@ -105,6 +117,66 @@ struct TranscriptAccumulator {
         }
 
         return ""
+    }
+}
+
+struct PartialTranscriptDisplayThrottle {
+    let minimumInterval: TimeInterval
+
+    private(set) var pendingText: String?
+    private var lastEmissionTime: TimeInterval?
+    private var lastEmittedText = ""
+
+    init(minimumInterval: TimeInterval = 0.22) {
+        self.minimumInterval = minimumInterval
+    }
+
+    mutating func reset() {
+        pendingText = nil
+        lastEmissionTime = nil
+        lastEmittedText = ""
+    }
+
+    mutating func push(_ text: String, at time: TimeInterval) -> String? {
+        let normalized = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !normalized.isEmpty else { return nil }
+        guard normalized != lastEmittedText else {
+            pendingText = nil
+            return nil
+        }
+
+        guard let lastEmissionTime else {
+            return emit(normalized, at: time)
+        }
+
+        if time - lastEmissionTime >= minimumInterval {
+            return emit(normalized, at: time)
+        }
+
+        pendingText = normalized
+        return nil
+    }
+
+    mutating func flush(at time: TimeInterval) -> String? {
+        guard let pendingText else { return nil }
+        return emit(pendingText, at: time)
+    }
+
+    func delayUntilNextEmission(at time: TimeInterval) -> TimeInterval? {
+        guard pendingText != nil else { return nil }
+        guard let lastEmissionTime else { return 0 }
+        return max(0, minimumInterval - (time - lastEmissionTime))
+    }
+
+    private mutating func emit(_ text: String, at time: TimeInterval) -> String? {
+        guard text != lastEmittedText else {
+            pendingText = nil
+            return nil
+        }
+        lastEmittedText = text
+        lastEmissionTime = time
+        pendingText = nil
+        return text
     }
 }
 

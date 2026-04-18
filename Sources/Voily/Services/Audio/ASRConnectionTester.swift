@@ -13,13 +13,16 @@ enum ASRConnectionTesterError: LocalizedError, Equatable {
 
 struct ASRConnectionTester {
     let qwenProbe: @Sendable (ASRProviderConfig, String) async throws -> Void
+    let stepProbe: @Sendable (ASRProviderConfig, String) async throws -> Void
     let doubaoProbe: @Sendable (ASRProviderConfig, String) async throws -> Void
 
     init(
         qwenProbe: @escaping @Sendable (ASRProviderConfig, String) async throws -> Void,
+        stepProbe: @escaping @Sendable (ASRProviderConfig, String) async throws -> Void,
         doubaoProbe: @escaping @Sendable (ASRProviderConfig, String) async throws -> Void
     ) {
         self.qwenProbe = qwenProbe
+        self.stepProbe = stepProbe
         self.doubaoProbe = doubaoProbe
     }
 
@@ -27,6 +30,8 @@ struct ASRConnectionTester {
         switch provider {
         case .qwenASR:
             try await qwenProbe(config, languageCode)
+        case .stepfunASR:
+            try await stepProbe(config, languageCode)
         case .doubaoStreaming:
             try await doubaoProbe(config, languageCode)
         case .senseVoice:
@@ -36,11 +41,15 @@ struct ASRConnectionTester {
 
     static func live(
         qwenService: QwenRealtimeASRService = QwenRealtimeASRService(),
+        stepService: StepRealtimeASRService = StepRealtimeASRService(),
         doubaoService: DoubaoStreamingASRService = DoubaoStreamingASRService()
     ) -> ASRConnectionTester {
         ASRConnectionTester(
             qwenProbe: { config, languageCode in
                 try await qwenService.testConnection(config: config, languageCode: languageCode)
+            },
+            stepProbe: { config, languageCode in
+                try await stepService.testConnection(config: config, languageCode: languageCode)
             },
             doubaoProbe: { config, languageCode in
                 try await doubaoService.testConnection(config: config, languageCode: languageCode)
