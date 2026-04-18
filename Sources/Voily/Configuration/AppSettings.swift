@@ -5,6 +5,7 @@ enum ASRProvider: String, CaseIterable, Codable, Identifiable {
     case senseVoice
     case doubaoStreaming
     case qwenASR
+    case stepfunASR
 
     var id: String { rawValue }
 
@@ -13,9 +14,11 @@ enum ASRProvider: String, CaseIterable, Codable, Identifiable {
         case .senseVoice:
             return "SenseVoice Small"
         case .doubaoStreaming:
-            return "豆包流式语音识别"
+            return "Doubao ASR"
         case .qwenASR:
             return "Qwen ASR"
+        case .stepfunASR:
+            return "StepFun ASR"
         }
     }
 
@@ -23,7 +26,7 @@ enum ASRProvider: String, CaseIterable, Codable, Identifiable {
         switch self {
         case .senseVoice:
             return .local
-        case .doubaoStreaming, .qwenASR:
+        case .doubaoStreaming, .qwenASR, .stepfunASR:
             return .cloud
         }
     }
@@ -213,7 +216,7 @@ struct ASRProviderConfig: Codable, Equatable {
         switch provider {
         case .senseVoice:
             return !modelPath.trimmed.isEmpty || !executablePath.trimmed.isEmpty
-        case .qwenASR:
+        case .qwenASR, .stepfunASR:
             return !baseURL.trimmed.isEmpty && !apiKey.trimmed.isEmpty && !model.trimmed.isEmpty
         case .doubaoStreaming:
             return !baseURL.trimmed.isEmpty
@@ -277,6 +280,15 @@ struct ModelSettingsSnapshot: Codable, Equatable {
                 baseURL: "wss://openspeech.bytedance.com/api/v3/sauc/bigmodel_async",
                 apiKey: "",
                 model: "volc.seedasr.sauc.duration",
+                appID: ""
+            )
+            configs[.stepfunASR] = ASRProviderConfig(
+                executablePath: "",
+                modelPath: "",
+                additionalArguments: "",
+                baseURL: "wss://api.stepfun.com/v1/realtime/asr/stream",
+                apiKey: "",
+                model: "step-asr-1.1-stream",
                 appID: ""
             )
             return configs
@@ -997,6 +1009,14 @@ final class AppSettings {
             qwenConfig.model = "qwen3-asr-flash-realtime"
         }
         normalized.asrConfigsByProvider[.qwenASR] = qwenConfig
+        var stepConfig = normalized.asrConfigsByProvider[.stepfunASR] ?? .empty
+        if stepConfig.baseURL.trimmed.isEmpty {
+            stepConfig.baseURL = "wss://api.stepfun.com/v1/realtime/asr/stream"
+        }
+        if stepConfig.model.trimmed.isEmpty {
+            stepConfig.model = "step-asr-1.1-stream"
+        }
+        normalized.asrConfigsByProvider[.stepfunASR] = stepConfig
         return normalized
     }
 

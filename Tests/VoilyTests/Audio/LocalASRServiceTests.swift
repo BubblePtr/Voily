@@ -22,6 +22,33 @@ final class LocalASRServiceTests: XCTestCase {
         XCTAssertEqual(accumulator.finalText, "hello world")
     }
 
+    func testTranscriptAccumulatorAppendsIncrementalDeltasIntoLiveText() {
+        var accumulator = TranscriptAccumulator()
+
+        XCTAssertEqual(accumulator.appendDelta("你"), "你")
+        XCTAssertEqual(accumulator.appendDelta("好"), "你好")
+        XCTAssertEqual(accumulator.appendDelta("，世界"), "你好，世界")
+        XCTAssertEqual(accumulator.finalText, "你好，世界")
+    }
+
+    func testPartialTranscriptDisplayThrottleEmitsFirstPartialImmediatelyAndBuffersRapidUpdates() {
+        var throttle = PartialTranscriptDisplayThrottle(minimumInterval: 0.25)
+
+        XCTAssertEqual(throttle.push("你", at: 0.00), "你")
+        XCTAssertNil(throttle.push("你好", at: 0.05))
+        XCTAssertNil(throttle.push("你好世", at: 0.10))
+        XCTAssertEqual(throttle.pendingText, "你好世")
+    }
+
+    func testPartialTranscriptDisplayThrottleFlushesLatestBufferedTextAfterInterval() {
+        var throttle = PartialTranscriptDisplayThrottle(minimumInterval: 0.25)
+
+        XCTAssertEqual(throttle.push("你", at: 0.00), "你")
+        XCTAssertNil(throttle.push("你好", at: 0.05))
+        XCTAssertEqual(throttle.flush(at: 0.25), "你好")
+        XCTAssertNil(throttle.pendingText)
+    }
+
     func testSenseVoiceCommandUsesSenseVoiceArguments() throws {
         let executablePath = try makeExecutable()
         let audioURL = URL(fileURLWithPath: "/tmp/sample.wav")

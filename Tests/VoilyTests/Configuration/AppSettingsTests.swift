@@ -243,11 +243,55 @@ final class AppSettingsTests: XCTestCase {
         XCTAssertEqual(settings.asrConfig(for: .doubaoStreaming).appID, "")
     }
 
+    func testStepFunASRConfigPersistsAcrossReload() {
+        let defaults = makeDefaults()
+        let settings = AppSettings(defaults: defaults)
+
+        settings.selectedASRProvider = .stepfunASR
+        settings.setASRConfig(
+            ASRProviderConfig(
+                executablePath: "",
+                modelPath: "",
+                additionalArguments: "",
+                baseURL: "wss://api.stepfun.com/v1/realtime/asr/stream",
+                apiKey: "step-key",
+                model: "step-asr-1.1-stream",
+                appID: ""
+            ),
+            for: .stepfunASR
+        )
+
+        let reloaded = AppSettings(defaults: defaults)
+
+        XCTAssertEqual(reloaded.selectedASRProvider, .stepfunASR)
+        XCTAssertEqual(reloaded.asrConfig(for: .stepfunASR).baseURL, "wss://api.stepfun.com/v1/realtime/asr/stream")
+        XCTAssertEqual(reloaded.asrConfig(for: .stepfunASR).apiKey, "step-key")
+        XCTAssertEqual(reloaded.asrConfig(for: .stepfunASR).model, "step-asr-1.1-stream")
+    }
+
+    func testDomesticTextProviderBrandIconsExist() {
+        let iconsDirectory = brandIconsDirectoryURL()
+        let missingFiles = ["minimax.png", "kimi.png", "zhipu.png"].filter { fileName in
+            !FileManager.default.fileExists(atPath: iconsDirectory.appendingPathComponent(fileName).path)
+        }
+
+        XCTAssertEqual(missingFiles, [], "Missing brand icons: \(missingFiles.joined(separator: ", "))")
+    }
+
     private func makeDefaults() -> UserDefaults {
         let suiteName = "Voily.AppSettingsTests.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!
         defaults.removePersistentDomain(forName: suiteName)
         return defaults
+    }
+
+    private func brandIconsDirectoryURL(filePath: StaticString = #filePath) -> URL {
+        URL(fileURLWithPath: "\(filePath)")
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appendingPathComponent("Sources/Voily/Resources/BrandIcons", isDirectory: true)
     }
 
     private func legacyModelSnapshotData() throws -> Data {

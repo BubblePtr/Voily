@@ -27,6 +27,9 @@ final class ASRConnectionTesterTests: XCTestCase {
                 XCTAssertEqual(receivedConfig, config)
                 await recorder.record(.qwenASR)
             },
+            stepProbe: { _, _ in
+                XCTFail("unexpected step probe")
+            },
             doubaoProbe: { _, _ in
                 XCTFail("unexpected doubao probe")
             }
@@ -58,6 +61,9 @@ final class ASRConnectionTesterTests: XCTestCase {
             qwenProbe: { _, _ in
                 XCTFail("unexpected qwen probe")
             },
+            stepProbe: { _, _ in
+                XCTFail("unexpected step probe")
+            },
             doubaoProbe: { receivedConfig, _ in
                 XCTAssertEqual(receivedConfig, config)
                 await recorder.record(.doubaoStreaming)
@@ -74,9 +80,45 @@ final class ASRConnectionTesterTests: XCTestCase {
         XCTAssertEqual(invokedProvider, .doubaoStreaming)
     }
 
+    func testRoutesStepProviderToStepProbe() async throws {
+        let config = ASRProviderConfig(
+            executablePath: "",
+            modelPath: "",
+            additionalArguments: "",
+            baseURL: "wss://api.stepfun.com/v1/realtime/asr/stream",
+            apiKey: "step-key",
+            model: "step-asr-1.1-stream",
+            appID: ""
+        )
+
+        let recorder = ProbeRecorder()
+        let tester = ASRConnectionTester(
+            qwenProbe: { _, _ in
+                XCTFail("unexpected qwen probe")
+            },
+            stepProbe: { receivedConfig, _ in
+                XCTAssertEqual(receivedConfig, config)
+                await recorder.record(.stepfunASR)
+            },
+            doubaoProbe: { _, _ in
+                XCTFail("unexpected doubao probe")
+            }
+        )
+
+        try await tester.testConnection(
+            provider: .stepfunASR,
+            config: config,
+            languageCode: "zh-CN"
+        )
+
+        let invokedProvider = await recorder.invokedProvider
+        XCTAssertEqual(invokedProvider, .stepfunASR)
+    }
+
     func testRejectsUnsupportedProvider() async {
         let tester = ASRConnectionTester(
             qwenProbe: { _, _ in },
+            stepProbe: { _, _ in },
             doubaoProbe: { _, _ in }
         )
 
