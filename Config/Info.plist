@@ -19,7 +19,7 @@
 	<key>CFBundleVersion</key>
 	<string>1</string>
 	<key>LSMinimumSystemVersion</key>
-	<string>26.0</string>
+	<string>14.0</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Voily 需要麦克风权限，以便在您按下 Fn 键时录制您的语音并转写为文字。</string>
 	<key>NSSpeechRecognitionUsageDescription</key>

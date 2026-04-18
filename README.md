@@ -3,7 +3,7 @@
 <p align="center">Language: EN | <a href="./README_CN.md">简中</a></p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/macOS_26.0+-black?style=flat-square&logo=apple&logoColor=white" alt="macOS 26.0+">
+  <img src="https://img.shields.io/badge/macOS_14.0+-black?style=flat-square&logo=apple&logoColor=white" alt="macOS 14.0+">
   <img src="https://img.shields.io/badge/Swift-orange?style=flat-square&logo=swift&logoColor=white" alt="Swift">
   <img src="https://img.shields.io/badge/License-Apache_2.0-blue?style=flat-square" alt="Apache 2.0">
   <img src="https://img.shields.io/badge/Open_Source-green?style=flat-square" alt="Open Source">
@@ -26,7 +26,7 @@ Voily is an open-source macOS dictation app. Hold the Fn key to record your voic
 
 ## 📋 Requirements
 
-- macOS 26.0 (Tahoe) or later
+- macOS 14.0 (Sonoma) or later
 - Xcode 26+
 - Microphone permission
 - Accessibility permission (for text injection via paste)

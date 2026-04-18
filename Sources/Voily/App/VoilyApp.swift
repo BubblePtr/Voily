@@ -1,7 +1,6 @@
 import SwiftUI
 
 @main
-@available(macOS 26.0, *)
 struct VoilyApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
 
@@ -9,7 +8,6 @@ struct VoilyApp: App {
         Window("Voily", id: SettingsWindowSceneID.settings) {
             appDelegate.appController.makeSettingsWindowSceneView()
         }
-        .defaultLaunchBehavior(.presented)
         .defaultSize(width: 1120, height: 760)
     }
 }

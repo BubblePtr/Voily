@@ -3,7 +3,7 @@
 <p align="center">语言: <a href="./README.md">EN</a> | 简中</p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/macOS_26.0+-black?style=flat-square&logo=apple&logoColor=white" alt="macOS 26.0+">
+  <img src="https://img.shields.io/badge/macOS_14.0+-black?style=flat-square&logo=apple&logoColor=white" alt="macOS 14.0+">
   <img src="https://img.shields.io/badge/Swift-orange?style=flat-square&logo=swift&logoColor=white" alt="Swift">
   <img src="https://img.shields.io/badge/License-Apache_2.0-blue?style=flat-square" alt="Apache 2.0">
   <img src="https://img.shields.io/badge/Open_Source-green?style=flat-square" alt="开源">
@@ -26,7 +26,7 @@ Voily 是一款开源的 macOS 语音听写应用。按住 Fn 键录音，松开
 
 ## 📋 系统要求
 
-- macOS 26.0 (Tahoe) 或更高版本
+- macOS 14.0 (Sonoma) 或更高版本
 - Xcode 26+
 - 麦克风权限
 - 辅助功能权限（用于通过粘贴注入文字）
