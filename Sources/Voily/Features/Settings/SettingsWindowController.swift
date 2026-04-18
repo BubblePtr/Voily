@@ -5,7 +5,6 @@ enum SettingsWindowSceneID {
     static let settings = "settings-window"
 }
 
-@available(macOS 26.0, *)
 struct SettingsWindowSceneView: View {
     let settings: AppSettings
     let usageStore: UsageStore
@@ -2305,13 +2304,11 @@ private extension TextRefinementProvider {
     }
 }
 
-@available(macOS 26.0, *)
 #Preview("Settings Home") {
     DashboardHomePage(usageStore: SettingsPreviewData.populatedUsageStore())
         .frame(width: 760, height: 700)
 }
 
-@available(macOS 26.0, *)
 #Preview("Settings Model") {
     ModelSettingsPage(
         settings: SettingsPreviewData.configuredSettings(),
@@ -2322,13 +2319,11 @@ private extension TextRefinementProvider {
     .frame(width: 1120, height: 760)
 }
 
-@available(macOS 26.0, *)
 #Preview("Settings Glossary") {
     GlossarySettingsPage(settings: SettingsPreviewData.configuredSettings())
         .frame(width: 760, height: 700)
 }
 
-@available(macOS 26.0, *)
 #Preview("Settings General") {
     ScrollView {
         VStack(alignment: .leading, spacing: 20) {

@@ -1,6 +1,5 @@
 import AppKit
 
-@available(macOS 26.0, *)
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
     let windowActions = WindowActions()
@@ -16,6 +15,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             return
         }
         appController.start()
+        Task { @MainActor in
+            self.appController.showSettingsWindow()
+        }
     }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {

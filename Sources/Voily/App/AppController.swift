@@ -67,7 +67,6 @@ private enum CaptureSessionMode: Equatable {
     }
 }
 
-@available(macOS 26.0, *)
 @MainActor
 final class WindowActions {
     private weak var settingsWindow: NSWindow?
@@ -97,7 +96,6 @@ final class WindowActions {
     }
 }
 
-@available(macOS 26.0, *)
 @MainActor
 final class AppController: NSObject {
     private let windowActions: WindowActions
@@ -139,6 +137,7 @@ final class AppController: NSObject {
     private var hasStopped = false
     private var hasStartedStartupPermissionGuidance = false
     private var hasCompletedInitialSettingsWindowAppearance = false
+    private var openSettingsWindowAction: (@MainActor () -> Void)?
 
     init(windowActions: WindowActions) {
         self.windowActions = windowActions
@@ -152,6 +151,10 @@ final class AppController: NSObject {
         observeAppIconPreference()
         observeTriggerKeyPreference()
         configureOverlayActions()
+    }
+
+    func registerOpenSettingsWindowAction(_ action: @escaping @MainActor () -> Void) {
+        openSettingsWindowAction = action
     }
 
     func stop() async {
@@ -190,6 +193,11 @@ final class AppController: NSObject {
         debugLog("showSettingsWindow() activated isActive=\(NSApp.isActive)")
         if windowActions.showSettingsWindow() {
             debugLog("showSettingsWindow() dispatched action")
+            return
+        }
+        if let openSettingsWindowAction {
+            debugLog("showSettingsWindow() opening settings scene")
+            openSettingsWindowAction()
             return
         }
         debugLog("showSettingsWindow() noRegisteredWindowYet")
@@ -1285,7 +1293,6 @@ final class AppController: NSObject {
     }
 }
 
-@available(macOS 26.0, *)
 extension AppController: NSMenuDelegate {
     func menuWillOpen(_ menu: NSMenu) {
         guard menu === statusMenu else { return }
@@ -1293,7 +1300,6 @@ extension AppController: NSMenuDelegate {
     }
 }
 
-@available(macOS 26.0, *)
 private struct MenuDashboardMenuItemView: View {
     let summary: TodayUsageSummary
     let summaries: [DailyUsageSummary]
@@ -1342,7 +1348,6 @@ private struct MenuDashboardMenuItemView: View {
     }
 }
 
-@available(macOS 26.0, *)
 private struct MenuMiniSparklineView: View {
     let summaries: [DailyUsageSummary]
 
@@ -1434,7 +1439,6 @@ private struct MenuChartPoint: Identifiable {
     var id: Date { date }
 }
 
-@available(macOS 26.0, *)
 #Preview("Menu Dashboard") {
     let usageStore = UsageStore()
 
