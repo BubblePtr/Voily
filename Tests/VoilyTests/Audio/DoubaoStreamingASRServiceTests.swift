@@ -98,6 +98,68 @@ final class DoubaoStreamingASRServiceTests: XCTestCase {
         XCTAssertEqual(response.code, 20000000)
     }
 
+    func testDecodeServerResponsePrefersFullResultTextOverLastUtterance() throws {
+        let payload = """
+        {
+          "code": 20000000,
+          "message": "success",
+          "sequence": -1,
+          "result": {
+            "text": "我先说前半句，然后再补后半句",
+            "utterances": [
+              {
+                "text": "我先说前半句",
+                "definite": true
+              },
+              {
+                "text": "然后再补后半句",
+                "definite": true
+              }
+            ]
+          }
+        }
+        """
+
+        let packet = DoubaoStreamingASRServiceTests.makeServerResponsePacket(payload: Data(payload.utf8))
+        let response = try DoubaoWireCodec.decodeServerMessage(packet)
+
+        XCTAssertEqual(response.text, "我先说前半句，然后再补后半句")
+        XCTAssertEqual(response.resultText, "我先说前半句，然后再补后半句")
+        XCTAssertEqual(response.lastUtteranceText, "然后再补后半句")
+        XCTAssertEqual(response.utteranceCount, 2)
+        XCTAssertEqual(response.sequence, -1)
+        XCTAssertTrue(response.isFinal)
+        XCTAssertEqual(response.code, 20000000)
+    }
+
+    func testDecodeServerResponseFallsBackToTrimmedLastUtteranceWhenResultTextIsWhitespace() throws {
+        let payload = """
+        {
+          "code": 20000000,
+          "message": "success",
+          "sequence": -1,
+          "result": {
+            "text": "   ",
+            "utterances": [
+              {
+                "text": "  保留这段有效文本  ",
+                "definite": true
+              }
+            ]
+          }
+        }
+        """
+
+        let packet = DoubaoStreamingASRServiceTests.makeServerResponsePacket(payload: Data(payload.utf8))
+        let response = try DoubaoWireCodec.decodeServerMessage(packet)
+
+        XCTAssertEqual(response.text, "保留这段有效文本")
+        XCTAssertEqual(response.resultText, "")
+        XCTAssertEqual(response.lastUtteranceText, "保留这段有效文本")
+        XCTAssertTrue(response.isFinal)
+        XCTAssertEqual(response.code, 20000000)
+    }
+
     func testDecodeSequencedServerResponseExtractsPartialText() throws {
         let payload = """
         {
