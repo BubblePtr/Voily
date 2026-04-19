@@ -9,18 +9,18 @@
   <img src="https://img.shields.io/badge/Open_Source-green?style=flat-square" alt="Open Source">
 </p>
 
-**Press Fn, speak, and text appears at your cursor.**
+**Press your trigger key, speak, and text appears at your cursor.**
 
-Voily is an open-source macOS dictation app. Hold the Fn key to record your voice, release to transcribe, and the recognized text is automatically pasted at the current cursor position — in any app. It supports both local and cloud-based ASR engines, optional LLM-powered text refinement, and a real-time floating overlay that shows transcription progress.
+Voily is an open-source macOS dictation app. Press your configured trigger key to start dictation, press it again to finish, and the recognized text is automatically pasted at the current cursor position — in any app. Long-press the trigger key to start quick Chinese-to-English translation. It supports both local and cloud-based ASR engines, optional LLM-powered text refinement, and a floating overlay that shows progress during capture and transcription.
 
 ## ✨ Features
 
-- **Fn-key triggered dictation** — Hold Fn to record, release to transcribe and paste. Double-press Fn for quick Chinese-to-English translation.
-- **Multiple ASR engines** — Choose between local (SenseVoice) or cloud (Doubao Streaming, Qwen ASR) speech recognition providers.
-- **Real-time partial results** — See transcription text appear in a floating overlay while you speak.
+- **Configurable trigger key** — Use either `Fn` or `Right Command`. Single press starts or finishes dictation, and long-pressing for 0.8s starts quick Chinese-to-English translation.
+- **Multiple ASR engines** — Choose between local `SenseVoice Small` or cloud `Doubao ASR`, `Qwen ASR`, and `StepFun ASR`.
+- **Live overlay feedback** — The floating overlay shows recording, transcription, translation, and injection state. Streaming providers can surface partial text while you speak.
 - **LLM text refinement** — Optionally post-process transcriptions with LLM providers (DeepSeek, Alibaba Cloud, Volcengine, MiniMax, Kimi, Zhipu) to remove filler words, formalize tone, or organize into lists.
 - **Glossary support** — Define custom terms and enable built-in glossary presets to improve recognition accuracy for domain-specific vocabulary.
-- **Quick translation** — Double-press Fn to dictate in Chinese and get English output.
+- **Quick translation** — Long-press the trigger key to dictate in Chinese and get English output.
 - **Menu bar dashboard** — View today's usage stats (duration, session count, character count) and a weekly sparkline chart from the menu bar.
 - **Minimal and native** — Built with SwiftUI and AppKit; lives in your menu bar with an optional Dock icon.
 
@@ -58,9 +58,10 @@ make install
 On first launch, Voily will ask for **Microphone** and **Accessibility** permissions. Then open Settings to configure:
 
 1. **ASR Provider** — Select a speech recognition engine:
-   - **SenseVoice Small** (local) — Requires downloading the ONNX model. No API key needed.
-   - **Doubao Streaming** (cloud) — Requires WebSocket URL, App ID, Token, and Resource ID.
-   - **Qwen ASR** (cloud) — Requires API Key. Pre-configured with default endpoint and model.
+   - **SenseVoice Small** (local) — Downloads and manages the MLX model locally. No API key needed.
+   - **Doubao ASR** (cloud) — Requires WebSocket URL, App ID, Token, and Resource ID.
+   - **Qwen ASR** (cloud) — Requires WebSocket URL, API Key, and Model. The default endpoint and model are prefilled.
+   - **StepFun ASR** (cloud) — Requires WebSocket URL, API Key, and Model.
 
 2. **Text Refinement** (optional) — Enable LLM post-processing and configure a provider (DeepSeek / Alibaba Cloud DashScope / Volcengine / MiniMax / Kimi / Zhipu).
 
@@ -72,9 +73,9 @@ On first launch, Voily will ask for **Microphone** and **Accessibility** permiss
 
 | Action | Gesture |
 |---|---|
-| Start dictation | Hold **Fn** key |
-| Finish & paste | Release **Fn** key |
-| Quick translate (ZH → EN) | Double-press **Fn** key |
+| Start dictation | Press the selected trigger key once |
+| Finish & paste | Press the selected trigger key again |
+| Quick translate (ZH → EN) | Long-press the selected trigger key for 0.8s |
 
 The floating overlay shows real-time status:
 - 🎙️ **Recording** — Waveform animation with live partial text

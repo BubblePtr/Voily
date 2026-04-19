@@ -1,0 +1,38 @@
+language: zh-CN
+
+reviews:
+  profile: chill
+  request_changes_workflow: false
+  high_level_summary: true
+  poem: false
+  review_status: true
+  collapse_walkthrough: false
+
+  path_instructions:
+    - path: "Sources/**/*.swift"
+      instructions: |
+        遵守 CLAUDE.md 的「不能违反的约束」：
+        - 最低系统版本 macOS 14.0，使用更高版本 API 必须用 `if #available` 包裹
+        - 新代码不允许 `import Combine`，统一 async/await + AsyncStream
+        - 新增 ASR 引擎必须实现 `SpeechTranscriptionService` 协议，禁止在调用方写 provider switch
+        - 录音期间静音系统输出的逻辑只能在 `SystemMediaPlaybackService` 中
+        - 文本注入只走粘贴路径，不允许 CGEvent 模拟逐字输入
+        - 仓库内不允许出现 API key / token / 模型权重
+
+    - path: "docs/decisions/*.md"
+      instructions: |
+        ADR 必须包含 frontmatter（date / status / tracks）以及四段正文：背景 / 决策 / 放弃的方案 / 后果。
+
+  auto_review:
+    enabled: true
+    drafts: false
+
+  instructions: |
+    当 PR 修改了 Sources/ 中的代码时，检查 docs/ 以及 README 文件中是否有对应文档需要更新（特别是 ARCHITECTURE.md 与相关 ADR）。
+    若涉及架构级变更（新增模块、新增 ASR/文本 provider、协议改动、依赖方向调整），检查是否需要新增一条 ADR；如缺失，在评论里建议补充并给出文件名草案。
+    检查 PR 中所有 Markdown 文件的内部链接是否有效（dead link）。
+    若 PR 引入了 macOS 14 之后才有的 API，要求作者用 `if #available` 包裹或在 ADR 中声明评估过的兼容方案。
+    若新增 Swift 文件中出现 `import Combine`，提示这违反 ADR 0002，要求改为 async/await。
+
+chat:
+  auto_reply: true
