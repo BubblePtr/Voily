@@ -53,6 +53,32 @@ make run
 make install
 ```
 
+### Install from GitHub Releases
+
+1. Download the latest notarized `.dmg` from GitHub Releases.
+2. Open the disk image and drag `Voily.app` into `Applications`.
+3. Launch `Voily.app` from `Applications`.
+4. On first launch, grant:
+   - Microphone
+   - Accessibility
+
+If macOS still warns about permissions, open `System Settings` -> `Privacy & Security` and enable the requested access manually.
+
+### Build a GitHub Release artifact
+
+```bash
+# Archive a Release build to build/release/Voily.app
+make release
+
+# Package a distributable dmg
+make package-dmg
+
+# Inspect signing, hardened runtime, and Gatekeeper status
+make verify-release
+```
+
+For the full signing, notarization, and GitHub release flow, see [docs/releasing.md](docs/releasing.md).
+
 ### Configuration
 
 On first launch, Voily will ask for **Microphone** and **Accessibility** permissions. Then open Settings to configure:
