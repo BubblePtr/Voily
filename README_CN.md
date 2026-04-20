@@ -53,6 +53,32 @@ make run
 make install
 ```
 
+### 从 GitHub Releases 安装
+
+1. 从 GitHub Releases 下载最新的已 notarize `.dmg`。
+2. 打开磁盘镜像，把 `Voily.app` 拖到 `Applications`。
+3. 从 `Applications` 启动 `Voily.app`。
+4. 首次启动时，授权：
+   - 麦克风
+   - 辅助功能
+
+如果 macOS 仍提示权限问题，请打开 `系统设置` -> `隐私与安全性`，手动开启对应权限。
+
+### 构建 GitHub 发布产物
+
+```bash
+# 归档 Release 构建，导出到 build/release/Voily.app
+make release
+
+# 打包可分发的 dmg
+make package-dmg
+
+# 检查签名、Hardened Runtime 和 Gatekeeper 状态
+make verify-release
+```
+
+完整的签名、notarization 和 GitHub Releases 发布流程见 [docs/releasing.md](docs/releasing.md)。
+
 ### 配置
 
 首次启动时，Voily 会请求**麦克风**和**辅助功能**权限。然后打开设置进行配置：
