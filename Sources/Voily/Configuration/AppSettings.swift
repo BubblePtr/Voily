@@ -4,6 +4,7 @@ import Observation
 enum ASRProvider: String, CaseIterable, Codable, Identifiable {
     case senseVoice
     case doubaoStreaming
+    case funASR
     case qwenASR
     case stepfunASR
 
@@ -15,6 +16,8 @@ enum ASRProvider: String, CaseIterable, Codable, Identifiable {
             return "SenseVoice Small"
         case .doubaoStreaming:
             return "Doubao ASR"
+        case .funASR:
+            return "Fun-ASR"
         case .qwenASR:
             return "Qwen ASR"
         case .stepfunASR:
@@ -26,7 +29,7 @@ enum ASRProvider: String, CaseIterable, Codable, Identifiable {
         switch self {
         case .senseVoice:
             return .local
-        case .doubaoStreaming, .qwenASR, .stepfunASR:
+        case .doubaoStreaming, .funASR, .qwenASR, .stepfunASR:
             return .cloud
         }
     }
@@ -162,6 +165,9 @@ struct ASRProviderConfig: Codable, Equatable {
     var apiKey: String
     var model: String
     var appID: String
+    var vocabularyID: String
+    var vocabularyTargetModel: String
+    var vocabularyRevision: String
 
     static let empty = ASRProviderConfig(
         executablePath: "",
@@ -170,7 +176,10 @@ struct ASRProviderConfig: Codable, Equatable {
         baseURL: "",
         apiKey: "",
         model: "",
-        appID: ""
+        appID: "",
+        vocabularyID: "",
+        vocabularyTargetModel: "",
+        vocabularyRevision: ""
     )
 
     private enum CodingKeys: String, CodingKey {
@@ -181,6 +190,9 @@ struct ASRProviderConfig: Codable, Equatable {
         case apiKey
         case model
         case appID
+        case vocabularyID
+        case vocabularyTargetModel
+        case vocabularyRevision
     }
 
     init(
@@ -190,7 +202,10 @@ struct ASRProviderConfig: Codable, Equatable {
         baseURL: String,
         apiKey: String,
         model: String,
-        appID: String = ""
+        appID: String = "",
+        vocabularyID: String = "",
+        vocabularyTargetModel: String = "",
+        vocabularyRevision: String = ""
     ) {
         self.executablePath = executablePath
         self.modelPath = modelPath
@@ -199,6 +214,9 @@ struct ASRProviderConfig: Codable, Equatable {
         self.apiKey = apiKey
         self.model = model
         self.appID = appID
+        self.vocabularyID = vocabularyID
+        self.vocabularyTargetModel = vocabularyTargetModel
+        self.vocabularyRevision = vocabularyRevision
     }
 
     init(from decoder: Decoder) throws {
@@ -210,13 +228,16 @@ struct ASRProviderConfig: Codable, Equatable {
         apiKey = try container.decodeIfPresent(String.self, forKey: .apiKey) ?? ""
         model = try container.decodeIfPresent(String.self, forKey: .model) ?? ""
         appID = try container.decodeIfPresent(String.self, forKey: .appID) ?? ""
+        vocabularyID = try container.decodeIfPresent(String.self, forKey: .vocabularyID) ?? ""
+        vocabularyTargetModel = try container.decodeIfPresent(String.self, forKey: .vocabularyTargetModel) ?? ""
+        vocabularyRevision = try container.decodeIfPresent(String.self, forKey: .vocabularyRevision) ?? ""
     }
 
     func isConfigured(for provider: ASRProvider) -> Bool {
         switch provider {
         case .senseVoice:
             return !modelPath.trimmed.isEmpty || !executablePath.trimmed.isEmpty
-        case .qwenASR, .stepfunASR:
+        case .funASR, .qwenASR, .stepfunASR:
             return !baseURL.trimmed.isEmpty && !apiKey.trimmed.isEmpty && !model.trimmed.isEmpty
         case .doubaoStreaming:
             return !baseURL.trimmed.isEmpty
@@ -224,6 +245,26 @@ struct ASRProviderConfig: Codable, Equatable {
                 && !model.trimmed.isEmpty
                 && !appID.trimmed.isEmpty
         }
+    }
+
+    func updatingFunASRVocabulary(
+        vocabularyID: String,
+        vocabularyTargetModel: String,
+        vocabularyRevision: String
+    ) -> ASRProviderConfig {
+        var updated = self
+        updated.vocabularyID = vocabularyID
+        updated.vocabularyTargetModel = vocabularyTargetModel
+        updated.vocabularyRevision = vocabularyRevision
+        return updated
+    }
+
+    func clearingFunASRVocabulary() -> ASRProviderConfig {
+        updatingFunASRVocabulary(
+            vocabularyID: "",
+            vocabularyTargetModel: "",
+            vocabularyRevision: ""
+        )
     }
 }
 
@@ -280,6 +321,15 @@ struct ModelSettingsSnapshot: Codable, Equatable {
                 baseURL: "wss://openspeech.bytedance.com/api/v3/sauc/bigmodel_async",
                 apiKey: "",
                 model: "volc.seedasr.sauc.duration",
+                appID: ""
+            )
+            configs[.funASR] = ASRProviderConfig(
+                executablePath: "",
+                modelPath: "",
+                additionalArguments: "",
+                baseURL: "wss://dashscope.aliyuncs.com/api-ws/v1/inference",
+                apiKey: "",
+                model: "fun-asr-realtime",
                 appID: ""
             )
             configs[.stepfunASR] = ASRProviderConfig(
@@ -1001,6 +1051,14 @@ final class AppSettings {
         var normalized = snapshot
         normalized.preferredMicrophoneUID = normalized.preferredMicrophoneUID?.trimmed.nilIfEmpty
         normalized.enabledDictationSkills = normalizedDictationSkills(snapshot.enabledDictationSkills)
+        var funASRConfig = normalized.asrConfigsByProvider[.funASR] ?? .empty
+        if funASRConfig.baseURL.trimmed.isEmpty {
+            funASRConfig.baseURL = "wss://dashscope.aliyuncs.com/api-ws/v1/inference"
+        }
+        if funASRConfig.model.trimmed.isEmpty {
+            funASRConfig.model = "fun-asr-realtime"
+        }
+        normalized.asrConfigsByProvider[.funASR] = funASRConfig
         var qwenConfig = normalized.asrConfigsByProvider[.qwenASR] ?? .empty
         if qwenConfig.baseURL.trimmed.isEmpty {
             qwenConfig.baseURL = "wss://dashscope.aliyuncs.com/api-ws/v1/realtime"

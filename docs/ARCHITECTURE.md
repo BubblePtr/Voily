@@ -39,6 +39,7 @@ Sources/Voily/
 
 - `LocalASRService` + `SenseVoiceResidentService`（本地，MLX 常驻服务）
 - `DoubaoStreamingASRService`（云端，WebSocket）
+- `FunASRRealtimeService` + `FunASRVocabularyService`（云端，WebSocket + 热词词表同步）
 - `QwenRealtimeASRService`（云端，HTTP/WS）
 - `StepRealtimeASRService`（云端）
 

@@ -15,15 +15,18 @@ struct ASRConnectionTester {
     let qwenProbe: @Sendable (ASRProviderConfig, String) async throws -> Void
     let stepProbe: @Sendable (ASRProviderConfig, String) async throws -> Void
     let doubaoProbe: @Sendable (ASRProviderConfig, String) async throws -> Void
+    let funASRProbe: @Sendable (ASRProviderConfig, String) async throws -> Void
 
     init(
         qwenProbe: @escaping @Sendable (ASRProviderConfig, String) async throws -> Void,
         stepProbe: @escaping @Sendable (ASRProviderConfig, String) async throws -> Void,
-        doubaoProbe: @escaping @Sendable (ASRProviderConfig, String) async throws -> Void
+        doubaoProbe: @escaping @Sendable (ASRProviderConfig, String) async throws -> Void,
+        funASRProbe: @escaping @Sendable (ASRProviderConfig, String) async throws -> Void
     ) {
         self.qwenProbe = qwenProbe
         self.stepProbe = stepProbe
         self.doubaoProbe = doubaoProbe
+        self.funASRProbe = funASRProbe
     }
 
     func testConnection(provider: ASRProvider, config: ASRProviderConfig, languageCode: String) async throws {
@@ -34,6 +37,8 @@ struct ASRConnectionTester {
             try await stepProbe(config, languageCode)
         case .doubaoStreaming:
             try await doubaoProbe(config, languageCode)
+        case .funASR:
+            try await funASRProbe(config, languageCode)
         case .senseVoice:
             throw ASRConnectionTesterError.unsupportedProvider
         }
@@ -42,7 +47,8 @@ struct ASRConnectionTester {
     static func live(
         qwenService: QwenRealtimeASRService = QwenRealtimeASRService(),
         stepService: StepRealtimeASRService = StepRealtimeASRService(),
-        doubaoService: DoubaoStreamingASRService = DoubaoStreamingASRService()
+        doubaoService: DoubaoStreamingASRService = DoubaoStreamingASRService(),
+        funASRService: FunASRRealtimeService = FunASRRealtimeService()
     ) -> ASRConnectionTester {
         ASRConnectionTester(
             qwenProbe: { config, languageCode in
@@ -53,6 +59,9 @@ struct ASRConnectionTester {
             },
             doubaoProbe: { config, languageCode in
                 try await doubaoService.testConnection(config: config, languageCode: languageCode)
+            },
+            funASRProbe: { config, languageCode in
+                try await funASRService.testConnection(config: config, languageCode: languageCode)
             }
         )
     }

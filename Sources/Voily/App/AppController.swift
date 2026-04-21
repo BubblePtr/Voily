@@ -106,6 +106,8 @@ final class AppController: NSObject {
     private let audioCaptureService = AudioCaptureService()
     private let speechService = SpeechTranscriptionService()
     private let senseVoiceResidentService = SenseVoiceResidentService()
+    private let funASRRealtimeService = FunASRRealtimeService()
+    private let funASRVocabularyService = FunASRVocabularyService()
     private let qwenRealtimeASRService = QwenRealtimeASRService()
     private let stepRealtimeASRService = StepRealtimeASRService()
     private let doubaoStreamingASRService = DoubaoStreamingASRService()
@@ -168,6 +170,7 @@ final class AppController: NSObject {
         if let currentResidentSession {
             await senseVoiceResidentService.cancelSession(currentResidentSession)
         }
+        try? await funASRRealtimeService.cancelSession()
         try? await qwenRealtimeASRService.cancelSession()
         try? await stepRealtimeASRService.cancelSession()
         try? await doubaoStreamingASRService.cancelSession()
@@ -304,7 +307,9 @@ final class AppController: NSObject {
             llmService: llmRefinementService,
             asrConnectionTester: ASRConnectionTester.live(
                 qwenService: qwenRealtimeASRService,
-                doubaoService: doubaoStreamingASRService
+                stepService: stepRealtimeASRService,
+                doubaoService: doubaoStreamingASRService,
+                funASRService: funASRRealtimeService
             ),
             managedASRModels: managedASRModels,
             registerWindow: registerSettingsWindow(_:),
@@ -580,7 +585,9 @@ final class AppController: NSObject {
                 debugLog("Recording with local ASR provider=\(selectedASRProvider.rawValue)")
                 localAudioWriter = TemporaryAudioCaptureWriter()
             } else {
-                if selectedASRProvider == .qwenASR {
+                if selectedASRProvider == .funASR {
+                    try await startFunASRRealtimeSession()
+                } else if selectedASRProvider == .qwenASR {
                     try await startQwenRealtimeSession()
                 } else if selectedASRProvider == .stepfunASR {
                     try await startStepRealtimeSession()
@@ -619,6 +626,7 @@ final class AppController: NSObject {
                 }
             }
             currentResidentSession = nil
+            try? await funASRRealtimeService.cancelSession()
             try? await qwenRealtimeASRService.cancelSession()
             try? await stepRealtimeASRService.cancelSession()
             try? await doubaoStreamingASRService.cancelSession()
@@ -779,6 +787,7 @@ final class AppController: NSObject {
             await senseVoiceResidentService.cancelSession(currentResidentSession)
         }
         currentResidentSession = nil
+        try? await funASRRealtimeService.cancelSession()
         try? await qwenRealtimeASRService.cancelSession()
         try? await stepRealtimeASRService.cancelSession()
         try? await doubaoStreamingASRService.cancelSession()
@@ -925,7 +934,41 @@ final class AppController: NSObject {
                 )
             }
         case .cloud:
-            if provider == .qwenASR {
+            if provider == .funASR {
+                do {
+                    let startedAt = Date()
+                    let result = try await funASRRealtimeService.finishSession()
+                    let durationMs = Int(Date().timeIntervalSince(startedAt) * 1000)
+                    let totalDurationMs = Int(Date().timeIntervalSince(recognitionStartedAt) * 1000)
+                    let text = result.text.trimmingCharacters(in: CharacterSet.whitespacesAndNewlines)
+                    debugLog(
+                        "ASR finished provider=\(provider.rawValue) source=cloud-realtime totalMs=\(totalDurationMs) realtimeMs=\(durationMs) textLength=\(text.count) command=\(result.commandSummary)"
+                    )
+                    return RecognitionOutcome(
+                        text: text,
+                        provider: provider,
+                        source: "cloud-realtime",
+                        totalDurationMs: totalDurationMs,
+                        engineDurationMs: durationMs,
+                        firstPartialMs: currentFirstPartialMs,
+                        partialCount: currentPartialCount
+                    )
+                } catch {
+                    let totalDurationMs = Int(Date().timeIntervalSince(recognitionStartedAt) * 1000)
+                    debugLog(
+                        "ASR finished provider=\(provider.rawValue) source=cloud-realtime-failed totalMs=\(totalDurationMs) reason=\(error.localizedDescription)"
+                    )
+                    return RecognitionOutcome(
+                        text: "",
+                        provider: provider,
+                        source: "cloud-realtime-failed",
+                        totalDurationMs: totalDurationMs,
+                        engineDurationMs: nil,
+                        firstPartialMs: currentFirstPartialMs,
+                        partialCount: currentPartialCount
+                    )
+                }
+            } else if provider == .qwenASR {
                 do {
                     let startedAt = Date()
                     let result = try await qwenRealtimeASRService.finishSession()
@@ -1061,13 +1104,23 @@ final class AppController: NSObject {
         localAudioWriter?.append(buffer)
 
         let provider = settings.selectedASRProvider
-        guard provider == .senseVoice || provider == .qwenASR || provider == .stepfunASR || provider == .doubaoStreaming else {
+        guard provider == .senseVoice
+            || provider == .funASR
+            || provider == .qwenASR
+            || provider == .stepfunASR
+            || provider == .doubaoStreaming
+        else {
             return
         }
 
         let pcmData: Data
         do {
-            let targetSampleRate = (provider == .qwenASR || provider == .stepfunASR || provider == .doubaoStreaming) ? 16_000.0 : buffer.format.sampleRate
+            let targetSampleRate = (
+                provider == .funASR
+                    || provider == .qwenASR
+                    || provider == .stepfunASR
+                    || provider == .doubaoStreaming
+            ) ? 16_000.0 : buffer.format.sampleRate
             pcmData = try TemporaryAudioCaptureWriter.pcm16MonoData(from: buffer, targetSampleRate: targetSampleRate)
         } catch {
             debugLog("\(provider.rawValue) chunk encode failed error=\(error.localizedDescription)")
@@ -1077,6 +1130,8 @@ final class AppController: NSObject {
         Task { @MainActor in
             if provider == .senseVoice {
                 await appendSenseVoiceChunk(pcmData, sampleRate: buffer.format.sampleRate)
+            } else if provider == .funASR {
+                await appendFunASRRealtimeChunk(pcmData)
             } else if provider == .qwenASR {
                 await appendQwenRealtimeChunk(pcmData)
             } else if provider == .stepfunASR {
@@ -1124,6 +1179,40 @@ final class AppController: NSObject {
         debugLog("Qwen realtime session started")
     }
 
+    private func startFunASRRealtimeSession() async throws {
+        resetRealtimePartialDisplayState()
+        let config = await preparedFunASRConfigForSession()
+        try await funASRRealtimeService.startSession(
+            config: config,
+            languageCode: activeInputLanguageCode
+        ) { [weak self] partialText in
+            Task { @MainActor in
+                self?.handleFunASRPartialText(partialText)
+            }
+        }
+        debugLog("Fun-ASR realtime session started")
+    }
+
+    private func preparedFunASRConfigForSession() async -> ASRProviderConfig {
+        let config = settings.selectedASRConfig
+
+        do {
+            let syncedConfig = try await funASRVocabularyService.syncVocabularyIfNeeded(
+                config: config,
+                glossaryTerms: settings.effectiveGlossaryItems
+            )
+            if syncedConfig != config {
+                settings.selectedASRConfig = syncedConfig
+            }
+            return syncedConfig
+        } catch {
+            debugLog("Fun-ASR hotword sync failed error=\(error.localizedDescription)")
+            let clearedConfig = config.clearingFunASRVocabulary()
+            settings.selectedASRConfig = clearedConfig
+            return clearedConfig
+        }
+    }
+
     private func startStepRealtimeSession() async throws {
         resetRealtimePartialDisplayState()
         try await stepRealtimeASRService.startSession(
@@ -1162,6 +1251,18 @@ final class AppController: NSObject {
         }
     }
 
+    private func appendFunASRRealtimeChunk(_ pcmData: Data) async {
+        guard currentPhase == .recording || currentPhase == .recordingPartial else { return }
+        currentPendingRealtimeAppendCount += 1
+        defer { currentPendingRealtimeAppendCount = max(0, currentPendingRealtimeAppendCount - 1) }
+
+        do {
+            try await funASRRealtimeService.appendAudioChunk(pcmData)
+        } catch {
+            debugLog("Fun-ASR realtime append failed error=\(error.localizedDescription)")
+        }
+    }
+
     private func appendStepRealtimeChunk(_ pcmData: Data) async {
         guard currentPhase == .recording || currentPhase == .recordingPartial else { return }
         currentPendingRealtimeAppendCount += 1
@@ -1187,6 +1288,10 @@ final class AppController: NSObject {
     }
 
     private func handleQwenPartialText(_ partialText: String) {
+        handleRealtimePartialText(partialText)
+    }
+
+    private func handleFunASRPartialText(_ partialText: String) {
         handleRealtimePartialText(partialText)
     }
 
@@ -1256,6 +1361,7 @@ final class AppController: NSObject {
 
     private func waitForPendingRealtimeAppends() async {
         guard settings.selectedASRProvider == .senseVoice
+            || settings.selectedASRProvider == .funASR
             || settings.selectedASRProvider == .qwenASR
             || settings.selectedASRProvider == .stepfunASR
             || settings.selectedASRProvider == .doubaoStreaming

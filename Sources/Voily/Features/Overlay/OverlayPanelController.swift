@@ -218,7 +218,8 @@ struct OverlayRootView: View {
             }
             return state.text
         case .transcribing:
-            return state.text.isEmpty ? "Transcribing…" : state.text
+            let text = state.text.trimmingCharacters(in: .whitespacesAndNewlines)
+            return text.isEmpty ? "Transcribing…" : "Transcribing… \(text)"
         case .refining:
             return "Refining..."
         case .translating:
