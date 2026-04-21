@@ -130,7 +130,7 @@ struct LocalASRService: Sendable {
                 "-f", audioFileURL.path,
                 "-l", senseVoiceLanguageCode(for: languageCode),
             ] + defaultArguments
-        case .doubaoStreaming, .qwenASR, .stepfunASR:
+        case .doubaoStreaming, .funASR, .qwenASR, .stepfunASR:
             throw LocalASRError.unsupportedProvider
         }
 
@@ -224,7 +224,7 @@ struct LocalASRService: Sendable {
             let lines = senseVoiceTranscriptLines(stdout: stdout, stderr: stderr)
             guard !lines.isEmpty else { return nil }
             return lines.joined(separator: "\n")
-        case .doubaoStreaming, .qwenASR, .stepfunASR:
+        case .doubaoStreaming, .funASR, .qwenASR, .stepfunASR:
             return nil
         }
     }

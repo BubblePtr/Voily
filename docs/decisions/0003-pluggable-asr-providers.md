@@ -8,7 +8,7 @@ tracks: []
 
 ## 背景
 
-Voily 需要同时支持本地引擎（SenseVoice）与多家云端流式 ASR（Doubao、Qwen、StepFun…），且后续会持续增加。早期某次新增 provider 时直接在调用方写了 `switch provider` 分支，导致 overlay / settings / 注入路径各自重复判断，新增引擎时改动面失控。
+Voily 需要同时支持本地引擎（SenseVoice）与多家云端流式 ASR（Doubao、Fun-ASR、Qwen、StepFun…），且后续会持续增加。早期某次新增 provider 时直接在调用方写了 `switch provider` 分支，导致 overlay / settings / 注入路径各自重复判断，新增引擎时改动面失控。
 
 ## 决策
 
@@ -26,6 +26,7 @@ Voily 需要同时支持本地引擎（SenseVoice）与多家云端流式 ASR（
 
 | Provider | 事件 | 字段语义 | 处理 |
 |---|---|---|---|
+| Fun-ASR | `result-generated` | 当前句快照，`sentence_end=true` 时提交 final sentence | `updatePartial` 替换 + `commitCurrentSentence` |
 | StepFun | `conversation.item.input_audio_transcription.delta` | 增量片段 | `appendDelta` 累积 |
 | Doubao | `decoded.text` | 当前 utterance 快照 | `updatePartial` 直接替换 |
 | Qwen | `conversation.item.input_audio_transcription.text` | partial 快照 | `updatePartial` 直接替换 |
@@ -39,6 +40,6 @@ Voily 需要同时支持本地引擎（SenseVoice）与多家云端流式 ASR（
 
 ## 后果
 
-- 正面：新增 provider 只需实现协议 + 在工厂注册 + 写 settings 配置面板；overlay / 注入路径零改动。
+- 正面：新增 provider 只需实现协议 + 在工厂注册 + 写 settings 配置面板；overlay / 注入路径零改动。像 Fun-ASR 这类需要额外词表同步的 provider，也应把差异收敛在 provider/配套 service 内，而不是泄漏到 UI。
 - 负面：不同云厂商的鉴权 / 配置字段差异大，settings 面板仍需 per-provider 实现，无法完全抽象 —— 接受，settings 是天然的边界。
 - 约束沉淀进 `CLAUDE.md` 的「不能违反的约束」第 3 条。

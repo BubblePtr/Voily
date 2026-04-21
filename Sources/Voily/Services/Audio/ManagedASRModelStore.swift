@@ -206,7 +206,7 @@ final class ManagedASRModelStore {
                 defaultArguments: "",
                 estimatedDownload: "约 950 MB"
             )
-        case .doubaoStreaming, .qwenASR, .stepfunASR:
+        case .doubaoStreaming, .funASR, .qwenASR, .stepfunASR:
             return nil
         }
     }

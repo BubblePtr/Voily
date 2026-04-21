@@ -230,6 +230,21 @@ final class AppSettingsTests: XCTestCase {
         XCTAssertEqual(reloaded.textRefinementConfig(for: .dashScope).model, "qwen-plus")
     }
 
+    func testArrayEncodedSnapshotBackfillsFunASRDefaultsForUpgradedUsers() throws {
+        let defaults = makeDefaults()
+        defaults.set(try arrayEncodedModelSnapshotData(), forKey: "modelSettingsSnapshot")
+
+        let settings = AppSettings(defaults: defaults)
+
+        XCTAssertEqual(settings.asrConfig(for: .funASR).baseURL, "wss://dashscope.aliyuncs.com/api-ws/v1/inference")
+        XCTAssertEqual(settings.asrConfig(for: .funASR).model, "fun-asr-realtime")
+
+        let reloaded = AppSettings(defaults: defaults)
+
+        XCTAssertEqual(reloaded.asrConfig(for: .funASR).baseURL, "wss://dashscope.aliyuncs.com/api-ws/v1/inference")
+        XCTAssertEqual(reloaded.asrConfig(for: .funASR).model, "fun-asr-realtime")
+    }
+
     func testLegacyASRConfigWithoutAppIDMigratesWithEmptyAppID() throws {
         let defaults = makeDefaults()
         defaults.set(try legacyDoubaoSnapshotData(), forKey: "modelSettingsSnapshot")
@@ -267,6 +282,38 @@ final class AppSettingsTests: XCTestCase {
         XCTAssertEqual(reloaded.asrConfig(for: .stepfunASR).baseURL, "wss://api.stepfun.com/v1/realtime/asr/stream")
         XCTAssertEqual(reloaded.asrConfig(for: .stepfunASR).apiKey, "step-key")
         XCTAssertEqual(reloaded.asrConfig(for: .stepfunASR).model, "step-asr-1.1-stream")
+    }
+
+    func testFunASRConfigPersistsAcrossReload() {
+        let defaults = makeDefaults()
+        let settings = AppSettings(defaults: defaults)
+
+        settings.selectedASRProvider = .funASR
+        settings.setASRConfig(
+            ASRProviderConfig(
+                executablePath: "",
+                modelPath: "",
+                additionalArguments: "",
+                baseURL: "wss://dashscope.aliyuncs.com/api-ws/v1/inference",
+                apiKey: "dashscope-key",
+                model: "fun-asr-realtime",
+                appID: "",
+                vocabularyID: "vocab-voily-123",
+                vocabularyTargetModel: "fun-asr-realtime",
+                vocabularyRevision: "rev-123"
+            ),
+            for: .funASR
+        )
+
+        let reloaded = AppSettings(defaults: defaults)
+
+        XCTAssertEqual(reloaded.selectedASRProvider, .funASR)
+        XCTAssertEqual(reloaded.asrConfig(for: .funASR).baseURL, "wss://dashscope.aliyuncs.com/api-ws/v1/inference")
+        XCTAssertEqual(reloaded.asrConfig(for: .funASR).apiKey, "dashscope-key")
+        XCTAssertEqual(reloaded.asrConfig(for: .funASR).model, "fun-asr-realtime")
+        XCTAssertEqual(reloaded.asrConfig(for: .funASR).vocabularyID, "vocab-voily-123")
+        XCTAssertEqual(reloaded.asrConfig(for: .funASR).vocabularyTargetModel, "fun-asr-realtime")
+        XCTAssertEqual(reloaded.asrConfig(for: .funASR).vocabularyRevision, "rev-123")
     }
 
     func testDomesticTextProviderBrandIconsExist() {

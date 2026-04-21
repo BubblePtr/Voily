@@ -18,21 +18,42 @@ reviews:
         - 录音期间静音系统输出的逻辑只能在 `SystemMediaPlaybackService` 中
         - 文本注入只走粘贴路径，不允许 CGEvent 模拟逐字输入
         - 仓库内不允许出现 API key / token / 模型权重
+        - 若涉及架构级变更（新增模块、新增 ASR/文本 provider、协议改动、依赖方向调整），检查是否需要新增或更新 ADR；若缺失，请提出 finding，并给出建议的 ADR 文件名草案
+        - 若本次改动影响用户可见行为、配置方式、支持矩阵或架构边界，必须检查 `README.md`、`README_CN.md`、`docs/ARCHITECTURE.md` 与相关 ADR 是否需要同步更新
+        - 若代码行为已经变化但本次 diff 中没有对应文档更新，请明确提出 finding，而不是只在总结里轻描淡写
+
+    - path: "Sources/Voily/Services/Audio/**/*.swift"
+      instructions: |
+        这是 ASR provider 的关键路径。若本次改动涉及以下任一内容，请重点检查文档是否缺失更新：
+        - 新增或删除 ASR provider
+        - 调整 provider 默认模型、默认 URL、认证方式、支持语言、采样率、热词、VAD 或断句参数
+        - 调整 realtime / final 行为、partial 展示语义、失败恢复、超时或连接复用策略
+        - 调整 provider wiring、抽象边界或 `AppController` 中的 provider 选择逻辑
+        对上述改动，至少检查 `README.md`、`README_CN.md`、`docs/ARCHITECTURE.md` 和相关 ADR 是否应该一起变化。
+        若这些文件没有随代码一起更新，且变化会影响用户、贡献者或后续维护者的理解，请提出 finding。
 
     - path: "docs/decisions/*.md"
       instructions: |
         ADR 必须包含 frontmatter（date / status / tracks）以及四段正文：背景 / 决策 / 放弃的方案 / 后果。
 
+    - path: "README*.md"
+      instructions: |
+        README 必须反映当前真实能力，不允许保留过期的 provider、参数、支持矩阵、接入方式或行为描述。
+        若本次改动涉及 ASR provider、配置字段、默认值、限制条件或用户可见流程，请检查 README 是否覆盖了这些变化。
+
+    - path: "docs/**/*.md"
+      instructions: |
+        文档必须与当前实现保持一致，尤其是 `docs/ARCHITECTURE.md`、provider 说明、行为时序、配置说明和限制条件。
+        若文档中仍保留旧术语、旧默认值、旧 provider 行为或与代码不一致的描述，请提出 finding。
+
+    - path: "**/*.md"
+      instructions: |
+        若本次 diff 修改了 Markdown 文件，请检查其中的相对链接和锚点链接是否仍然有效。
+        若发现 dead link、错误锚点、重命名后未同步的文档引用或失效的 README/docs 交叉引用，请提出 finding。
+
   auto_review:
     enabled: true
     drafts: false
-
-  instructions: |
-    当 PR 修改了 Sources/ 中的代码时，检查 docs/ 以及 README 文件中是否有对应文档需要更新（特别是 ARCHITECTURE.md 与相关 ADR）。
-    若涉及架构级变更（新增模块、新增 ASR/文本 provider、协议改动、依赖方向调整），检查是否需要新增一条 ADR；如缺失，在评论里建议补充并给出文件名草案。
-    检查 PR 中所有 Markdown 文件的内部链接是否有效（dead link）。
-    若 PR 引入了 macOS 14 之后才有的 API，要求作者用 `if #available` 包裹或在 ADR 中声明评估过的兼容方案。
-    若新增 Swift 文件中出现 `import Combine`，提示这违反 ADR 0002，要求改为 async/await。
 
 chat:
   auto_reply: true

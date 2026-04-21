@@ -16,7 +16,7 @@ Voily is an open-source macOS dictation app. Press your configured trigger key t
 ## ✨ Features
 
 - **Configurable trigger key** — Use either `Fn` or `Right Command`. Single press starts or finishes dictation, and long-pressing for 0.8s starts quick Chinese-to-English translation.
-- **Multiple ASR engines** — Choose between local `SenseVoice Small` or cloud `Doubao ASR`, `Qwen ASR`, and `StepFun ASR`.
+- **Multiple ASR engines** — Choose between local `SenseVoice Small` or cloud `Doubao ASR`, `Fun-ASR`, `Qwen ASR`, and `StepFun ASR`.
 - **Live overlay feedback** — The floating overlay shows recording, transcription, translation, and injection state. Streaming providers can surface partial text while you speak.
 - **LLM text refinement** — Optionally post-process transcriptions with LLM providers (DeepSeek, Alibaba Cloud, Volcengine, MiniMax, Kimi, Zhipu) to remove filler words, formalize tone, or organize into lists.
 - **Glossary support** — Define custom terms and enable built-in glossary presets to improve recognition accuracy for domain-specific vocabulary.
@@ -86,6 +86,7 @@ On first launch, Voily will ask for **Microphone** and **Accessibility** permiss
 1. **ASR Provider** — Select a speech recognition engine:
    - **SenseVoice Small** (local) — Downloads and manages the MLX model locally. No API key needed.
    - **Doubao ASR** (cloud) — Requires WebSocket URL, App ID, Token, and Resource ID.
+   - **Fun-ASR** (cloud) — Requires WebSocket URL, API Key, and Model. Defaults to `wss://dashscope.aliyuncs.com/api-ws/v1/inference` and `fun-asr-realtime`, and can sync your glossary as hotword vocabulary.
    - **Qwen ASR** (cloud) — Requires WebSocket URL, API Key, and Model. The default endpoint and model are prefilled.
    - **StepFun ASR** (cloud) — Requires WebSocket URL, API Key, and Model.
 
@@ -93,7 +94,7 @@ On first launch, Voily will ask for **Microphone** and **Accessibility** permiss
 
 3. **Dictation Skills** — Toggle processing skills like filler-word removal, formalization, or ordered-list formatting.
 
-4. **Glossary** — Add custom terms or enable built-in presets to improve recognition of specialized vocabulary.
+4. **Glossary** — Add custom terms or enable built-in presets to improve recognition of specialized vocabulary. When `Fun-ASR` is selected, Voily syncs the effective glossary into the provider hotword vocabulary before each realtime session.
 
 ## 🎯 Usage
 
