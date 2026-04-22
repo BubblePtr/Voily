@@ -12,13 +12,15 @@ Voily 需要同时支持本地引擎（SenseVoice）与多家云端流式 ASR（
 
 ## 决策
 
-所有 ASR 引擎通过统一会话抽象 `ASRCaptureSession`（位于 `Sources/Voily/Services/Audio/`）接入，暴露三件事：
+所有 ASR 引擎通过统一会话抽象 `ASRCaptureSession`（位于 `Sources/Voily/Services/Audio/`）接入，暴露纯会话职责：
 
-1. 启动一次会话并返回 `AsyncThrowingStream<TranscriptionEvent, Error>`
-2. 主动结束会话并拿到 final
-3. 连接健康检查（供 settings 里的「测试连接」按钮调用，见 `ASRConnectionTester`）
+1. `start(onPartial:)`：启动一次实时会话并接收 partial 回调
+2. `append(_:)`：持续喂入录音 buffer；chunk 级错误直接向上抛出
+3. `finish()` / `cancel()`：主动结束会话拿到 final，或中途取消
 
-调用方只持有协议类型，provider 选择集中在工厂层。
+调用方只持有协议类型，provider 选择集中在 `ASRCaptureSessionFactory` 一层。
+
+连接测试不属于 `ASRCaptureSession`。settings 里的「测试连接」按钮继续走独立的 `ASRConnectionTester`，由 provider 配套 service（而不是捕获会话）提供探活能力；工厂层负责运行时 session 构建，`ASRConnectionTester` 负责配置侧连通性验证，两者边界分离。
 
 ### partial 语义统一
 

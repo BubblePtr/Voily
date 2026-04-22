@@ -21,9 +21,83 @@ enum ASRCaptureSessionError: LocalizedError {
 @MainActor
 protocol ASRCaptureSession: AnyObject {
     func start(onPartial: @escaping @Sendable (String) -> Void) async throws
-    func append(_ buffer: AVAudioPCMBuffer) async
+    func append(_ buffer: AVAudioPCMBuffer) async throws
     func finish() async throws -> ASRCaptureSessionFinalResult
     func cancel() async
+}
+
+@MainActor
+struct ActiveASRCaptureSession {
+    let provider: ASRProvider
+    let session: any ASRCaptureSession
+}
+
+@MainActor
+protocol ASRCaptureSessionBuilding {
+    func makeSession(
+        provider: ASRProvider,
+        languageCode: String,
+        config: ASRProviderConfig,
+        glossaryTerms: [String],
+        persistConfig: @escaping (ASRProviderConfig) async -> Void
+    ) -> ActiveASRCaptureSession
+}
+
+@MainActor
+struct LiveASRCaptureSessionFactory: ASRCaptureSessionBuilding {
+    let senseVoiceResidentService: SenseVoiceResidentService
+    let funASRRealtimeService: FunASRRealtimeService
+    let funASRVocabularyService: FunASRVocabularyService
+    let qwenRealtimeASRService: QwenRealtimeASRService
+    let stepRealtimeASRService: StepRealtimeASRService
+    let doubaoStreamingASRService: DoubaoStreamingASRService
+
+    func makeSession(
+        provider: ASRProvider,
+        languageCode: String,
+        config: ASRProviderConfig,
+        glossaryTerms: [String],
+        persistConfig: @escaping (ASRProviderConfig) async -> Void
+    ) -> ActiveASRCaptureSession {
+        let session: any ASRCaptureSession
+
+        switch provider {
+        case .senseVoice:
+            session = SenseVoiceCaptureSession(
+                service: senseVoiceResidentService,
+                languageCode: languageCode
+            )
+        case .funASR:
+            session = FunASRCaptureSession(
+                realtimeService: funASRRealtimeService,
+                vocabularyService: funASRVocabularyService,
+                languageCode: languageCode,
+                initialConfig: config,
+                glossaryTerms: glossaryTerms,
+                persistConfig: persistConfig
+            )
+        case .qwenASR:
+            session = QwenCaptureSession(
+                service: qwenRealtimeASRService,
+                config: config,
+                languageCode: languageCode
+            )
+        case .stepfunASR:
+            session = StepCaptureSession(
+                service: stepRealtimeASRService,
+                config: config,
+                languageCode: languageCode
+            )
+        case .doubaoStreaming:
+            session = DoubaoCaptureSession(
+                service: doubaoStreamingASRService,
+                config: config,
+                languageCode: languageCode
+            )
+        }
+
+        return ActiveASRCaptureSession(provider: provider, session: session)
+    }
 }
 
 struct LocalASRTranscriptionResult: Equatable {
@@ -374,19 +448,15 @@ final class SenseVoiceCaptureSession: ASRCaptureSession {
 
     func start(onPartial _: @escaping @Sendable (String) -> Void) async throws {}
 
-    func append(_ buffer: AVAudioPCMBuffer) async {
-        do {
-            if residentSession == nil {
-                residentSession = try await startResidentSession(buffer.format.sampleRate, languageCode)
-                debugLog("SenseVoice capture session started")
-            }
-
-            guard let residentSession else { return }
-            let pcmData = try AudioPCMConverter.pcm16MonoData(from: buffer, targetSampleRate: buffer.format.sampleRate)
-            try await appendAudio(residentSession.id, pcmData)
-        } catch {
-            debugLog("SenseVoice capture append failed error=\(error.localizedDescription)")
+    func append(_ buffer: AVAudioPCMBuffer) async throws {
+        if residentSession == nil {
+            residentSession = try await startResidentSession(buffer.format.sampleRate, languageCode)
+            debugLog("SenseVoice capture session started")
         }
+
+        guard let residentSession else { return }
+        let pcmData = try AudioPCMConverter.pcm16MonoData(from: buffer, targetSampleRate: buffer.format.sampleRate)
+        try await appendAudio(residentSession.id, pcmData)
     }
 
     func finish() async throws -> ASRCaptureSessionFinalResult {
@@ -492,13 +562,9 @@ final class FunASRCaptureSession: ASRCaptureSession {
         try await startRealtimeSession(config, languageCode, onPartial)
     }
 
-    func append(_ buffer: AVAudioPCMBuffer) async {
-        do {
-            let pcmData = try AudioPCMConverter.pcm16MonoData(from: buffer, targetSampleRate: 16_000)
-            try await appendAudioChunk(pcmData)
-        } catch {
-            debugLog("Fun-ASR capture append failed error=\(error.localizedDescription)")
-        }
+    func append(_ buffer: AVAudioPCMBuffer) async throws {
+        let pcmData = try AudioPCMConverter.pcm16MonoData(from: buffer, targetSampleRate: 16_000)
+        try await appendAudioChunk(pcmData)
     }
 
     func finish() async throws -> ASRCaptureSessionFinalResult {
@@ -563,13 +629,9 @@ final class QwenCaptureSession: ASRCaptureSession {
         try await startRealtimeSession(config, languageCode, onPartial)
     }
 
-    func append(_ buffer: AVAudioPCMBuffer) async {
-        do {
-            let pcmData = try AudioPCMConverter.pcm16MonoData(from: buffer, targetSampleRate: 16_000)
-            try await appendAudioChunk(pcmData)
-        } catch {
-            debugLog("Qwen capture append failed error=\(error.localizedDescription)")
-        }
+    func append(_ buffer: AVAudioPCMBuffer) async throws {
+        let pcmData = try AudioPCMConverter.pcm16MonoData(from: buffer, targetSampleRate: 16_000)
+        try await appendAudioChunk(pcmData)
     }
 
     func finish() async throws -> ASRCaptureSessionFinalResult {
@@ -634,13 +696,9 @@ final class StepCaptureSession: ASRCaptureSession {
         try await startRealtimeSession(config, languageCode, onPartial)
     }
 
-    func append(_ buffer: AVAudioPCMBuffer) async {
-        do {
-            let pcmData = try AudioPCMConverter.pcm16MonoData(from: buffer, targetSampleRate: 16_000)
-            try await appendAudioChunk(pcmData)
-        } catch {
-            debugLog("Step capture append failed error=\(error.localizedDescription)")
-        }
+    func append(_ buffer: AVAudioPCMBuffer) async throws {
+        let pcmData = try AudioPCMConverter.pcm16MonoData(from: buffer, targetSampleRate: 16_000)
+        try await appendAudioChunk(pcmData)
     }
 
     func finish() async throws -> ASRCaptureSessionFinalResult {
@@ -705,13 +763,9 @@ final class DoubaoCaptureSession: ASRCaptureSession {
         try await startRealtimeSession(config, languageCode, onPartial)
     }
 
-    func append(_ buffer: AVAudioPCMBuffer) async {
-        do {
-            let pcmData = try AudioPCMConverter.pcm16MonoData(from: buffer, targetSampleRate: 16_000)
-            try await appendAudioChunk(pcmData)
-        } catch {
-            debugLog("Doubao capture append failed error=\(error.localizedDescription)")
-        }
+    func append(_ buffer: AVAudioPCMBuffer) async throws {
+        let pcmData = try AudioPCMConverter.pcm16MonoData(from: buffer, targetSampleRate: 16_000)
+        try await appendAudioChunk(pcmData)
     }
 
     func finish() async throws -> ASRCaptureSessionFinalResult {

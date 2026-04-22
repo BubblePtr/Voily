@@ -67,6 +67,35 @@ private enum CaptureSessionMode: Equatable {
     }
 }
 
+private final class PendingRealtimeAppendCounter: @unchecked Sendable {
+    private let lock = NSLock()
+    private var count = 0
+
+    func increment() {
+        lock.lock()
+        count += 1
+        lock.unlock()
+    }
+
+    func decrement() {
+        lock.lock()
+        count = max(0, count - 1)
+        lock.unlock()
+    }
+
+    func reset() {
+        lock.lock()
+        count = 0
+        lock.unlock()
+    }
+
+    var value: Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return count
+    }
+}
+
 @MainActor
 final class WindowActions {
     private weak var settingsWindow: NSWindow?
@@ -115,6 +144,7 @@ final class AppController: NSObject {
     private let textInjectionService = TextInjectionService()
     private let llmRefinementService = LLMRefinementService()
     private let audioOutputMuteService = SystemAudioOutputMuteService()
+    private let injectedASRCaptureSessionFactory: (any ASRCaptureSessionBuilding)?
 
     private var statusItem: NSStatusItem?
     private var statusMenu: NSMenu?
@@ -126,10 +156,10 @@ final class AppController: NSObject {
     private var smoothedRMS: Float = 0
     private var currentSessionStartedAt: Date?
     private var currentSessionMode: CaptureSessionMode?
-    private var activeASRSession: ASRCaptureSession?
+    private var activeASRSession: ActiveASRCaptureSession?
     private var currentFirstPartialMs: Int?
     private var currentPartialCount = 0
-    private var currentPendingRealtimeAppendCount = 0
+    private var currentCaptureAppendError: Error?
     private var currentAudioOutputMuteToken: AudioOutputMuteInterruptionToken?
     private var realtimePartialDisplayThrottle = PartialTranscriptDisplayThrottle()
     private var realtimePartialFlushTask: Task<Void, Never>?
@@ -137,9 +167,27 @@ final class AppController: NSObject {
     private var hasStartedStartupPermissionGuidance = false
     private var hasCompletedInitialSettingsWindowAppearance = false
     private var openSettingsWindowAction: (@MainActor () -> Void)?
+    private let realtimeAppendCounter = PendingRealtimeAppendCounter()
 
-    init(windowActions: WindowActions) {
+    private lazy var defaultASRCaptureSessionFactory: any ASRCaptureSessionBuilding = LiveASRCaptureSessionFactory(
+        senseVoiceResidentService: senseVoiceResidentService,
+        funASRRealtimeService: funASRRealtimeService,
+        funASRVocabularyService: funASRVocabularyService,
+        qwenRealtimeASRService: qwenRealtimeASRService,
+        stepRealtimeASRService: stepRealtimeASRService,
+        doubaoStreamingASRService: doubaoStreamingASRService
+    )
+
+    private var asrCaptureSessionFactory: any ASRCaptureSessionBuilding {
+        injectedASRCaptureSessionFactory ?? defaultASRCaptureSessionFactory
+    }
+
+    init(
+        windowActions: WindowActions,
+        asrCaptureSessionFactory: (any ASRCaptureSessionBuilding)? = nil
+    ) {
         self.windowActions = windowActions
+        self.injectedASRCaptureSessionFactory = asrCaptureSessionFactory
     }
 
     func start() {
@@ -163,13 +211,15 @@ final class AppController: NSObject {
         debugLog("AppController.stop()")
         triggerKeyMonitor.stop()
         audioCaptureService.stop()
-        await activeASRSession?.cancel()
+        await activeASRSession?.session.cancel()
         resetRealtimePartialDisplayState()
         await senseVoiceResidentService.stop()
         await restoreAudioOutputIfNeeded()
         activeASRSession = nil
+        currentCaptureAppendError = nil
         currentSessionMode = nil
         currentOverlayControls = .none
+        realtimeAppendCounter.reset()
     }
 
     func showSettingsWindow() {
@@ -561,7 +611,8 @@ final class AppController: NSObject {
         currentSessionStartedAt = Date()
         currentFirstPartialMs = nil
         currentPartialCount = 0
-        currentPendingRealtimeAppendCount = 0
+        currentCaptureAppendError = nil
+        realtimeAppendCounter.reset()
         activeASRSession = nil
         triggerKeyMonitor.setSessionMode(mode == .dictation ? .dictating : .translating)
         setOverlay(text: "", rmsLevel: 0, phase: .recording)
@@ -569,18 +620,35 @@ final class AppController: NSObject {
         do {
             let selectedASRProvider = settings.selectedASRProvider
             resetRealtimePartialDisplayState()
-            let activeASRSession = makeActiveASRSession()
+            let activeASRSession = asrCaptureSessionFactory.makeSession(
+                provider: selectedASRProvider,
+                languageCode: activeInputLanguageCode,
+                config: settings.selectedASRConfig,
+                glossaryTerms: settings.effectiveGlossaryItems,
+                persistConfig: { [settings] updatedConfig in
+                    settings.selectedASRConfig = updatedConfig
+                }
+            )
             self.activeASRSession = activeASRSession
-            debugLog("Recording with ASR provider=\(selectedASRProvider.rawValue)")
-            try await activeASRSession.start { [weak self] partialText in
+            debugLog("Recording with ASR provider=\(activeASRSession.provider.rawValue)")
+            try await activeASRSession.session.start { [weak self] partialText in
                 Task { @MainActor in
                     self?.handleRealtimePartialText(partialText)
                 }
             }
 
-            try audioCaptureService.start(inputDeviceUID: settings.preferredMicrophoneUID) { [weak self] buffer in
+            try audioCaptureService.start(
+                inputDeviceUID: settings.preferredMicrophoneUID
+            ) { [weak self, appendCounter = realtimeAppendCounter, provider = activeASRSession.provider] buffer in
+                appendCounter.increment()
                 Task { @MainActor in
-                    await self?.handleCapturedBuffer(buffer)
+                    defer { appendCounter.decrement() }
+                    guard let self else { return }
+                    do {
+                        try await self.handleCapturedBuffer(buffer)
+                    } catch {
+                        self.recordCaptureAppendErrorIfNeeded(error, provider: provider)
+                    }
                 }
             } onLevel: { [weak self] level in
                 Task { @MainActor in
@@ -589,9 +657,10 @@ final class AppController: NSObject {
             }
         } catch {
             NSLog("Recording start failed: \(error.localizedDescription)")
-            await activeASRSession?.cancel()
+            await activeASRSession?.session.cancel()
             activeASRSession = nil
-            currentPendingRealtimeAppendCount = 0
+            currentCaptureAppendError = nil
+            realtimeAppendCounter.reset()
             await restoreAudioOutputIfNeeded()
             currentSessionMode = nil
             currentOverlayControls = .none
@@ -740,7 +809,7 @@ final class AppController: NSObject {
         debugLog(
             "cleanupCurrentSession hideOverlay=\(hideOverlay) outputMuteTokenPresent=\(currentAudioOutputMuteToken != nil)"
         )
-        await activeASRSession?.cancel()
+        await activeASRSession?.session.cancel()
         activeASRSession = nil
         resetRealtimePartialDisplayState()
         await restoreAudioOutputIfNeeded()
@@ -748,7 +817,8 @@ final class AppController: NSObject {
         currentSessionMode = nil
         currentFirstPartialMs = nil
         currentPartialCount = 0
-        currentPendingRealtimeAppendCount = 0
+        currentCaptureAppendError = nil
+        realtimeAppendCounter.reset()
         currentOverlayControls = .none
         currentText = ""
         currentPhase = .idle
@@ -830,7 +900,7 @@ final class AppController: NSObject {
     }
 
     private func recognizeText() async -> RecognitionOutcome {
-        let provider = settings.selectedASRProvider
+        let provider = activeASRSession?.provider ?? settings.selectedASRProvider
         debugLog("ASR selection provider=\(provider.rawValue)")
         let recognitionStartedAt = Date()
         guard let activeASRSession else {
@@ -848,7 +918,10 @@ final class AppController: NSObject {
 
         do {
             let startedAt = Date()
-            let result = try await activeASRSession.finish()
+            if let currentCaptureAppendError {
+                throw currentCaptureAppendError
+            }
+            let result = try await activeASRSession.session.finish()
             let durationMs = Int(Date().timeIntervalSince(startedAt) * 1000)
             let totalDurationMs = Int(Date().timeIntervalSince(recognitionStartedAt) * 1000)
             let text = result.text.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -883,57 +956,17 @@ final class AppController: NSObject {
         }
     }
 
-    private func handleCapturedBuffer(_ buffer: AVAudioPCMBuffer) async {
+    private func handleCapturedBuffer(_ buffer: AVAudioPCMBuffer) async throws {
         guard currentPhase == .recording || currentPhase == .recordingPartial else { return }
         guard let activeASRSession else { return }
-        currentPendingRealtimeAppendCount += 1
-        defer { currentPendingRealtimeAppendCount = max(0, currentPendingRealtimeAppendCount - 1) }
-        await activeASRSession.append(buffer)
+        try await activeASRSession.session.append(buffer)
     }
 
-    private func makeActiveASRSession() -> ASRCaptureSession {
-        let provider = settings.selectedASRProvider
-        let config = settings.selectedASRConfig
-        let languageCode = activeInputLanguageCode
-
-        switch provider {
-        case .senseVoice:
-            return SenseVoiceCaptureSession(
-                service: senseVoiceResidentService,
-                languageCode: languageCode
-            )
-        case .funASR:
-            return FunASRCaptureSession(
-                realtimeService: funASRRealtimeService,
-                vocabularyService: funASRVocabularyService,
-                languageCode: languageCode,
-                initialConfig: config,
-                glossaryTerms: settings.effectiveGlossaryItems,
-                persistConfig: { [settings] updatedConfig in
-                    await MainActor.run {
-                        settings.selectedASRConfig = updatedConfig
-                    }
-                }
-            )
-        case .qwenASR:
-            return QwenCaptureSession(
-                service: qwenRealtimeASRService,
-                config: config,
-                languageCode: languageCode
-            )
-        case .stepfunASR:
-            return StepCaptureSession(
-                service: stepRealtimeASRService,
-                config: config,
-                languageCode: languageCode
-            )
-        case .doubaoStreaming:
-            return DoubaoCaptureSession(
-                service: doubaoStreamingASRService,
-                config: config,
-                languageCode: languageCode
-            )
+    private func recordCaptureAppendErrorIfNeeded(_ error: Error, provider: ASRProvider) {
+        if currentCaptureAppendError == nil {
+            currentCaptureAppendError = error
         }
+        debugLog("ASR capture append failed provider=\(provider.rawValue) error=\(error.localizedDescription)")
     }
 
     private func applyPartialTextToOverlay(_ partialText: String) {
@@ -995,11 +1028,12 @@ final class AppController: NSObject {
     private func waitForPendingRealtimeAppends() async {
         guard activeASRSession != nil else { return }
         let deadline = Date().addingTimeInterval(1.5)
-        while currentPendingRealtimeAppendCount > 0, Date() < deadline {
+        while realtimeAppendCounter.value > 0, Date() < deadline {
             try? await Task.sleep(for: .milliseconds(20))
         }
-        if currentPendingRealtimeAppendCount > 0 {
-            debugLog("Realtime pending appends timed out count=\(currentPendingRealtimeAppendCount)")
+        let pendingCount = realtimeAppendCounter.value
+        if pendingCount > 0 {
+            debugLog("Realtime pending appends timed out count=\(pendingCount)")
         }
     }
 

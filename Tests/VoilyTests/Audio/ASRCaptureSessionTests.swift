@@ -2,6 +2,10 @@ import XCTest
 import AVFoundation
 @testable import Voily
 
+private enum TestCaptureSessionError: Error, Equatable {
+    case expected
+}
+
 private actor SessionRecorder {
     private(set) var startCalls: [(sampleRate: Double, languageCode: String)] = []
     private(set) var appendCalls: [(sessionID: String, byteCount: Int)] = []
@@ -68,8 +72,8 @@ final class ASRCaptureSessionTests: XCTestCase {
         )
 
         try await session.start(onPartial: { _ in })
-        await session.append(makeBuffer(sampleRate: 44_100, samples: [0.2, -0.2, 0.1, -0.1]))
-        await session.append(makeBuffer(sampleRate: 44_100, samples: [0.3, -0.3, 0.2, -0.2]))
+        try await session.append(makeBuffer(sampleRate: 44_100, samples: [0.2, -0.2, 0.1, -0.1]))
+        try await session.append(makeBuffer(sampleRate: 44_100, samples: [0.3, -0.3, 0.2, -0.2]))
 
         let startCalls = await recorder.startCalls
         let appendCalls = await recorder.appendCalls
@@ -98,7 +102,7 @@ final class ASRCaptureSessionTests: XCTestCase {
         )
 
         try await session.start(onPartial: { _ in })
-        await session.append(makeBuffer(sampleRate: 16_000, samples: [0.2, -0.2, 0.1, -0.1]))
+        try await session.append(makeBuffer(sampleRate: 16_000, samples: [0.2, -0.2, 0.1, -0.1]))
         let result = try await session.finish()
 
         XCTAssertEqual(
@@ -191,7 +195,7 @@ final class ASRCaptureSessionTests: XCTestCase {
         )
 
         try await session.start(onPartial: { _ in })
-        await session.append(makeBuffer(sampleRate: 48_000, samples: [0.25, -0.25, 0.5, -0.5]))
+        try await session.append(makeBuffer(sampleRate: 48_000, samples: [0.25, -0.25, 0.5, -0.5]))
         let result = try await session.finish()
         await session.cancel()
 
@@ -207,6 +211,87 @@ final class ASRCaptureSessionTests: XCTestCase {
                 commandSummary: "qwen finish"
             )
         )
+    }
+
+    func testFunASRSessionAppendRethrowsChunkFailure() async throws {
+        let config = ASRProviderConfig(
+            executablePath: "",
+            modelPath: "",
+            additionalArguments: "",
+            baseURL: "wss://dashscope.aliyuncs.com/api-ws/v1/inference",
+            apiKey: "dashscope-key",
+            model: "fun-asr-realtime"
+        )
+        let session = FunASRCaptureSession(
+            languageCode: "zh-Hans",
+            initialConfig: config,
+            glossaryTerms: [],
+            syncVocabulary: { config, _ in config },
+            persistConfig: { _ in },
+            startRealtimeSession: { _, _, _ in },
+            appendAudioChunk: { _ in
+                throw TestCaptureSessionError.expected
+            },
+            finishRealtimeSession: {
+                FunASRRealtimeASRResult(text: "", duration: 0, commandSummary: "")
+            },
+            cancelRealtimeSession: {}
+        )
+
+        try await session.start(onPartial: { _ in })
+
+        do {
+            try await session.append(makeBuffer(sampleRate: 16_000, samples: [0.1, -0.1]))
+            XCTFail("Expected append to throw")
+        } catch {
+            XCTAssertEqual(error as? TestCaptureSessionError, .expected)
+        }
+    }
+
+    func testSenseVoiceSessionAppendRethrowsBackendFailure() async throws {
+        let session = SenseVoiceCaptureSession(
+            languageCode: "en-US",
+            startResidentSession: { sampleRate, languageCode in
+                SenseVoiceResidentSession(id: "resident-session", language: languageCode, sampleRate: sampleRate)
+            },
+            appendAudio: { _, _ in
+                throw TestCaptureSessionError.expected
+            },
+            finalizeSession: { _ in
+                LocalASRTranscriptionResult(text: "", duration: 0, commandSummary: "")
+            },
+            cancelResidentSession: { _ in }
+        )
+
+        try await session.start(onPartial: { _ in })
+
+        do {
+            try await session.append(makeBuffer(sampleRate: 16_000, samples: [0.1, -0.1]))
+            XCTFail("Expected append to throw")
+        } catch {
+            XCTAssertEqual(error as? TestCaptureSessionError, .expected)
+        }
+    }
+
+    func testLiveFactoryReturnsProviderBoundSession() async {
+        let factory = LiveASRCaptureSessionFactory(
+            senseVoiceResidentService: SenseVoiceResidentService(),
+            funASRRealtimeService: FunASRRealtimeService(),
+            funASRVocabularyService: FunASRVocabularyService(),
+            qwenRealtimeASRService: QwenRealtimeASRService(),
+            stepRealtimeASRService: StepRealtimeASRService(),
+            doubaoStreamingASRService: DoubaoStreamingASRService()
+        )
+        let session = factory.makeSession(
+            provider: .funASR,
+            languageCode: "zh-Hans",
+            config: ASRProviderConfig.empty,
+            glossaryTerms: [],
+            persistConfig: { _ in }
+        )
+
+        XCTAssertEqual(session.provider, .funASR)
+        XCTAssertTrue(session.session is FunASRCaptureSession)
     }
 
     private func makeBuffer(sampleRate: Double, samples: [Float]) -> AVAudioPCMBuffer {

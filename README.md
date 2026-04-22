@@ -17,6 +17,7 @@ Voily is an open-source macOS dictation app. Press your configured trigger key t
 
 - **Configurable trigger key** — Use either `Fn` or `Right Command`. Single press starts or finishes dictation, and long-pressing for 0.8s starts quick Chinese-to-English translation.
 - **Multiple ASR engines** — Choose between local `SenseVoice Small` or cloud `Doubao ASR`, `Fun-ASR`, `Qwen ASR`, and `StepFun ASR`.
+- **Pluggable ASR runtime** — All capture providers run through the shared `ASRCaptureSession` abstraction, so adding a new engine does not fork the dictation flow.
 - **Live overlay feedback** — The floating overlay shows recording, transcription, translation, and injection state. Streaming providers can surface partial text while you speak.
 - **LLM text refinement** — Optionally post-process transcriptions with LLM providers (DeepSeek, Alibaba Cloud, Volcengine, MiniMax, Kimi, Zhipu) to remove filler words, formalize tone, or organize into lists.
 - **Glossary support** — Define custom terms and enable built-in glossary presets to improve recognition accuracy for domain-specific vocabulary.
@@ -30,6 +31,7 @@ Voily is an open-source macOS dictation app. Press your configured trigger key t
 - Xcode 26+
 - Microphone permission
 - Accessibility permission (for text injection via paste)
+- No Speech Recognition permission is required. The previous Apple `Speech.framework` fallback has been removed.
 
 ## 🚀 Getting Started
 
@@ -64,6 +66,12 @@ make install
 
 If macOS still warns about permissions, open `System Settings` -> `Privacy & Security` and enable the requested access manually.
 
+Voily now requests only:
+- **Microphone** — required for audio capture
+- **Accessibility** — required for paste-based text injection
+
+The older Apple `Speech.framework` fallback was removed, so you should no longer see or need a separate Speech Recognition permission prompt.
+
 ### Build a GitHub Release artifact
 
 ```bash
@@ -82,6 +90,18 @@ For the full signing, notarization, and GitHub release flow, see [docs/releasing
 ### Configuration
 
 On first launch, Voily will ask for **Microphone** and **Accessibility** permissions. Then open Settings to configure:
+
+### Supported ASR Providers
+
+| Provider | Runtime | Connection Test | Notes |
+|---|---|---|---|
+| SenseVoice Small | Local | Not needed | Managed locally by Voily |
+| Doubao ASR | Cloud | Supported | WebSocket-based realtime ASR |
+| Fun-ASR | Cloud | Supported | Realtime ASR with optional glossary hotword sync |
+| Qwen ASR | Cloud | Supported | Realtime ASR |
+| StepFun ASR | Cloud | Supported | Realtime ASR |
+
+Voily no longer ships an Apple `Speech.framework` fallback. The runtime ASR path is now limited to the providers above and is constructed through the shared capture-session layer described in [docs/decisions/0003-pluggable-asr-providers.md](docs/decisions/0003-pluggable-asr-providers.md).
 
 1. **ASR Provider** — Select a speech recognition engine:
    - **SenseVoice Small** (local) — Downloads and manages the MLX model locally. No API key needed.
