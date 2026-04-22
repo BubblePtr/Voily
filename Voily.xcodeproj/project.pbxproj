@@ -17,7 +17,6 @@
 		A00100080000000000000000 /* OverlayState.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00200080000000000000000 /* OverlayState.swift */; };
 		A00100090000000000000000 /* PermissionCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00200090000000000000000 /* PermissionCoordinator.swift */; };
 		A001000A0000000000000000 /* SettingsWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A002000A0000000000000000 /* SettingsWindowController.swift */; };
-		A001000B0000000000000000 /* SpeechTranscriptionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A002000B0000000000000000 /* SpeechTranscriptionService.swift */; };
 		A001000C0000000000000000 /* SupportedLanguage.swift in Sources */ = {isa = PBXBuildFile; fileRef = A002000C0000000000000000 /* SupportedLanguage.swift */; };
 		A001000D0000000000000000 /* TextInjectionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A002000D0000000000000000 /* TextInjectionService.swift */; };
 		A001000E0000000000000000 /* VoilyApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A002000E0000000000000000 /* VoilyApp.swift */; };
@@ -27,8 +26,7 @@
 		A00100140000000000000000 /* UsageStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00200160000000000000000 /* UsageStoreTests.swift */; };
 		A00100150000000000000000 /* XCTest.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A00200180000000000000000 /* XCTest.framework */; };
 		A00100160000000000000000 /* AppIntents.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A00200190000000000000000 /* AppIntents.framework */; };
-		A00100170000000000000000 /* LocalASRService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A002001A0000000000000000 /* LocalASRService.swift */; };
-		A00100180000000000000000 /* LocalASRServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A002001B0000000000000000 /* LocalASRServiceTests.swift */; };
+		A00100180000000000000000 /* AudioSupportTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A002001B0000000000000000 /* AudioSupportTests.swift */; };
 		A00100190000000000000000 /* ManagedASRModelStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A002001C0000000000000000 /* ManagedASRModelStore.swift */; };
 		A001001A0000000000000000 /* SenseVoiceResidentService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A002001D0000000000000000 /* SenseVoiceResidentService.swift */; };
 		A001001B0000000000000000 /* QwenRealtimeASRService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A002001E0000000000000000 /* QwenRealtimeASRService.swift */; };
@@ -47,6 +45,8 @@
 		A00100280000000000000000 /* FunASRRealtimeServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A002002B0000000000000000 /* FunASRRealtimeServiceTests.swift */; };
 		A00100290000000000000000 /* FunASRVocabularyServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A002002C0000000000000000 /* FunASRVocabularyServiceTests.swift */; };
 		A001002A0000000000000000 /* FunASRVocabularyService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A002002D0000000000000000 /* FunASRVocabularyService.swift */; };
+		A001002B0000000000000000 /* ASRCaptureSessionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A002002E0000000000000000 /* ASRCaptureSessionTests.swift */; };
+		A001002C0000000000000000 /* ASRCaptureSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = A002002F0000000000000000 /* ASRCaptureSession.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -70,7 +70,6 @@
 		A00200080000000000000000 /* OverlayState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OverlayState.swift; sourceTree = "<group>"; };
 		A00200090000000000000000 /* PermissionCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PermissionCoordinator.swift; sourceTree = "<group>"; };
 		A002000A0000000000000000 /* SettingsWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsWindowController.swift; sourceTree = "<group>"; };
-		A002000B0000000000000000 /* SpeechTranscriptionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeechTranscriptionService.swift; sourceTree = "<group>"; };
 		A002000C0000000000000000 /* SupportedLanguage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupportedLanguage.swift; sourceTree = "<group>"; };
 		A002000D0000000000000000 /* TextInjectionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextInjectionService.swift; sourceTree = "<group>"; };
 		A002000E0000000000000000 /* VoilyApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoilyApp.swift; sourceTree = "<group>"; };
@@ -83,8 +82,7 @@
 		A00200170000000000000000 /* VoilyTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = VoilyTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		A00200180000000000000000 /* XCTest.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = XCTest.framework; path = System/Library/Frameworks/XCTest.framework; sourceTree = SDKROOT; };
 		A00200190000000000000000 /* AppIntents.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AppIntents.framework; path = System/Library/Frameworks/AppIntents.framework; sourceTree = SDKROOT; };
-		A002001A0000000000000000 /* LocalASRService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalASRService.swift; sourceTree = "<group>"; };
-		A002001B0000000000000000 /* LocalASRServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalASRServiceTests.swift; sourceTree = "<group>"; };
+		A002001B0000000000000000 /* AudioSupportTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioSupportTests.swift; sourceTree = "<group>"; };
 		A002001C0000000000000000 /* ManagedASRModelStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ManagedASRModelStore.swift; sourceTree = "<group>"; };
 		A002001D0000000000000000 /* SenseVoiceResidentService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SenseVoiceResidentService.swift; sourceTree = "<group>"; };
 		A002001E0000000000000000 /* QwenRealtimeASRService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QwenRealtimeASRService.swift; sourceTree = "<group>"; };
@@ -103,6 +101,8 @@
 		A002002B0000000000000000 /* FunASRRealtimeServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FunASRRealtimeServiceTests.swift; sourceTree = "<group>"; };
 		A002002C0000000000000000 /* FunASRVocabularyServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FunASRVocabularyServiceTests.swift; sourceTree = "<group>"; };
 		A002002D0000000000000000 /* FunASRVocabularyService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FunASRVocabularyService.swift; sourceTree = "<group>"; };
+		A002002E0000000000000000 /* ASRCaptureSessionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ASRCaptureSessionTests.swift; sourceTree = "<group>"; };
+		A002002F0000000000000000 /* ASRCaptureSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ASRCaptureSession.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -248,16 +248,15 @@
 		A004000C0000000000000000 /* Audio */ = {
 			isa = PBXGroup;
 			children = (
+				A002002F0000000000000000 /* ASRCaptureSession.swift */,
 				A00200280000000000000000 /* ASRConnectionTester.swift */,
 				A00200040000000000000000 /* AudioCaptureService.swift */,
 				A00200260000000000000000 /* DoubaoStreamingASRService.swift */,
 				A002002A0000000000000000 /* FunASRRealtimeService.swift */,
 				A002002D0000000000000000 /* FunASRVocabularyService.swift */,
-				A002001A0000000000000000 /* LocalASRService.swift */,
 				A002001C0000000000000000 /* ManagedASRModelStore.swift */,
 				A002001E0000000000000000 /* QwenRealtimeASRService.swift */,
 				A002001D0000000000000000 /* SenseVoiceResidentService.swift */,
-				A002000B0000000000000000 /* SpeechTranscriptionService.swift */,
 				A00200290000000000000000 /* StepRealtimeASRService.swift */,
 			);
 			path = Audio;
@@ -283,11 +282,12 @@
 		A004000F0000000000000000 /* Audio */ = {
 			isa = PBXGroup;
 			children = (
+				A002002E0000000000000000 /* ASRCaptureSessionTests.swift */,
 				A00200270000000000000000 /* ASRConnectionTesterTests.swift */,
 				A00200250000000000000000 /* DoubaoStreamingASRServiceTests.swift */,
 				A002002B0000000000000000 /* FunASRRealtimeServiceTests.swift */,
 				A002002C0000000000000000 /* FunASRVocabularyServiceTests.swift */,
-				A002001B0000000000000000 /* LocalASRServiceTests.swift */,
+				A002001B0000000000000000 /* AudioSupportTests.swift */,
 			);
 			path = Audio;
 			sourceTree = "<group>";
@@ -423,6 +423,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A001002C0000000000000000 /* ASRCaptureSession.swift in Sources */,
 				A00100010000000000000000 /* AppController.swift in Sources */,
 				A00100020000000000000000 /* AppDelegate.swift in Sources */,
 				A00100030000000000000000 /* AppSettings.swift in Sources */,
@@ -433,7 +434,6 @@
 				A001002A0000000000000000 /* FunASRVocabularyService.swift in Sources */,
 				A00100060000000000000000 /* LLMRefinementService.swift in Sources */,
 				A00100230000000000000000 /* DoubaoStreamingASRService.swift in Sources */,
-				A00100170000000000000000 /* LocalASRService.swift in Sources */,
 				A00100190000000000000000 /* ManagedASRModelStore.swift in Sources */,
 				A00100070000000000000000 /* OverlayPanelController.swift in Sources */,
 				A00100080000000000000000 /* OverlayState.swift in Sources */,
@@ -442,7 +442,6 @@
 				A001001A0000000000000000 /* SenseVoiceResidentService.swift in Sources */,
 				A00100120000000000000000 /* DashboardHomePage.swift in Sources */,
 				A001000A0000000000000000 /* SettingsWindowController.swift in Sources */,
-				A001000B0000000000000000 /* SpeechTranscriptionService.swift in Sources */,
 				A00100260000000000000000 /* StepRealtimeASRService.swift in Sources */,
 				A001000C0000000000000000 /* SupportedLanguage.swift in Sources */,
 				A00100200000000000000000 /* SystemMediaPlaybackService.swift in Sources */,
@@ -456,6 +455,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A001002B0000000000000000 /* ASRCaptureSessionTests.swift in Sources */,
 				A001001D0000000000000000 /* AppSettingsTests.swift in Sources */,
 				A001001F0000000000000000 /* AppSettingsPersistenceIntegrationTests.swift in Sources */,
 				A00100240000000000000000 /* ASRConnectionTesterTests.swift in Sources */,
@@ -463,7 +463,7 @@
 				A00100280000000000000000 /* FunASRRealtimeServiceTests.swift in Sources */,
 				A00100290000000000000000 /* FunASRVocabularyServiceTests.swift in Sources */,
 				A001001E0000000000000000 /* LLMRefinementServiceTests.swift in Sources */,
-				A00100180000000000000000 /* LocalASRServiceTests.swift in Sources */,
+				A00100180000000000000000 /* AudioSupportTests.swift in Sources */,
 				A00100210000000000000000 /* SystemMediaPlaybackServiceTests.swift in Sources */,
 				A00100140000000000000000 /* UsageStoreTests.swift in Sources */,
 			);

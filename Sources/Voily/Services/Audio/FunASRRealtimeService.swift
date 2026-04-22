@@ -124,6 +124,9 @@ actor FunASRRealtimeService {
 
         try await withCheckedThrowingContinuation { continuation in
             createdContinuation = continuation
+            // `withCheckedThrowingContinuation`, `startTimeoutTask`, and the `sendControlMessage`
+            // Task race only through this actor: `failAll` clears `createdContinuation`, and we
+            // cancel `startTimeoutTask` right after the continuation resumes so no dangling timeout survives.
             startTimeoutTask = Task {
                 try? await Task.sleep(for: .seconds(10))
                 guard !Task.isCancelled else { return }
@@ -458,7 +461,9 @@ actor FunASRRealtimeService {
             return "zh"
         case .japanese:
             return "ja"
-        case .korean, .none:
+        case .korean:
+            return "ko"
+        case .none:
             return nil
         }
     }

@@ -12,7 +12,7 @@ Voily 需要同时支持本地引擎（SenseVoice）与多家云端流式 ASR（
 
 ## 决策
 
-所有 ASR 引擎实现统一协议 `SpeechTranscriptionService`（位于 `Sources/Voily/Services/Audio/`），暴露三件事：
+所有 ASR 引擎通过统一会话抽象 `ASRCaptureSession`（位于 `Sources/Voily/Services/Audio/`）接入，暴露三件事：
 
 1. 启动一次会话并返回 `AsyncThrowingStream<TranscriptionEvent, Error>`
 2. 主动结束会话并拿到 final
@@ -36,7 +36,7 @@ Voily 需要同时支持本地引擎（SenseVoice）与多家云端流式 ASR（
 ## 放弃的方案
 
 - **每个 provider 一个独立 ViewModel + 调用路径**：复制粘贴严重，bug 修一处漏三处。
-- **沿用 Speech.framework 的 delegate 风格**：与项目其它部分的 async/await 风格不一致（见 ADR 0002）。
+- **沿用系统 Speech.framework 回退链路**：会让调用方继续承担 provider 特判，与项目其它部分的 async/await 风格不一致（见 ADR 0002）。
 
 ## 后果
 

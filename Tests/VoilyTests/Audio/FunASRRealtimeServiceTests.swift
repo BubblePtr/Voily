@@ -46,12 +46,26 @@ final class FunASRRealtimeServiceTests: XCTestCase {
         XCTAssertEqual(parameters["language_hints"] as? [String], ["en"])
     }
 
-    func testRunTaskMessageOmitsLanguageHintsWhenLanguageIsUnsupported() throws {
+    func testRunTaskMessageUsesExplicitKoreanLanguageHint() throws {
         let message = try FunASRRealtimeService.makeRunTaskMessage(
             taskID: "task-123",
             model: "fun-asr-realtime",
             vocabularyID: nil,
             languageCode: SupportedLanguage.korean.rawValue
+        )
+        let json = try XCTUnwrap(JSONSerialization.jsonObject(with: message) as? [String: Any])
+        let payload = try XCTUnwrap(json["payload"] as? [String: Any])
+        let parameters = try XCTUnwrap(payload["parameters"] as? [String: Any])
+
+        XCTAssertEqual(parameters["language_hints"] as? [String], ["ko"])
+    }
+
+    func testRunTaskMessageOmitsLanguageHintsWhenLanguageIsUnsupported() throws {
+        let message = try FunASRRealtimeService.makeRunTaskMessage(
+            taskID: "task-123",
+            model: "fun-asr-realtime",
+            vocabularyID: nil,
+            languageCode: "unsupported-language"
         )
         let json = try XCTUnwrap(JSONSerialization.jsonObject(with: message) as? [String: Any])
         let payload = try XCTUnwrap(json["payload"] as? [String: Any])

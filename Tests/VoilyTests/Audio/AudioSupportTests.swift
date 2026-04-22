@@ -2,7 +2,7 @@ import XCTest
 import AVFoundation
 @testable import Voily
 
-final class LocalASRServiceTests: XCTestCase {
+final class AudioSupportTests: XCTestCase {
     func testTranscriptAccumulatorKeepsCommittedSegmentsAcrossPauses() {
         var accumulator = TranscriptAccumulator()
 
@@ -49,78 +49,7 @@ final class LocalASRServiceTests: XCTestCase {
         XCTAssertNil(throttle.pendingText)
     }
 
-    func testSenseVoiceCommandUsesSenseVoiceArguments() throws {
-        let executablePath = try makeExecutable()
-        let audioURL = URL(fileURLWithPath: "/tmp/sample.wav")
-        let config = ASRProviderConfig(
-            executablePath: executablePath,
-            modelPath: "/opt/models/sensevoice-small",
-            additionalArguments: "--vad true",
-            baseURL: "",
-            apiKey: "",
-            model: ""
-        )
-
-        let command = try LocalASRService.makeCommand(
-            provider: .senseVoice,
-            config: config,
-            audioFileURL: audioURL,
-            languageCode: "en-US"
-        )
-
-        XCTAssertEqual(
-            command.arguments,
-            ["-m", "/opt/models/sensevoice-small", "-f", "/tmp/sample.wav", "-l", "en", "-np", "-nt", "--vad", "true"]
-        )
-    }
-
-    func testMakeCommandRejectsMissingModelPath() throws {
-        let executablePath = try makeExecutable()
-        let config = ASRProviderConfig(
-            executablePath: executablePath,
-            modelPath: "   ",
-            additionalArguments: "",
-            baseURL: "",
-            apiKey: "",
-            model: ""
-        )
-
-        XCTAssertThrowsError(
-            try LocalASRService.makeCommand(
-                provider: .senseVoice,
-                config: config,
-                audioFileURL: URL(fileURLWithPath: "/tmp/sample.wav"),
-                languageCode: "zh-Hans"
-            )
-        ) { error in
-            XCTAssertEqual(error as? LocalASRError, .missingModelPath)
-        }
-    }
-
-    func testMakeCommandRejectsCloudProvider() throws {
-        let executablePath = try makeExecutable()
-        let config = ASRProviderConfig(
-            executablePath: executablePath,
-            modelPath: "/models/unused",
-            additionalArguments: "",
-            baseURL: "",
-            apiKey: "",
-            model: ""
-        )
-
-        XCTAssertThrowsError(
-            try LocalASRService.makeCommand(
-                provider: .qwenASR,
-                config: config,
-                audioFileURL: URL(fileURLWithPath: "/tmp/sample.wav"),
-                languageCode: "zh-Hans"
-            )
-        ) { error in
-            XCTAssertEqual(error as? LocalASRError, .unsupportedProvider)
-        }
-    }
-
-    func testTemporaryAudioCaptureWriterProducesCanonicalWAV() throws {
+    func testAudioPCMConverterProducesPCM16MonoData() throws {
         let format = try XCTUnwrap(
             AVAudioFormat(
                 commonFormat: .pcmFormatFloat32,
@@ -136,16 +65,10 @@ final class LocalASRServiceTests: XCTestCase {
             buffer.floatChannelData?[0][index] = sample
         }
 
-        let writer = TemporaryAudioCaptureWriter()
-        writer.append(buffer)
-        let url = try writer.finalize()
-        defer { try? FileManager.default.removeItem(at: url) }
+        let data = try AudioPCMConverter.pcm16MonoData(from: buffer, targetSampleRate: 16_000)
 
-        let data = try Data(contentsOf: url)
-        XCTAssertEqual(String(data: data.prefix(4), encoding: .ascii), "RIFF")
-        XCTAssertEqual(String(data: data.subdata(in: 8..<12), encoding: .ascii), "WAVE")
-        XCTAssertEqual(String(data: data.subdata(in: 12..<16), encoding: .ascii), "fmt ")
-        XCTAssertEqual(String(data: data.subdata(in: 36..<40), encoding: .ascii), "data")
+        XCTAssertEqual(data.count, 8)
+        XCTAssertEqual(Array(data), [255, 31, 0, 224, 255, 63, 0, 192])
     }
 
     func testAutomaticMicrophoneSelectionPrefersUSBThenBuiltInThenBluetooth() {
@@ -174,15 +97,4 @@ final class LocalASRServiceTests: XCTestCase {
         )
     }
 
-    private func makeExecutable() throws -> String {
-        let url = FileManager.default.temporaryDirectory
-            .appending(path: "voily-test-\(UUID().uuidString)")
-            .appendingPathExtension("sh")
-        try "#!/bin/sh\nexit 0\n".write(to: url, atomically: true, encoding: .utf8)
-        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: url.path)
-        addTeardownBlock {
-            try? FileManager.default.removeItem(at: url)
-        }
-        return url.path
-    }
 }

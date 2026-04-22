@@ -35,9 +35,9 @@ Sources/Voily/
 
 ### 2.2 ASR provider
 
-统一协议在 `Services/Audio/SpeechTranscriptionService.swift`。当前实现：
+统一会话抽象在 `Services/Audio/ASRCaptureSession.swift`。当前实现：
 
-- `LocalASRService` + `SenseVoiceResidentService`（本地，MLX 常驻服务）
+- `SenseVoiceResidentService`（本地，MLX 常驻服务）
 - `DoubaoStreamingASRService`（云端，WebSocket）
 - `FunASRRealtimeService` + `FunASRVocabularyService`（云端，WebSocket + 热词词表同步）
 - `QwenRealtimeASRService`（云端，HTTP/WS）
