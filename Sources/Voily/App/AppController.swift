@@ -67,6 +67,35 @@ private enum CaptureSessionMode: Equatable {
     }
 }
 
+private final class PendingRealtimeAppendCounter: @unchecked Sendable {
+    private let lock = NSLock()
+    private var count = 0
+
+    func increment() {
+        lock.lock()
+        count += 1
+        lock.unlock()
+    }
+
+    func decrement() {
+        lock.lock()
+        count = max(0, count - 1)
+        lock.unlock()
+    }
+
+    func reset() {
+        lock.lock()
+        count = 0
+        lock.unlock()
+    }
+
+    var value: Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return count
+    }
+}
+
 @MainActor
 final class WindowActions {
     private weak var settingsWindow: NSWindow?
@@ -104,7 +133,6 @@ final class AppController: NSObject {
     private let permissionCoordinator = PermissionCoordinator()
     private let triggerKeyMonitor = TriggerKeyMonitor()
     private let audioCaptureService = AudioCaptureService()
-    private let speechService = SpeechTranscriptionService()
     private let senseVoiceResidentService = SenseVoiceResidentService()
     private let funASRRealtimeService = FunASRRealtimeService()
     private let funASRVocabularyService = FunASRVocabularyService()
@@ -116,6 +144,7 @@ final class AppController: NSObject {
     private let textInjectionService = TextInjectionService()
     private let llmRefinementService = LLMRefinementService()
     private let audioOutputMuteService = SystemAudioOutputMuteService()
+    private let injectedASRCaptureSessionFactory: (any ASRCaptureSessionBuilding)?
 
     private var statusItem: NSStatusItem?
     private var statusMenu: NSMenu?
@@ -127,12 +156,10 @@ final class AppController: NSObject {
     private var smoothedRMS: Float = 0
     private var currentSessionStartedAt: Date?
     private var currentSessionMode: CaptureSessionMode?
-    private var localAudioWriter: TemporaryAudioCaptureWriter?
-    private var currentResidentSession: SenseVoiceResidentSession?
+    private var activeASRSession: ActiveASRCaptureSession?
     private var currentFirstPartialMs: Int?
     private var currentPartialCount = 0
-    private var currentSpeechCaptureEnabled = false
-    private var currentPendingRealtimeAppendCount = 0
+    private var currentCaptureAppendError: Error?
     private var currentAudioOutputMuteToken: AudioOutputMuteInterruptionToken?
     private var realtimePartialDisplayThrottle = PartialTranscriptDisplayThrottle()
     private var realtimePartialFlushTask: Task<Void, Never>?
@@ -140,9 +167,27 @@ final class AppController: NSObject {
     private var hasStartedStartupPermissionGuidance = false
     private var hasCompletedInitialSettingsWindowAppearance = false
     private var openSettingsWindowAction: (@MainActor () -> Void)?
+    private let realtimeAppendCounter = PendingRealtimeAppendCounter()
 
-    init(windowActions: WindowActions) {
+    private lazy var defaultASRCaptureSessionFactory: any ASRCaptureSessionBuilding = LiveASRCaptureSessionFactory(
+        senseVoiceResidentService: senseVoiceResidentService,
+        funASRRealtimeService: funASRRealtimeService,
+        funASRVocabularyService: funASRVocabularyService,
+        qwenRealtimeASRService: qwenRealtimeASRService,
+        stepRealtimeASRService: stepRealtimeASRService,
+        doubaoStreamingASRService: doubaoStreamingASRService
+    )
+
+    private var asrCaptureSessionFactory: any ASRCaptureSessionBuilding {
+        injectedASRCaptureSessionFactory ?? defaultASRCaptureSessionFactory
+    }
+
+    init(
+        windowActions: WindowActions,
+        asrCaptureSessionFactory: (any ASRCaptureSessionBuilding)? = nil
+    ) {
         self.windowActions = windowActions
+        self.injectedASRCaptureSessionFactory = asrCaptureSessionFactory
     }
 
     func start() {
@@ -166,22 +211,15 @@ final class AppController: NSObject {
         debugLog("AppController.stop()")
         triggerKeyMonitor.stop()
         audioCaptureService.stop()
-        speechService.cancel()
-        if let currentResidentSession {
-            await senseVoiceResidentService.cancelSession(currentResidentSession)
-        }
-        try? await funASRRealtimeService.cancelSession()
-        try? await qwenRealtimeASRService.cancelSession()
-        try? await stepRealtimeASRService.cancelSession()
-        try? await doubaoStreamingASRService.cancelSession()
+        await activeASRSession?.session.cancel()
         resetRealtimePartialDisplayState()
         await senseVoiceResidentService.stop()
         await restoreAudioOutputIfNeeded()
-        currentResidentSession = nil
-        localAudioWriter?.cancel()
-        localAudioWriter = nil
+        activeASRSession = nil
+        currentCaptureAppendError = nil
         currentSessionMode = nil
         currentOverlayControls = .none
+        realtimeAppendCounter.reset()
     }
 
     func showSettingsWindow() {
@@ -573,41 +611,43 @@ final class AppController: NSObject {
         currentSessionStartedAt = Date()
         currentFirstPartialMs = nil
         currentPartialCount = 0
-        currentResidentSession = nil
-        currentSpeechCaptureEnabled = false
-        currentPendingRealtimeAppendCount = 0
+        currentCaptureAppendError = nil
+        realtimeAppendCounter.reset()
+        activeASRSession = nil
         triggerKeyMonitor.setSessionMode(mode == .dictation ? .dictating : .translating)
         setOverlay(text: "", rmsLevel: 0, phase: .recording)
 
         do {
             let selectedASRProvider = settings.selectedASRProvider
-            if selectedASRProvider.category == .local {
-                debugLog("Recording with local ASR provider=\(selectedASRProvider.rawValue)")
-                localAudioWriter = TemporaryAudioCaptureWriter()
-            } else {
-                if selectedASRProvider == .funASR {
-                    try await startFunASRRealtimeSession()
-                } else if selectedASRProvider == .qwenASR {
-                    try await startQwenRealtimeSession()
-                } else if selectedASRProvider == .stepfunASR {
-                    try await startStepRealtimeSession()
-                } else if selectedASRProvider == .doubaoStreaming {
-                    try await startDoubaoRealtimeSession()
-                } else if selectedASRProvider.category == .cloud {
-                    debugLog("Cloud ASR provider not implemented provider=\(selectedASRProvider.rawValue) fallback=true")
-                    try speechService.start(localeIdentifier: activeInputLanguageCode) { [weak self] text in
-                        guard let self else { return }
-                        self.setOverlay(text: text, rmsLevel: self.smoothedRMS, phase: .recording)
-                    }
-                    currentSpeechCaptureEnabled = true
+            resetRealtimePartialDisplayState()
+            let activeASRSession = asrCaptureSessionFactory.makeSession(
+                provider: selectedASRProvider,
+                languageCode: activeInputLanguageCode,
+                config: settings.selectedASRConfig,
+                glossaryTerms: settings.effectiveGlossaryItems,
+                persistConfig: { [settings] updatedConfig in
+                    settings.selectedASRConfig = updatedConfig
+                }
+            )
+            self.activeASRSession = activeASRSession
+            debugLog("Recording with ASR provider=\(activeASRSession.provider.rawValue)")
+            try await activeASRSession.session.start { [weak self] partialText in
+                Task { @MainActor in
+                    self?.handleRealtimePartialText(partialText)
                 }
             }
 
-            try audioCaptureService.start(inputDeviceUID: settings.preferredMicrophoneUID) { [weak self] buffer in
-                self?.handleCapturedBuffer(buffer)
+            try audioCaptureService.start(
+                inputDeviceUID: settings.preferredMicrophoneUID
+            ) { [weak self, appendCounter = realtimeAppendCounter, provider = activeASRSession.provider] buffer in
+                appendCounter.increment()
                 Task { @MainActor in
-                    if self?.currentSpeechCaptureEnabled == true {
-                        self?.speechService.append(buffer)
+                    defer { appendCounter.decrement() }
+                    guard let self else { return }
+                    do {
+                        try await self.handleCapturedBuffer(buffer)
+                    } catch {
+                        self.recordCaptureAppendErrorIfNeeded(error, provider: provider)
                     }
                 }
             } onLevel: { [weak self] level in
@@ -617,20 +657,10 @@ final class AppController: NSObject {
             }
         } catch {
             NSLog("Recording start failed: \(error.localizedDescription)")
-            speechService.cancel()
-            localAudioWriter?.cancel()
-            localAudioWriter = nil
-            if let currentResidentSession {
-                Task {
-                    await self.senseVoiceResidentService.cancelSession(currentResidentSession)
-                }
-            }
-            currentResidentSession = nil
-            try? await funASRRealtimeService.cancelSession()
-            try? await qwenRealtimeASRService.cancelSession()
-            try? await stepRealtimeASRService.cancelSession()
-            try? await doubaoStreamingASRService.cancelSession()
-            currentPendingRealtimeAppendCount = 0
+            await activeASRSession?.session.cancel()
+            activeASRSession = nil
+            currentCaptureAppendError = nil
+            realtimeAppendCounter.reset()
             await restoreAudioOutputIfNeeded()
             currentSessionMode = nil
             currentOverlayControls = .none
@@ -779,26 +809,16 @@ final class AppController: NSObject {
         debugLog(
             "cleanupCurrentSession hideOverlay=\(hideOverlay) outputMuteTokenPresent=\(currentAudioOutputMuteToken != nil)"
         )
-        speechService.cancel()
-        localAudioWriter?.cancel()
-        localAudioWriter = nil
-
-        if let currentResidentSession {
-            await senseVoiceResidentService.cancelSession(currentResidentSession)
-        }
-        currentResidentSession = nil
-        try? await funASRRealtimeService.cancelSession()
-        try? await qwenRealtimeASRService.cancelSession()
-        try? await stepRealtimeASRService.cancelSession()
-        try? await doubaoStreamingASRService.cancelSession()
+        await activeASRSession?.session.cancel()
+        activeASRSession = nil
         resetRealtimePartialDisplayState()
         await restoreAudioOutputIfNeeded()
 
         currentSessionMode = nil
-        currentSpeechCaptureEnabled = false
         currentFirstPartialMs = nil
         currentPartialCount = 0
-        currentPendingRealtimeAppendCount = 0
+        currentCaptureAppendError = nil
+        realtimeAppendCounter.reset()
         currentOverlayControls = .none
         currentText = ""
         currentPhase = .idle
@@ -880,419 +900,73 @@ final class AppController: NSObject {
     }
 
     private func recognizeText() async -> RecognitionOutcome {
-        let provider = settings.selectedASRProvider
+        let provider = activeASRSession?.provider ?? settings.selectedASRProvider
         debugLog("ASR selection provider=\(provider.rawValue)")
         let recognitionStartedAt = Date()
-
-        switch provider.category {
-        case .local:
-            defer {
-                localAudioWriter?.cancel()
-                localAudioWriter = nil
-            }
-
-            do {
-                guard let localAudioWriter else {
-                    throw LocalASRError.noAudioCaptured
-                }
-
-                let audioFinalizeStartedAt = Date()
-                let audioFileURL = try localAudioWriter.finalize()
-                let audioFinalizeDurationMs = Int(Date().timeIntervalSince(audioFinalizeStartedAt) * 1000)
-                defer { try? FileManager.default.removeItem(at: audioFileURL) }
-
-                let localTranscriptionStartedAt = Date()
-                let result = try await transcribeLocally(audioFileURL: audioFileURL)
-                let localTranscriptionDurationMs = Int(Date().timeIntervalSince(localTranscriptionStartedAt) * 1000)
-                let totalDurationMs = Int(Date().timeIntervalSince(recognitionStartedAt) * 1000)
-                let text = result.text.trimmingCharacters(in: .whitespacesAndNewlines)
-                debugLog(
-                    "ASR finished provider=\(provider.rawValue) source=local totalMs=\(totalDurationMs) audioFinalizeMs=\(audioFinalizeDurationMs) localTranscribeMs=\(localTranscriptionDurationMs) textLength=\(text.count) command=\(result.commandSummary)"
-                )
-                return RecognitionOutcome(
-                    text: text,
-                    provider: provider,
-                    source: "local",
-                    totalDurationMs: totalDurationMs,
-                    engineDurationMs: localTranscriptionDurationMs,
-                    firstPartialMs: currentFirstPartialMs,
-                    partialCount: currentPartialCount
-                )
-            } catch {
-                let totalDurationMs = Int(Date().timeIntervalSince(recognitionStartedAt) * 1000)
-                debugLog(
-                    "ASR finished provider=\(provider.rawValue) source=local-failed totalMs=\(totalDurationMs) reason=\(error.localizedDescription)"
-                )
-                return RecognitionOutcome(
-                    text: "",
-                    provider: provider,
-                    source: "local-failed",
-                    totalDurationMs: totalDurationMs,
-                    engineDurationMs: nil,
-                    firstPartialMs: currentFirstPartialMs,
-                    partialCount: currentPartialCount
-                )
-            }
-        case .cloud:
-            if provider == .funASR {
-                do {
-                    let startedAt = Date()
-                    let result = try await funASRRealtimeService.finishSession()
-                    let durationMs = Int(Date().timeIntervalSince(startedAt) * 1000)
-                    let totalDurationMs = Int(Date().timeIntervalSince(recognitionStartedAt) * 1000)
-                    let text = result.text.trimmingCharacters(in: CharacterSet.whitespacesAndNewlines)
-                    debugLog(
-                        "ASR finished provider=\(provider.rawValue) source=cloud-realtime totalMs=\(totalDurationMs) realtimeMs=\(durationMs) textLength=\(text.count) command=\(result.commandSummary)"
-                    )
-                    return RecognitionOutcome(
-                        text: text,
-                        provider: provider,
-                        source: "cloud-realtime",
-                        totalDurationMs: totalDurationMs,
-                        engineDurationMs: durationMs,
-                        firstPartialMs: currentFirstPartialMs,
-                        partialCount: currentPartialCount
-                    )
-                } catch {
-                    let totalDurationMs = Int(Date().timeIntervalSince(recognitionStartedAt) * 1000)
-                    debugLog(
-                        "ASR finished provider=\(provider.rawValue) source=cloud-realtime-failed totalMs=\(totalDurationMs) reason=\(error.localizedDescription)"
-                    )
-                    return RecognitionOutcome(
-                        text: "",
-                        provider: provider,
-                        source: "cloud-realtime-failed",
-                        totalDurationMs: totalDurationMs,
-                        engineDurationMs: nil,
-                        firstPartialMs: currentFirstPartialMs,
-                        partialCount: currentPartialCount
-                    )
-                }
-            } else if provider == .qwenASR {
-                do {
-                    let startedAt = Date()
-                    let result = try await qwenRealtimeASRService.finishSession()
-                    let durationMs = Int(Date().timeIntervalSince(startedAt) * 1000)
-                    let totalDurationMs = Int(Date().timeIntervalSince(recognitionStartedAt) * 1000)
-                    let text = result.text.trimmingCharacters(in: CharacterSet.whitespacesAndNewlines)
-                    debugLog(
-                        "ASR finished provider=\(provider.rawValue) source=cloud-realtime totalMs=\(totalDurationMs) realtimeMs=\(durationMs) textLength=\(text.count) command=\(result.commandSummary)"
-                    )
-                    return RecognitionOutcome(
-                        text: text,
-                        provider: provider,
-                        source: "cloud-realtime",
-                        totalDurationMs: totalDurationMs,
-                        engineDurationMs: durationMs,
-                        firstPartialMs: currentFirstPartialMs,
-                        partialCount: currentPartialCount
-                    )
-                } catch {
-                    let totalDurationMs = Int(Date().timeIntervalSince(recognitionStartedAt) * 1000)
-                    debugLog(
-                        "ASR finished provider=\(provider.rawValue) source=cloud-realtime-failed totalMs=\(totalDurationMs) reason=\(error.localizedDescription)"
-                    )
-                    return RecognitionOutcome(
-                        text: "",
-                        provider: provider,
-                        source: "cloud-realtime-failed",
-                        totalDurationMs: totalDurationMs,
-                        engineDurationMs: nil,
-                        firstPartialMs: currentFirstPartialMs,
-                        partialCount: currentPartialCount
-                    )
-                }
-            } else if provider == .stepfunASR {
-                do {
-                    let startedAt = Date()
-                    let result = try await stepRealtimeASRService.finishSession()
-                    let durationMs = Int(Date().timeIntervalSince(startedAt) * 1000)
-                    let totalDurationMs = Int(Date().timeIntervalSince(recognitionStartedAt) * 1000)
-                    let text = result.text.trimmingCharacters(in: CharacterSet.whitespacesAndNewlines)
-                    debugLog(
-                        "ASR finished provider=\(provider.rawValue) source=cloud-realtime totalMs=\(totalDurationMs) realtimeMs=\(durationMs) textLength=\(text.count) command=\(result.commandSummary)"
-                    )
-                    return RecognitionOutcome(
-                        text: text,
-                        provider: provider,
-                        source: "cloud-realtime",
-                        totalDurationMs: totalDurationMs,
-                        engineDurationMs: durationMs,
-                        firstPartialMs: currentFirstPartialMs,
-                        partialCount: currentPartialCount
-                    )
-                } catch {
-                    let totalDurationMs = Int(Date().timeIntervalSince(recognitionStartedAt) * 1000)
-                    debugLog(
-                        "ASR finished provider=\(provider.rawValue) source=cloud-realtime-failed totalMs=\(totalDurationMs) reason=\(error.localizedDescription)"
-                    )
-                    return RecognitionOutcome(
-                        text: "",
-                        provider: provider,
-                        source: "cloud-realtime-failed",
-                        totalDurationMs: totalDurationMs,
-                        engineDurationMs: nil,
-                        firstPartialMs: currentFirstPartialMs,
-                        partialCount: currentPartialCount
-                    )
-                }
-            } else if provider == .doubaoStreaming {
-                do {
-                    let startedAt = Date()
-                    let result = try await doubaoStreamingASRService.finishSession()
-                    let durationMs = Int(Date().timeIntervalSince(startedAt) * 1000)
-                    let totalDurationMs = Int(Date().timeIntervalSince(recognitionStartedAt) * 1000)
-                    let text = result.text.trimmingCharacters(in: CharacterSet.whitespacesAndNewlines)
-                    debugLog(
-                        "ASR finished provider=\(provider.rawValue) source=cloud-realtime totalMs=\(totalDurationMs) realtimeMs=\(durationMs) textLength=\(text.count) command=\(result.commandSummary)"
-                    )
-                    return RecognitionOutcome(
-                        text: text,
-                        provider: provider,
-                        source: "cloud-realtime",
-                        totalDurationMs: totalDurationMs,
-                        engineDurationMs: durationMs,
-                        firstPartialMs: currentFirstPartialMs,
-                        partialCount: currentPartialCount
-                    )
-                } catch {
-                    let totalDurationMs = Int(Date().timeIntervalSince(recognitionStartedAt) * 1000)
-                    debugLog(
-                        "ASR finished provider=\(provider.rawValue) source=cloud-realtime-failed totalMs=\(totalDurationMs) reason=\(error.localizedDescription)"
-                    )
-                    return RecognitionOutcome(
-                        text: "",
-                        provider: provider,
-                        source: "cloud-realtime-failed",
-                        totalDurationMs: totalDurationMs,
-                        engineDurationMs: nil,
-                        firstPartialMs: currentFirstPartialMs,
-                        partialCount: currentPartialCount
-                    )
-                }
-            }
-
-            let speechStartedAt = Date()
-            let text = await speechService.finish().trimmingCharacters(in: .whitespacesAndNewlines)
-            let speechDurationMs = Int(Date().timeIntervalSince(speechStartedAt) * 1000)
+        guard let activeASRSession else {
             let totalDurationMs = Int(Date().timeIntervalSince(recognitionStartedAt) * 1000)
+            return RecognitionOutcome(
+                text: "",
+                provider: provider,
+                source: "\(provider.category.rawValue)-failed",
+                totalDurationMs: totalDurationMs,
+                engineDurationMs: nil,
+                firstPartialMs: currentFirstPartialMs,
+                partialCount: currentPartialCount
+            )
+        }
+
+        do {
+            let startedAt = Date()
+            if let currentCaptureAppendError {
+                throw currentCaptureAppendError
+            }
+            let result = try await activeASRSession.session.finish()
+            let durationMs = Int(Date().timeIntervalSince(startedAt) * 1000)
+            let totalDurationMs = Int(Date().timeIntervalSince(recognitionStartedAt) * 1000)
+            let text = result.text.trimmingCharacters(in: .whitespacesAndNewlines)
+            let commandSummary = result.commandSummary ?? ""
             debugLog(
-                "ASR finished provider=\(provider.rawValue) source=system-speech totalMs=\(totalDurationMs) speechMs=\(speechDurationMs) textLength=\(text.count)"
+                "ASR finished provider=\(provider.rawValue) source=\(result.source) totalMs=\(totalDurationMs) engineMs=\(durationMs) textLength=\(text.count) command=\(commandSummary)"
             )
             return RecognitionOutcome(
                 text: text,
                 provider: provider,
-                source: "system-speech",
+                source: result.source,
                 totalDurationMs: totalDurationMs,
-                engineDurationMs: speechDurationMs,
-                firstPartialMs: nil,
-                partialCount: 0
+                engineDurationMs: durationMs,
+                firstPartialMs: currentFirstPartialMs,
+                partialCount: currentPartialCount
+            )
+        } catch {
+            let totalDurationMs = Int(Date().timeIntervalSince(recognitionStartedAt) * 1000)
+            let failedSource = provider.category == .local ? "local-failed" : "cloud-realtime-failed"
+            debugLog(
+                "ASR finished provider=\(provider.rawValue) source=\(failedSource) totalMs=\(totalDurationMs) reason=\(error.localizedDescription)"
+            )
+            return RecognitionOutcome(
+                text: "",
+                provider: provider,
+                source: failedSource,
+                totalDurationMs: totalDurationMs,
+                engineDurationMs: nil,
+                firstPartialMs: currentFirstPartialMs,
+                partialCount: currentPartialCount
             )
         }
     }
 
-    private func transcribeLocally(audioFileURL _: URL) async throws -> LocalASRTranscriptionResult {
-        guard let currentResidentSession else {
-            throw SenseVoiceResidentServiceError.serverUnavailable
-        }
-        let result = try await senseVoiceResidentService.finalizeSession(currentResidentSession)
-        debugLog("SenseVoice resident succeeded durationMs=\(Int(result.duration * 1000))")
-        return result
-    }
-
-    private func handleCapturedBuffer(_ buffer: AVAudioPCMBuffer) {
-        localAudioWriter?.append(buffer)
-
-        let provider = settings.selectedASRProvider
-        guard provider == .senseVoice
-            || provider == .funASR
-            || provider == .qwenASR
-            || provider == .stepfunASR
-            || provider == .doubaoStreaming
-        else {
-            return
-        }
-
-        let pcmData: Data
-        do {
-            let targetSampleRate = (
-                provider == .funASR
-                    || provider == .qwenASR
-                    || provider == .stepfunASR
-                    || provider == .doubaoStreaming
-            ) ? 16_000.0 : buffer.format.sampleRate
-            pcmData = try TemporaryAudioCaptureWriter.pcm16MonoData(from: buffer, targetSampleRate: targetSampleRate)
-        } catch {
-            debugLog("\(provider.rawValue) chunk encode failed error=\(error.localizedDescription)")
-            return
-        }
-
-        Task { @MainActor in
-            if provider == .senseVoice {
-                await appendSenseVoiceChunk(pcmData, sampleRate: buffer.format.sampleRate)
-            } else if provider == .funASR {
-                await appendFunASRRealtimeChunk(pcmData)
-            } else if provider == .qwenASR {
-                await appendQwenRealtimeChunk(pcmData)
-            } else if provider == .stepfunASR {
-                await appendStepRealtimeChunk(pcmData)
-            } else {
-                await appendDoubaoRealtimeChunk(pcmData)
-            }
-        }
-    }
-
-    private func appendSenseVoiceChunk(_ pcmData: Data, sampleRate: Double) async {
+    private func handleCapturedBuffer(_ buffer: AVAudioPCMBuffer) async throws {
         guard currentPhase == .recording || currentPhase == .recordingPartial else { return }
-        currentPendingRealtimeAppendCount += 1
-        defer { currentPendingRealtimeAppendCount = max(0, currentPendingRealtimeAppendCount - 1) }
+        guard let activeASRSession else { return }
+        try await activeASRSession.session.append(buffer)
+    }
 
-        do {
-            if currentResidentSession == nil {
-                currentResidentSession = try await senseVoiceResidentService.startSession(
-                    sampleRate: sampleRate,
-                    languageCode: activeInputLanguageCode
-                )
-                debugLog("SenseVoice resident session started")
-            }
-
-            guard let currentResidentSession else { return }
-            try await senseVoiceResidentService.appendAudio(
-                sessionID: currentResidentSession.id,
-                pcm16MonoData: pcmData
-            )
-        } catch {
-            debugLog("SenseVoice resident append failed error=\(error.localizedDescription)")
+    private func recordCaptureAppendErrorIfNeeded(_ error: Error, provider: ASRProvider) {
+        if currentCaptureAppendError == nil {
+            currentCaptureAppendError = error
         }
-    }
-
-    private func startQwenRealtimeSession() async throws {
-        resetRealtimePartialDisplayState()
-        try await qwenRealtimeASRService.startSession(
-            config: settings.selectedASRConfig,
-            languageCode: activeInputLanguageCode
-        ) { [weak self] partialText in
-            Task { @MainActor in
-                self?.handleQwenPartialText(partialText)
-            }
-        }
-        debugLog("Qwen realtime session started")
-    }
-
-    private func startFunASRRealtimeSession() async throws {
-        resetRealtimePartialDisplayState()
-        let config = await preparedFunASRConfigForSession()
-        try await funASRRealtimeService.startSession(
-            config: config,
-            languageCode: activeInputLanguageCode
-        ) { [weak self] partialText in
-            Task { @MainActor in
-                self?.handleFunASRPartialText(partialText)
-            }
-        }
-        debugLog("Fun-ASR realtime session started")
-    }
-
-    private func preparedFunASRConfigForSession() async -> ASRProviderConfig {
-        let config = settings.selectedASRConfig
-
-        do {
-            let syncedConfig = try await funASRVocabularyService.syncVocabularyIfNeeded(
-                config: config,
-                glossaryTerms: settings.effectiveGlossaryItems
-            )
-            if syncedConfig != config {
-                settings.selectedASRConfig = syncedConfig
-            }
-            return syncedConfig
-        } catch {
-            debugLog("Fun-ASR hotword sync failed error=\(error.localizedDescription)")
-            let clearedConfig = config.clearingFunASRVocabulary()
-            settings.selectedASRConfig = clearedConfig
-            return clearedConfig
-        }
-    }
-
-    private func startStepRealtimeSession() async throws {
-        resetRealtimePartialDisplayState()
-        try await stepRealtimeASRService.startSession(
-            config: settings.selectedASRConfig,
-            languageCode: activeInputLanguageCode
-        ) { [weak self] partialText in
-            Task { @MainActor in
-                self?.handleStepPartialText(partialText)
-            }
-        }
-        debugLog("Step realtime session started")
-    }
-
-    private func startDoubaoRealtimeSession() async throws {
-        resetRealtimePartialDisplayState()
-        try await doubaoStreamingASRService.startSession(
-            config: settings.selectedASRConfig,
-            languageCode: activeInputLanguageCode
-        ) { [weak self] partialText in
-            Task { @MainActor in
-                self?.handleDoubaoPartialText(partialText)
-            }
-        }
-        debugLog("Doubao realtime session started")
-    }
-
-    private func appendQwenRealtimeChunk(_ pcmData: Data) async {
-        guard currentPhase == .recording || currentPhase == .recordingPartial else { return }
-        currentPendingRealtimeAppendCount += 1
-        defer { currentPendingRealtimeAppendCount = max(0, currentPendingRealtimeAppendCount - 1) }
-
-        do {
-            try await qwenRealtimeASRService.appendAudioChunk(pcmData)
-        } catch {
-            debugLog("Qwen realtime append failed error=\(error.localizedDescription)")
-        }
-    }
-
-    private func appendFunASRRealtimeChunk(_ pcmData: Data) async {
-        guard currentPhase == .recording || currentPhase == .recordingPartial else { return }
-        currentPendingRealtimeAppendCount += 1
-        defer { currentPendingRealtimeAppendCount = max(0, currentPendingRealtimeAppendCount - 1) }
-
-        do {
-            try await funASRRealtimeService.appendAudioChunk(pcmData)
-        } catch {
-            debugLog("Fun-ASR realtime append failed error=\(error.localizedDescription)")
-        }
-    }
-
-    private func appendStepRealtimeChunk(_ pcmData: Data) async {
-        guard currentPhase == .recording || currentPhase == .recordingPartial else { return }
-        currentPendingRealtimeAppendCount += 1
-        defer { currentPendingRealtimeAppendCount = max(0, currentPendingRealtimeAppendCount - 1) }
-
-        do {
-            try await stepRealtimeASRService.appendAudioChunk(pcmData)
-        } catch {
-            debugLog("Step realtime append failed error=\(error.localizedDescription)")
-        }
-    }
-
-    private func appendDoubaoRealtimeChunk(_ pcmData: Data) async {
-        guard currentPhase == .recording || currentPhase == .recordingPartial else { return }
-        currentPendingRealtimeAppendCount += 1
-        defer { currentPendingRealtimeAppendCount = max(0, currentPendingRealtimeAppendCount - 1) }
-
-        do {
-            try await doubaoStreamingASRService.appendAudioChunk(pcmData)
-        } catch {
-            debugLog("Doubao realtime append failed error=\(error.localizedDescription)")
-        }
-    }
-
-    private func handleQwenPartialText(_ partialText: String) {
-        handleRealtimePartialText(partialText)
-    }
-
-    private func handleFunASRPartialText(_ partialText: String) {
-        handleRealtimePartialText(partialText)
+        debugLog("ASR capture append failed provider=\(provider.rawValue) error=\(error.localizedDescription)")
     }
 
     private func applyPartialTextToOverlay(_ partialText: String) {
@@ -1309,14 +983,6 @@ final class AppController: NSObject {
         }
         currentPartialCount += 1
         setOverlay(text: trimmed, rmsLevel: smoothedRMS, phase: .recordingPartial)
-    }
-
-    private func handleDoubaoPartialText(_ partialText: String) {
-        handleRealtimePartialText(partialText)
-    }
-
-    private func handleStepPartialText(_ partialText: String) {
-        handleRealtimePartialText(partialText)
     }
 
     private func handleRealtimePartialText(_ partialText: String) {
@@ -1360,18 +1026,14 @@ final class AppController: NSObject {
     }
 
     private func waitForPendingRealtimeAppends() async {
-        guard settings.selectedASRProvider == .senseVoice
-            || settings.selectedASRProvider == .funASR
-            || settings.selectedASRProvider == .qwenASR
-            || settings.selectedASRProvider == .stepfunASR
-            || settings.selectedASRProvider == .doubaoStreaming
-        else { return }
+        guard activeASRSession != nil else { return }
         let deadline = Date().addingTimeInterval(1.5)
-        while currentPendingRealtimeAppendCount > 0, Date() < deadline {
+        while realtimeAppendCounter.value > 0, Date() < deadline {
             try? await Task.sleep(for: .milliseconds(20))
         }
-        if currentPendingRealtimeAppendCount > 0 {
-            debugLog("Realtime pending appends timed out count=\(currentPendingRealtimeAppendCount)")
+        let pendingCount = realtimeAppendCounter.value
+        if pendingCount > 0 {
+            debugLog("Realtime pending appends timed out count=\(pendingCount)")
         }
     }
 

@@ -14,7 +14,7 @@ tracks: []
 
 - 模型文件存放在 `~/Library/Application Support/Voily/LocalModels/`，由 `ManagedASRModelStore` 管理下载、校验、卸载。
 - 不同 provider（ONNX / MLX 模型目录）**各自独立校验**，不共用一个全局「已就绪」状态——某 provider 模型缺失不应阻塞其它 provider 可用。
-- 运行时由 `SenseVoiceResidentService` 维护常驻进程（健康检查 / 重启 / 日志），上层只看到 `SpeechTranscriptionService` 协议（见 ADR 0003）。
+- 运行时由 `SenseVoiceResidentService` 维护常驻进程（健康检查 / 重启 / 日志），上层只看到统一的 `ASRCaptureSession` 抽象（见 ADR 0003）。
 - 当前已收敛到纯 MLX 路线，`SenseVoiceResidentService` 是热路径上的本地引擎。
 
 ## 放弃的方案

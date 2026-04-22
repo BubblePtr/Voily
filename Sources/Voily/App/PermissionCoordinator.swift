@@ -1,6 +1,5 @@
 import AppKit
 import AVFoundation
-import Speech
 import ApplicationServices
 
 @MainActor
@@ -18,16 +17,8 @@ final class PermissionCoordinator {
         AVCaptureDevice.authorizationStatus(for: .audio) == .authorized
     }
 
-    var isSpeechRecognitionAuthorized: Bool {
-        SFSpeechRecognizer.authorizationStatus() == .authorized
-    }
-
     var microphoneAuthorizationStatus: AVAuthorizationStatus {
         AVCaptureDevice.authorizationStatus(for: .audio)
-    }
-
-    var speechRecognitionAuthorizationStatus: SFSpeechRecognizerAuthorizationStatus {
-        SFSpeechRecognizer.authorizationStatus()
     }
 
     func promptForAccessibilityIfNeeded(force: Bool = false) {
@@ -85,27 +76,6 @@ final class PermissionCoordinator {
             return await withCheckedContinuation { continuation in
                 AVCaptureDevice.requestAccess(for: .audio) { granted in
                     continuation.resume(returning: granted)
-                }
-            }
-        case .denied, .restricted:
-            return false
-        @unknown default:
-            return false
-        }
-    }
-
-    func requestSpeechRecognitionIfNeeded() async -> Bool {
-        guard !isRunningUnderXCTest() else {
-            debugLog("PermissionCoordinator.requestSpeechRecognitionIfNeeded skipped under XCTest")
-            return false
-        }
-        switch SFSpeechRecognizer.authorizationStatus() {
-        case .authorized:
-            return true
-        case .notDetermined:
-            return await withCheckedContinuation { continuation in
-                SFSpeechRecognizer.requestAuthorization { status in
-                    continuation.resume(returning: status == .authorized)
                 }
             }
         case .denied, .restricted:
