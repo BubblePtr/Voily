@@ -203,7 +203,6 @@ private struct SettingsRootView: View {
                         .tag(nil as SettingsPage?)
                         .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 12, trailing: 16))
                         .listRowBackground(Color.clear)
-                        .allowsHitTesting(false)
                 }
 
                 Section {
@@ -285,6 +284,7 @@ private struct SidebarHeader: View {
                         .foregroundStyle(.secondary)
                 }
             }
+            .allowsHitTesting(false)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -302,6 +302,9 @@ private struct SidebarHeader: View {
 private struct SidebarAppIcon: View {
     let settings: AppSettings
     let onUnlock: () -> Void
+    @State private var isTapFeedbackActive = false
+    @State private var shouldSkipNextTapFeedback = false
+    @State private var tapFeedbackSequence = 0
 
     var body: some View {
         Group {
@@ -319,10 +322,61 @@ private struct SidebarAppIcon: View {
         }
         .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
         .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .opacity(isTapFeedbackActive ? 0.8 : 1)
+        .simultaneousGesture(
+            DragGesture(minimumDistance: 0)
+                .onChanged { _ in
+                    guard !isTapFeedbackActive else { return }
+                    shouldSkipNextTapFeedback = true
+                    activateTapFeedback()
+                }
+                .onEnded { _ in
+                    deactivateTapFeedback()
+                }
+        )
+        .simultaneousGesture(
+            TapGesture().onEnded {
+                guard !shouldSkipNextTapFeedback else {
+                    shouldSkipNextTapFeedback = false
+                    return
+                }
+                pulseTapFeedback()
+                shouldSkipNextTapFeedback = false
+            }
+        )
+        .onDisappear {
+            isTapFeedbackActive = false
+            shouldSkipNextTapFeedback = false
+        }
         .onTapGesture(count: 7) {
             guard !settings.isEasterEggUnlocked else { return }
             settings.isEasterEggUnlocked = true
             onUnlock()
+        }
+    }
+
+    private func activateTapFeedback() {
+        withAnimation(.easeOut(duration: 0.06)) {
+            isTapFeedbackActive = true
+        }
+    }
+
+    private func deactivateTapFeedback() {
+        withAnimation(.spring(response: 0.18, dampingFraction: 0.72)) {
+            isTapFeedbackActive = false
+        }
+    }
+
+    private func pulseTapFeedback() {
+        tapFeedbackSequence += 1
+        let sequence = tapFeedbackSequence
+
+        activateTapFeedback()
+
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 110_000_000)
+            guard sequence == tapFeedbackSequence else { return }
+            deactivateTapFeedback()
         }
     }
 }
