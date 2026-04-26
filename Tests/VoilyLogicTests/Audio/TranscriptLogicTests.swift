@@ -47,4 +47,15 @@ final class TranscriptLogicTests: XCTestCase {
         XCTAssertEqual(throttle.flush(at: 0.25), "你好")
         XCTAssertNil(throttle.pendingText)
     }
+
+    func testPartialTranscriptDisplayThrottleDefaultIntervalIs220ms() {
+        var throttle = PartialTranscriptDisplayThrottle()
+
+        XCTAssertEqual(throttle.minimumInterval, 0.22, accuracy: 0.0001)
+        XCTAssertEqual(throttle.push("你", at: 0.00), "你")
+        XCTAssertNil(throttle.push("你好", at: 0.05))
+        XCTAssertEqual(throttle.pendingText, "你好")
+        XCTAssertEqual(throttle.flush(at: 0.22), "你好")
+        XCTAssertNil(throttle.pendingText)
+    }
 }
