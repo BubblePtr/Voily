@@ -1,5 +1,5 @@
 import XCTest
-@testable import Voily
+@testable import VoilyLogic
 
 final class FunASRRealtimeServiceTests: XCTestCase {
     func testRunTaskMessageIncludesModelAndRealtimeParameters() throws {

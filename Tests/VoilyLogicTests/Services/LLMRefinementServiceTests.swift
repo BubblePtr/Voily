@@ -1,5 +1,5 @@
 import XCTest
-@testable import Voily
+@testable import VoilyLogic
 
 @MainActor
 final class LLMRefinementServiceTests: XCTestCase {
