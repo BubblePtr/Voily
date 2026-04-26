@@ -2,7 +2,7 @@
 
 ## 这是什么
 
-开源 macOS 听写应用：按住 Fn 录音，松开转写，自动粘贴到光标位置。支持本地 / 云端 ASR 引擎，可选 LLM 文本润色，提供实时浮动 overlay。
+开源 macOS 听写应用：按一下触发键开始录音，再按一下停止转写，自动粘贴到光标位置。支持本地 / 云端 ASR 引擎，可选 LLM 文本润色，提供实时浮动 overlay。
 
 ## 技术栈
 
@@ -19,7 +19,7 @@
 4. **录音期间必须静音系统输出**，避免回授。逻辑集中在 `SystemMediaPlaybackService`，不要在各 ASR provider 里各自实现。
 5. **文本注入只走粘贴路径**（需要 Accessibility 权限），不要尝试 CGEvent 模拟键盘逐字输入。
 6. **不在仓库里提交 API key、token、模型权重**。本地模型走 `ManagedASRModelStore` 下载到 `~/Library/Application Support/Voily/LocalModels/`，按 provider 独立校验。详见 `docs/decisions/0004-local-model-storage.md`。
-7. **触发键交互固定**：单击=听写切换，双击=中英翻译；右 Command 出现在组合键里时不触发；监听走 IOKit，不要换成 NSEvent global monitor。详见 `docs/decisions/0005-trigger-key-interaction.md`。
+7. **触发键交互固定**：短按=听写切换（tap 开始，再 tap 结束），长按（≥0.8s）=中英翻译；右 Command 出现在组合键里时不触发；监听走 IOKit，不要换成 NSEvent global monitor。详见 `docs/decisions/0005-trigger-key-interaction.md`。
 
 ## 知识地图
 
