@@ -23,7 +23,6 @@
 		A00100110000000000000000 /* Resources/BrandIcons in Resources */ = {isa = PBXBuildFile; fileRef = A00200130000000000000000 /* Resources/BrandIcons */; };
 		A00100120000000000000000 /* DashboardHomePage.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00200140000000000000000 /* DashboardHomePage.swift */; };
 		A00100130000000000000000 /* UsageStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00200150000000000000000 /* UsageStore.swift */; };
-		A00100140000000000000000 /* UsageStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00200160000000000000000 /* UsageStoreTests.swift */; };
 		A00100150000000000000000 /* XCTest.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A00200180000000000000000 /* XCTest.framework */; };
 		A00100160000000000000000 /* AppIntents.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A00200190000000000000000 /* AppIntents.framework */; };
 		A00100180000000000000000 /* AudioSupportTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A002001B0000000000000000 /* AudioSupportTests.swift */; };
@@ -31,9 +30,6 @@
 		A001001A0000000000000000 /* SenseVoiceResidentService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A002001D0000000000000000 /* SenseVoiceResidentService.swift */; };
 		A001001B0000000000000000 /* QwenRealtimeASRService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A002001E0000000000000000 /* QwenRealtimeASRService.swift */; };
 		A001001C0000000000000000 /* Resources/Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A002001F0000000000000000 /* Resources/Assets.xcassets */; };
-		A001001D0000000000000000 /* AppSettingsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00200200000000000000000 /* AppSettingsTests.swift */; };
-		A001001E0000000000000000 /* LLMRefinementServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00200210000000000000000 /* LLMRefinementServiceTests.swift */; };
-		A001001F0000000000000000 /* AppSettingsPersistenceIntegrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00200220000000000000000 /* AppSettingsPersistenceIntegrationTests.swift */; };
 		A00100200000000000000000 /* SystemMediaPlaybackService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00200230000000000000000 /* SystemMediaPlaybackService.swift */; };
 		A00100210000000000000000 /* SystemMediaPlaybackServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00200240000000000000000 /* SystemMediaPlaybackServiceTests.swift */; };
 		A00100220000000000000000 /* DoubaoStreamingASRServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00200250000000000000000 /* DoubaoStreamingASRServiceTests.swift */; };
@@ -42,11 +38,13 @@
 		A00100250000000000000000 /* ASRConnectionTester.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00200280000000000000000 /* ASRConnectionTester.swift */; };
 		A00100260000000000000000 /* StepRealtimeASRService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00200290000000000000000 /* StepRealtimeASRService.swift */; };
 		A00100270000000000000000 /* FunASRRealtimeService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A002002A0000000000000000 /* FunASRRealtimeService.swift */; };
-		A00100280000000000000000 /* FunASRRealtimeServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A002002B0000000000000000 /* FunASRRealtimeServiceTests.swift */; };
-		A00100290000000000000000 /* FunASRVocabularyServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A002002C0000000000000000 /* FunASRVocabularyServiceTests.swift */; };
 		A001002A0000000000000000 /* FunASRVocabularyService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A002002D0000000000000000 /* FunASRVocabularyService.swift */; };
 		A001002B0000000000000000 /* ASRCaptureSessionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A002002E0000000000000000 /* ASRCaptureSessionTests.swift */; };
 		A001002C0000000000000000 /* ASRCaptureSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = A002002F0000000000000000 /* ASRCaptureSession.swift */; };
+		A001002D0000000000000000 /* TriggerKeyMonitorCoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00200300000000000000000 /* TriggerKeyMonitorCoreTests.swift */; };
+		A001002E0000000000000000 /* BrandIconResourceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00200310000000000000000 /* BrandIconResourceTests.swift */; };
+		A001002F0000000000000000 /* TranscriptLogic.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00200320000000000000000 /* TranscriptLogic.swift */; };
+		A00100300000000000000000 /* DebugLog.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00200330000000000000000 /* DebugLog.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -78,7 +76,6 @@
 		A00200130000000000000000 /* Resources/BrandIcons */ = {isa = PBXFileReference; lastKnownFileType = folder; path = Resources/BrandIcons; sourceTree = "<group>"; };
 		A00200140000000000000000 /* DashboardHomePage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardHomePage.swift; sourceTree = "<group>"; };
 		A00200150000000000000000 /* UsageStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UsageStore.swift; sourceTree = "<group>"; };
-		A00200160000000000000000 /* UsageStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UsageStoreTests.swift; sourceTree = "<group>"; };
 		A00200170000000000000000 /* VoilyTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = VoilyTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		A00200180000000000000000 /* XCTest.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = XCTest.framework; path = System/Library/Frameworks/XCTest.framework; sourceTree = SDKROOT; };
 		A00200190000000000000000 /* AppIntents.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AppIntents.framework; path = System/Library/Frameworks/AppIntents.framework; sourceTree = SDKROOT; };
@@ -87,9 +84,6 @@
 		A002001D0000000000000000 /* SenseVoiceResidentService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SenseVoiceResidentService.swift; sourceTree = "<group>"; };
 		A002001E0000000000000000 /* QwenRealtimeASRService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QwenRealtimeASRService.swift; sourceTree = "<group>"; };
 		A002001F0000000000000000 /* Resources/Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Resources/Assets.xcassets; sourceTree = SOURCE_ROOT; };
-		A00200200000000000000000 /* AppSettingsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppSettingsTests.swift; sourceTree = "<group>"; };
-		A00200210000000000000000 /* LLMRefinementServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LLMRefinementServiceTests.swift; sourceTree = "<group>"; };
-		A00200220000000000000000 /* AppSettingsPersistenceIntegrationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppSettingsPersistenceIntegrationTests.swift; sourceTree = "<group>"; };
 		A00200230000000000000000 /* SystemMediaPlaybackService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemMediaPlaybackService.swift; sourceTree = "<group>"; };
 		A00200240000000000000000 /* SystemMediaPlaybackServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemMediaPlaybackServiceTests.swift; sourceTree = "<group>"; };
 		A00200250000000000000000 /* DoubaoStreamingASRServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DoubaoStreamingASRServiceTests.swift; sourceTree = "<group>"; };
@@ -98,11 +92,13 @@
 		A00200280000000000000000 /* ASRConnectionTester.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ASRConnectionTester.swift; sourceTree = "<group>"; };
 		A00200290000000000000000 /* StepRealtimeASRService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StepRealtimeASRService.swift; sourceTree = "<group>"; };
 		A002002A0000000000000000 /* FunASRRealtimeService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FunASRRealtimeService.swift; sourceTree = "<group>"; };
-		A002002B0000000000000000 /* FunASRRealtimeServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FunASRRealtimeServiceTests.swift; sourceTree = "<group>"; };
-		A002002C0000000000000000 /* FunASRVocabularyServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FunASRVocabularyServiceTests.swift; sourceTree = "<group>"; };
 		A002002D0000000000000000 /* FunASRVocabularyService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FunASRVocabularyService.swift; sourceTree = "<group>"; };
 		A002002E0000000000000000 /* ASRCaptureSessionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ASRCaptureSessionTests.swift; sourceTree = "<group>"; };
 		A002002F0000000000000000 /* ASRCaptureSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ASRCaptureSession.swift; sourceTree = "<group>"; };
+		A00200300000000000000000 /* TriggerKeyMonitorCoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TriggerKeyMonitorCoreTests.swift; sourceTree = "<group>"; };
+		A00200310000000000000000 /* BrandIconResourceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrandIconResourceTests.swift; sourceTree = "<group>"; };
+		A00200320000000000000000 /* TranscriptLogic.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptLogic.swift; sourceTree = "<group>"; };
+		A00200330000000000000000 /* DebugLog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DebugLog.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -155,6 +151,7 @@
 				A00400080000000000000000 /* Features */,
 				A004000B0000000000000000 /* Services */,
 				A004000E0000000000000000 /* Storage */,
+				A00400150000000000000000 /* Support */,
 			);
 			path = Sources/Voily;
 			sourceTree = SOURCE_ROOT;
@@ -179,6 +176,7 @@
 		A00400050000000000000000 /* Tests/VoilyTests */ = {
 			isa = PBXGroup;
 			children = (
+				A00400140000000000000000 /* App */,
 				A004000F0000000000000000 /* Audio */,
 				A00400100000000000000000 /* Configuration */,
 				A00400110000000000000000 /* Services */,
@@ -258,6 +256,7 @@
 				A002001E0000000000000000 /* QwenRealtimeASRService.swift */,
 				A002001D0000000000000000 /* SenseVoiceResidentService.swift */,
 				A00200290000000000000000 /* StepRealtimeASRService.swift */,
+				A00200320000000000000000 /* TranscriptLogic.swift */,
 			);
 			path = Audio;
 			sourceTree = "<group>";
@@ -285,8 +284,6 @@
 				A002002E0000000000000000 /* ASRCaptureSessionTests.swift */,
 				A00200270000000000000000 /* ASRConnectionTesterTests.swift */,
 				A00200250000000000000000 /* DoubaoStreamingASRServiceTests.swift */,
-				A002002B0000000000000000 /* FunASRRealtimeServiceTests.swift */,
-				A002002C0000000000000000 /* FunASRVocabularyServiceTests.swift */,
 				A002001B0000000000000000 /* AudioSupportTests.swift */,
 			);
 			path = Audio;
@@ -295,16 +292,22 @@
 		A00400100000000000000000 /* Configuration */ = {
 			isa = PBXGroup;
 			children = (
-				A00200200000000000000000 /* AppSettingsTests.swift */,
-				A00200220000000000000000 /* AppSettingsPersistenceIntegrationTests.swift */,
+				A00200310000000000000000 /* BrandIconResourceTests.swift */,
 			);
 			path = Configuration;
+			sourceTree = "<group>";
+		};
+		A00400140000000000000000 /* App */ = {
+			isa = PBXGroup;
+			children = (
+				A00200300000000000000000 /* TriggerKeyMonitorCoreTests.swift */,
+			);
+			path = App;
 			sourceTree = "<group>";
 		};
 		A00400110000000000000000 /* Services */ = {
 			isa = PBXGroup;
 			children = (
-				A00200210000000000000000 /* LLMRefinementServiceTests.swift */,
 				A00200240000000000000000 /* SystemMediaPlaybackServiceTests.swift */,
 			);
 			path = Services;
@@ -313,7 +316,6 @@
 		A00400120000000000000000 /* Storage */ = {
 			isa = PBXGroup;
 			children = (
-				A00200160000000000000000 /* UsageStoreTests.swift */,
 			);
 			path = Storage;
 			sourceTree = "<group>";
@@ -324,6 +326,14 @@
 				A00200230000000000000000 /* SystemMediaPlaybackService.swift */,
 			);
 			path = Media;
+			sourceTree = "<group>";
+		};
+		A00400150000000000000000 /* Support */ = {
+			isa = PBXGroup;
+			children = (
+				A00200330000000000000000 /* DebugLog.swift */,
+			);
+			path = Support;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -428,6 +438,7 @@
 				A00100020000000000000000 /* AppDelegate.swift in Sources */,
 				A00100030000000000000000 /* AppSettings.swift in Sources */,
 				A00100040000000000000000 /* AudioCaptureService.swift in Sources */,
+				A00100300000000000000000 /* DebugLog.swift in Sources */,
 				A00100250000000000000000 /* ASRConnectionTester.swift in Sources */,
 				A00100050000000000000000 /* FnKeyMonitor.swift in Sources */,
 				A00100270000000000000000 /* FunASRRealtimeService.swift in Sources */,
@@ -446,6 +457,7 @@
 				A001000C0000000000000000 /* SupportedLanguage.swift in Sources */,
 				A00100200000000000000000 /* SystemMediaPlaybackService.swift in Sources */,
 				A001000D0000000000000000 /* TextInjectionService.swift in Sources */,
+				A001002F0000000000000000 /* TranscriptLogic.swift in Sources */,
 				A00100130000000000000000 /* UsageStore.swift in Sources */,
 				A001000E0000000000000000 /* VoilyApp.swift in Sources */,
 			);
@@ -456,16 +468,12 @@
 			buildActionMask = 2147483647;
 			files = (
 				A001002B0000000000000000 /* ASRCaptureSessionTests.swift in Sources */,
-				A001001D0000000000000000 /* AppSettingsTests.swift in Sources */,
-				A001001F0000000000000000 /* AppSettingsPersistenceIntegrationTests.swift in Sources */,
 				A00100240000000000000000 /* ASRConnectionTesterTests.swift in Sources */,
+				A001002E0000000000000000 /* BrandIconResourceTests.swift in Sources */,
 				A00100220000000000000000 /* DoubaoStreamingASRServiceTests.swift in Sources */,
-				A00100280000000000000000 /* FunASRRealtimeServiceTests.swift in Sources */,
-				A00100290000000000000000 /* FunASRVocabularyServiceTests.swift in Sources */,
-				A001001E0000000000000000 /* LLMRefinementServiceTests.swift in Sources */,
 				A00100180000000000000000 /* AudioSupportTests.swift in Sources */,
 				A00100210000000000000000 /* SystemMediaPlaybackServiceTests.swift in Sources */,
-				A00100140000000000000000 /* UsageStoreTests.swift in Sources */,
+				A001002D0000000000000000 /* TriggerKeyMonitorCoreTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

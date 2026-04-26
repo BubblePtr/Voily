@@ -1,6 +1,6 @@
 import Foundation
 import XCTest
-@testable import Voily
+@testable import VoilyLogic
 
 @MainActor
 final class AppSettingsPersistenceIntegrationTests: XCTestCase {
