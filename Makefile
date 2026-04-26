@@ -3,12 +3,17 @@ BUILD_DIR := .xcodebuild
 APP_PATH := $(BUILD_DIR)/Build/Products/Debug/$(APP_NAME).app
 RELEASE_SCRIPT := ./scripts/release.sh
 
-.PHONY: build test run install clean release archive export-app package-zip package-dmg notarize staple verify-release clean-release
+.PHONY: build test test-logic test-app run install clean release archive export-app package-zip package-dmg notarize staple verify-release clean-release
 
 build:
 	xcodebuild -project Voily.xcodeproj -scheme Voily -configuration Debug -derivedDataPath $(BUILD_DIR) build
 
-test:
+test: test-logic test-app
+
+test-logic:
+	swift test
+
+test-app:
 	xcodebuild -project Voily.xcodeproj -scheme Voily -configuration Debug -derivedDataPath $(BUILD_DIR) test
 
 run: build

@@ -61,6 +61,7 @@ Settings 里的「测试连接」不属于 `ASRCaptureSession`；这一职责由
 - `make build` — debug 构建
 - `make run` — 构建并运行
 - `make install` — 安装到 `~/Applications`
+- `make test` — 运行 SwiftPM 逻辑测试和 Xcode app/unit 测试；详见 [testing.md](testing.md)
 - 更多目标见 [Makefile](../Makefile)
 
 ## 5. 权限与系统集成
