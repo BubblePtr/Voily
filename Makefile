@@ -3,7 +3,7 @@ BUILD_DIR := .xcodebuild
 APP_PATH := $(BUILD_DIR)/Build/Products/Debug/$(APP_NAME).app
 RELEASE_SCRIPT := ./scripts/release.sh
 
-.PHONY: build test test-logic test-app run install clean release archive export-app package-zip package-dmg notarize staple verify-release clean-release
+.PHONY: build test test-logic test-app run install install-user install-system clean release archive export-app package-zip package-dmg notarize staple verify-release clean-release
 
 build:
 	xcodebuild -project Voily.xcodeproj -scheme Voily -configuration Debug -derivedDataPath $(BUILD_DIR) build
@@ -19,11 +19,18 @@ test-app:
 run: build
 	open "$(APP_PATH)"
 
-install: build
+install: install-user
+
+install-user: build
 	@mkdir -p "$(HOME)/Applications"
 	rm -rf "$(HOME)/Applications/$(APP_NAME).app"
 	cp -R "$(APP_PATH)" "$(HOME)/Applications/$(APP_NAME).app"
 	@echo "Installed to $(HOME)/Applications/$(APP_NAME).app"
+
+install-system: build
+	rm -rf "/Applications/$(APP_NAME).app"
+	cp -R "$(APP_PATH)" "/Applications/$(APP_NAME).app"
+	@echo "Installed to /Applications/$(APP_NAME).app"
 
 release archive export-app:
 	$(RELEASE_SCRIPT) archive

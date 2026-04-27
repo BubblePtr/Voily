@@ -518,7 +518,13 @@ final class AppController: NSObject {
     }
 
     private func configureTriggerKeyMonitoringIfNeeded() {
-        guard permissionCoordinator.isAccessibilityTrusted else { return }
+        guard permissionCoordinator.isAccessibilityTrusted else {
+            if triggerKeyMonitor.isRunning {
+                debugLog("configureTriggerKeyMonitoringIfNeeded stopping monitor because Accessibility is no longer trusted")
+                triggerKeyMonitor.stop()
+            }
+            return
+        }
         guard !triggerKeyMonitor.isRunning else {
             debugLog("configureTriggerKeyMonitoringIfNeeded alreadyRunning=true")
             return
@@ -856,7 +862,9 @@ final class AppController: NSObject {
         let granted = await request()
 
         debugLog("Resuming trigger key monitoring after system permission prompt granted=\(granted)")
-        triggerKeyMonitor.start()
+        if permissionCoordinator.isAccessibilityTrusted {
+            triggerKeyMonitor.start()
+        }
         return granted
     }
 

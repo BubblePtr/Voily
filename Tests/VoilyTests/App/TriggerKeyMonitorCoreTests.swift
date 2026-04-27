@@ -2,6 +2,24 @@ import XCTest
 @testable import Voily
 
 final class TriggerKeyMonitorCoreTests: XCTestCase {
+    func testTriggerKeyEventTapUsesListenOnlyMode() {
+        XCTAssertEqual(TriggerKeyEventTapPolicy.options, .listenOnly)
+    }
+
+    func testEventTapDisableKeepsTapAliveWhenAccessibilityIsTrusted() {
+        XCTAssertEqual(
+            TriggerKeyEventTapDisablePolicy.actionWhenDisabled(isAccessibilityTrusted: true),
+            .reenable
+        )
+    }
+
+    func testEventTapDisableStopsTapWhenAccessibilityWasRevoked() {
+        XCTAssertEqual(
+            TriggerKeyEventTapDisablePolicy.actionWhenDisabled(isAccessibilityTrusted: false),
+            .stop
+        )
+    }
+
     func testSingleTapStartsDictationOnRelease() {
         var core = TriggerKeyMonitorCore(longPressThreshold: 0.8)
 
