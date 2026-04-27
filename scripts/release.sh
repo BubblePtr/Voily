@@ -281,7 +281,7 @@ verify_release() {
   ensure_app
 
   local artifact_path="${1:-}"
-  local bundle_id codesign_output spctl_output artifact_spctl_args
+  local bundle_id codesign_output entitlements_output spctl_output artifact_spctl_args
 
   bundle_id="$(app_info_value CFBundleIdentifier)"
   [[ "$bundle_id" == "$EXPECTED_BUNDLE_ID" ]] || die "Bundle identifier mismatch: expected $EXPECTED_BUNDLE_ID, found $bundle_id"
@@ -297,7 +297,12 @@ verify_release() {
   printf "%s\n" "$codesign_output"
 
   log "Reading app entitlements"
-  codesign -d --entitlements :- "$APP_PATH" 2>&1 || true
+  entitlements_output="$(codesign -d --entitlements :- "$APP_PATH" 2>&1)"
+  printf "%s\n" "$entitlements_output"
+
+  if ! grep -q "com.apple.security.device.audio-input" <<<"$entitlements_output"; then
+    die "Release app bundle is missing the microphone Hardened Runtime entitlement."
+  fi
 
   log "Assessing Gatekeeper status for app bundle"
   if spctl_output="$(spctl -a -vv "$APP_PATH" 2>&1)"; then

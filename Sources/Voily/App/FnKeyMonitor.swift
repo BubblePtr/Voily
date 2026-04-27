@@ -9,6 +9,21 @@ enum TriggerKeyGestureAction: Equatable {
     case startQuickTranslation
 }
 
+enum TriggerKeyEventTapDisableAction: Equatable {
+    case reenable
+    case stop
+}
+
+struct TriggerKeyEventTapPolicy {
+    static let options: CGEventTapOptions = .listenOnly
+}
+
+struct TriggerKeyEventTapDisablePolicy {
+    static func actionWhenDisabled(isAccessibilityTrusted: Bool) -> TriggerKeyEventTapDisableAction {
+        isAccessibilityTrusted ? .reenable : .stop
+    }
+}
+
 enum TriggerKeySessionMode: Equatable {
     case idle
     case dictating
@@ -173,6 +188,7 @@ final class TriggerKeyMonitor: @unchecked Sendable {
     var onDictationFinish: (@Sendable () -> Void)?
     var onQuickTranslation: (@Sendable () -> Void)?
 
+    private let accessibilityTrustProvider: @Sendable () -> Bool
     private let stateQueue = DispatchQueue(label: "Voily.TriggerKeyMonitor.State")
     private var eventTap: CFMachPort?
     private var runLoopSource: CFRunLoopSource?
@@ -182,6 +198,10 @@ final class TriggerKeyMonitor: @unchecked Sendable {
     private var triggerKey: TriggerKey = .fn
     private var core = TriggerKeyMonitorCore()
     private var gestureResolutionWorkItem: DispatchWorkItem?
+
+    init(accessibilityTrustProvider: @escaping @Sendable () -> Bool = { AXIsProcessTrusted() }) {
+        self.accessibilityTrustProvider = accessibilityTrustProvider
+    }
 
     var isRunning: Bool {
         stateQueue.sync { tapRequested }
@@ -280,7 +300,7 @@ final class TriggerKeyMonitor: @unchecked Sendable {
         guard let tap = CGEvent.tapCreate(
             tap: .cgSessionEventTap,
             place: .headInsertEventTap,
-            options: .defaultTap,
+            options: TriggerKeyEventTapPolicy.options,
             eventsOfInterest: CGEventMask(mask),
             callback: callback,
             userInfo: refcon
@@ -311,11 +331,29 @@ final class TriggerKeyMonitor: @unchecked Sendable {
         eventTap = nil
     }
 
+    private func stopFromTapThreadAfterAccessibilityRevocation() {
+        stateQueue.sync {
+            cancelTimers()
+            core.reset()
+            tapRequested = false
+        }
+        invalidateEventTap()
+        tapRunLoop = nil
+        tapThread = nil
+        CFRunLoopStop(CFRunLoopGetCurrent())
+    }
+
     private func handle(proxy: CGEventTapProxy, type: CGEventType, event: CGEvent) -> Unmanaged<CGEvent>? {
         if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
-            debugLog("TriggerKeyMonitor tap disabled by system, reenabling")
-            if let eventTap {
-                CGEvent.tapEnable(tap: eventTap, enable: true)
+            switch TriggerKeyEventTapDisablePolicy.actionWhenDisabled(isAccessibilityTrusted: accessibilityTrustProvider()) {
+            case .reenable:
+                debugLog("TriggerKeyMonitor tap disabled by system, reenabling")
+                if let eventTap {
+                    CGEvent.tapEnable(tap: eventTap, enable: true)
+                }
+            case .stop:
+                debugLog("TriggerKeyMonitor tap disabled after Accessibility revocation, stopping")
+                stopFromTapThreadAfterAccessibilityRevocation()
             }
             return Unmanaged.passUnretained(event)
         }
@@ -345,9 +383,6 @@ final class TriggerKeyMonitor: @unchecked Sendable {
             }
             dispatch(actions)
 
-            if triggerKey == .fn {
-                return nil
-            }
             return Unmanaged.passUnretained(event)
         }
 
@@ -403,7 +438,7 @@ final class TriggerKeyMonitor: @unchecked Sendable {
             return actions
         }
         dispatch(actions)
-        return nil
+        return Unmanaged.passUnretained(event)
     }
 
     private var monitoredKeyCode: Int {
