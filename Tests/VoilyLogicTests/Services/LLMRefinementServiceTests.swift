@@ -180,7 +180,9 @@ private final class CapturingURLProtocol: URLProtocol {
     nonisolated(unsafe) static var responseBody = Data()
 
     override class func canInit(with request: URLRequest) -> Bool {
-        true
+        guard let url = request.url else { return false }
+        return url.host == "api.deepseek.com"
+            && url.path.hasSuffix("/chat/completions")
     }
 
     override class func canonicalRequest(for request: URLRequest) -> URLRequest {

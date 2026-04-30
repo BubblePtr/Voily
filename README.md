@@ -112,6 +112,8 @@ Voily no longer ships an Apple `Speech.framework` fallback. The runtime ASR path
 
 2. **Text Refinement** (optional) — Enable LLM post-processing and configure a provider (DeepSeek / Alibaba Cloud DashScope / Volcengine / MiniMax / Kimi / Zhipu).
 
+   DeepSeek defaults to `https://api.deepseek.com` and `deepseek-v4-flash`; the API key field is intentionally empty and must be filled by the user. Existing `https://api.deepseek.com/v1`, `deepseek-chat`, and `deepseek-reasoner` settings are normalized to the new endpoint and model while preserving the saved API key.
+
 3. **Dictation Skills** — Toggle processing skills like filler-word removal, formalization, or ordered-list formatting.
 
 4. **Glossary** — Add custom terms or enable built-in presets to improve recognition of specialized vocabulary. When `Fun-ASR` is selected, Voily syncs the effective glossary into the provider hotword vocabulary before each realtime session.
