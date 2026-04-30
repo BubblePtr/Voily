@@ -50,7 +50,8 @@ final class LLMRefinementService {
                 ),
                 .init(role: "user", content: request.text),
             ],
-            temperature: 0
+            temperature: 0,
+            thinking: Self.thinkingMode(for: provider)
         )
 
         urlRequest.httpBody = try JSONEncoder().encode(payload)
@@ -103,6 +104,15 @@ final class LLMRefinementService {
 
     private static func shouldStripLeadingThinkBlock(for provider: TextRefinementProvider?) -> Bool {
         provider != nil
+    }
+
+    private static func thinkingMode(for provider: TextRefinementProvider) -> ChatCompletionsRequest.Thinking? {
+        switch provider {
+        case .deepSeek:
+            return .init(type: "disabled")
+        case .dashScope, .volcengine, .minimax, .kimi, .zhipu:
+            return nil
+        }
     }
 
     private static func leadingThinkBlockRange(in text: String) -> Range<String.Index>? {
@@ -223,9 +233,14 @@ private struct ChatCompletionsRequest: Codable {
         let content: String
     }
 
+    struct Thinking: Codable {
+        let type: String
+    }
+
     let model: String
     let messages: [Message]
     let temperature: Double
+    let thinking: Thinking?
 }
 
 private struct ChatCompletionsResponse: Codable {

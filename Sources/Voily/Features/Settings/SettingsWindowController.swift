@@ -1464,7 +1464,7 @@ private struct TextRefinementProviderFields: View {
     private var baseURLPlaceholder: String {
         switch provider {
         case .deepSeek:
-            return "https://api.deepseek.com/v1"
+            return "https://api.deepseek.com"
         case .dashScope:
             return "https://dashscope.aliyuncs.com/compatible-mode/v1"
         case .volcengine:
@@ -1481,7 +1481,7 @@ private struct TextRefinementProviderFields: View {
     private var modelPlaceholder: String {
         switch provider {
         case .deepSeek:
-            return "deepseek-chat"
+            return "deepseek-v4-flash"
         case .dashScope:
             return "qwen-plus"
         case .volcengine:
@@ -2108,9 +2108,9 @@ enum SettingsPreviewData {
         )
         settings.setTextRefinementConfig(
             TextRefinementProviderConfig(
-                baseURL: "https://api.deepseek.com/v1",
+                baseURL: "https://api.deepseek.com",
                 apiKey: "sk-preview-123456",
-                model: "deepseek-chat"
+                model: "deepseek-v4-flash"
             ),
             for: .deepSeek
         )
