@@ -343,9 +343,17 @@ struct ModelSettingsSnapshot: Codable, Equatable {
             )
             return configs
         }(),
-        textConfigsByProvider: Dictionary(
-            uniqueKeysWithValues: TextRefinementProvider.allCases.map { ($0, .empty) }
-        )
+        textConfigsByProvider: {
+            var configs: [TextRefinementProvider: TextRefinementProviderConfig] = Dictionary(
+                uniqueKeysWithValues: TextRefinementProvider.allCases.map { ($0, .empty) }
+            )
+            configs[.deepSeek] = TextRefinementProviderConfig(
+                baseURL: "https://api.deepseek.com",
+                apiKey: "",
+                model: "deepseek-v4-flash"
+            )
+            return configs
+        }()
     )
 
     private enum CodingKeys: String, CodingKey {
@@ -1075,6 +1083,17 @@ final class AppSettings {
             stepConfig.model = "step-asr-1.1-stream"
         }
         normalized.asrConfigsByProvider[.stepfunASR] = stepConfig
+        var deepSeekConfig = normalized.textConfigsByProvider[.deepSeek] ?? .empty
+        if deepSeekConfig.baseURL.trimmed.isEmpty || deepSeekConfig.baseURL.trimmed == "https://api.deepseek.com/v1" {
+            deepSeekConfig.baseURL = "https://api.deepseek.com"
+        }
+        if deepSeekConfig.model.trimmed.isEmpty
+            || deepSeekConfig.model.trimmed == "deepseek-chat"
+            || deepSeekConfig.model.trimmed == "deepseek-reasoner"
+        {
+            deepSeekConfig.model = "deepseek-v4-flash"
+        }
+        normalized.textConfigsByProvider[.deepSeek] = deepSeekConfig
         return normalized
     }
 

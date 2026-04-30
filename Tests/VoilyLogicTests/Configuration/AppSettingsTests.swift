@@ -20,6 +20,28 @@ final class AppSettingsTests: XCTestCase {
         XCTAssertNil(settings.preferredMicrophoneUID)
     }
 
+    func testDeepSeekTextConfigDefaultsToV4Flash() {
+        let settings = AppSettings(defaults: makeDefaults())
+        let config = settings.textRefinementConfig(for: .deepSeek)
+
+        XCTAssertEqual(config.baseURL, "https://api.deepseek.com")
+        XCTAssertEqual(config.model, "deepseek-v4-flash")
+        XCTAssertEqual(config.apiKey, "")
+        XCTAssertFalse(config.isConfigured)
+    }
+
+    func testLegacyDeepSeekReasonerConfigMigratesToV4Flash() throws {
+        let defaults = makeDefaults()
+        defaults.set(try legacyDeepSeekReasonerSnapshotData(), forKey: "modelSettingsSnapshot")
+
+        let settings = AppSettings(defaults: defaults)
+        let config = settings.textRefinementConfig(for: .deepSeek)
+
+        XCTAssertEqual(config.baseURL, "https://api.deepseek.com")
+        XCTAssertEqual(config.apiKey, "sk-legacy")
+        XCTAssertEqual(config.model, "deepseek-v4-flash")
+    }
+
     func testEffectiveGlossaryItemsDeduplicateAcrossCustomTermsAndPresets() {
         let settings = AppSettings(defaults: makeDefaults())
         settings.setGlossaryState(
@@ -412,6 +434,25 @@ final class AppSettingsTests: XCTestCase {
               "baseURL": "https://api.deepseek.com/v1",
               "apiKey": "sk-legacy",
               "model": "deepseek-chat"
+            }
+          }
+        }
+        """
+        return try XCTUnwrap(json.data(using: .utf8))
+    }
+
+    private func legacyDeepSeekReasonerSnapshotData() throws -> Data {
+        let json = """
+        {
+          "selectedASRProvider": "senseVoice",
+          "selectedTextProvider": "deepSeek",
+          "textRefinementEnabled": true,
+          "asrConfigsByProvider": {},
+          "textConfigsByProvider": {
+            "deepSeek": {
+              "baseURL": "https://api.deepseek.com/v1",
+              "apiKey": "sk-legacy",
+              "model": "deepseek-reasoner"
             }
           }
         }

@@ -3,6 +3,57 @@ import XCTest
 
 @MainActor
 final class LLMRefinementServiceTests: XCTestCase {
+    override func tearDown() {
+        CapturingURLProtocol.reset()
+        URLProtocol.unregisterClass(CapturingURLProtocol.self)
+        super.tearDown()
+    }
+
+    func testDeepSeekRequestDisablesThinkingMode() async throws {
+        URLProtocol.registerClass(CapturingURLProtocol.self)
+        CapturingURLProtocol.responseBody = """
+        {
+          "choices": [
+            {
+              "message": {
+                "role": "assistant",
+                "content": "把 JSON 字段补齐。"
+              }
+            }
+          ]
+        }
+        """.data(using: .utf8)!
+
+        let settings = AppSettings(defaults: makeDefaults())
+        settings.selectedTextProvider = .deepSeek
+        settings.setTextRefinementConfig(
+            TextRefinementProviderConfig(
+                baseURL: "https://api.deepseek.com",
+                apiKey: "sk-test",
+                model: "deepseek-v4-flash"
+            ),
+            for: .deepSeek
+        )
+
+        let output = try await LLMRefinementService().process(
+            TextProcessingRequest(
+                text: "把杰森字段补齐",
+                languageCode: "zh-Hans",
+                mode: .dictation(skills: [])
+            ),
+            settings: settings
+        )
+
+        let body = try XCTUnwrap(CapturingURLProtocol.lastRequestBody)
+        let json = try XCTUnwrap(JSONSerialization.jsonObject(with: body) as? [String: Any])
+        let thinking = try XCTUnwrap(json["thinking"] as? [String: Any])
+
+        XCTAssertEqual(output, "把 JSON 字段补齐。")
+        XCTAssertEqual(CapturingURLProtocol.lastRequest?.url?.absoluteString, "https://api.deepseek.com/chat/completions")
+        XCTAssertEqual(json["model"] as? String, "deepseek-v4-flash")
+        XCTAssertEqual(thinking["type"] as? String, "disabled")
+    }
+
     func testNormalizedResponseTextStripsLeadingThinkBlockForProvider() {
         let output = LLMRefinementService.normalizedResponseText("""
         <think>
@@ -120,5 +171,60 @@ final class LLMRefinementServiceTests: XCTestCase {
         let defaults = UserDefaults(suiteName: suiteName)!
         defaults.removePersistentDomain(forName: suiteName)
         return defaults
+    }
+}
+
+private final class CapturingURLProtocol: URLProtocol {
+    nonisolated(unsafe) static var lastRequest: URLRequest?
+    nonisolated(unsafe) static var lastRequestBody: Data?
+    nonisolated(unsafe) static var responseBody = Data()
+
+    override class func canInit(with request: URLRequest) -> Bool {
+        guard let url = request.url else { return false }
+        return url.host == "api.deepseek.com"
+            && url.path.hasSuffix("/chat/completions")
+    }
+
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest {
+        request
+    }
+
+    override func startLoading() {
+        Self.lastRequest = request
+        Self.lastRequestBody = request.httpBody ?? request.httpBodyStream.flatMap(Self.readBodyStream)
+
+        let response = HTTPURLResponse(
+            url: request.url!,
+            statusCode: 200,
+            httpVersion: "HTTP/1.1",
+            headerFields: ["Content-Type": "application/json"]
+        )!
+        client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+        client?.urlProtocol(self, didLoad: Self.responseBody)
+        client?.urlProtocolDidFinishLoading(self)
+    }
+
+    override func stopLoading() {}
+
+    static func reset() {
+        lastRequest = nil
+        lastRequestBody = nil
+        responseBody = Data()
+    }
+
+    private static func readBodyStream(_ stream: InputStream) -> Data {
+        stream.open()
+        defer { stream.close() }
+
+        var data = Data()
+        var buffer = [UInt8](repeating: 0, count: 4096)
+        while stream.hasBytesAvailable {
+            let count = stream.read(&buffer, maxLength: buffer.count)
+            if count <= 0 {
+                break
+            }
+            data.append(buffer, count: count)
+        }
+        return data
     }
 }

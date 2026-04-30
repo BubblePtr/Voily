@@ -47,6 +47,12 @@ Settings 里的「测试连接」不属于 `ASRCaptureSession`；这一职责由
 
 新增 provider 见 [docs/decisions/0003-pluggable-asr-providers.md](decisions/0003-pluggable-asr-providers.md)。
 
+### 2.3 LLM 文本润色
+
+`LLMRefinementService` 通过兼容 OpenAI chat completions 的 HTTP 接口调用文本润色 provider。当前 provider 包括 DeepSeek、阿里云百炼、火山引擎、MiniMax、Kimi 和智谱；设置项统一保存在 `TextRefinementProviderConfig`，包含 Base URL、API Key 和 Model。
+
+DeepSeek 的默认 Base URL 是 `https://api.deepseek.com`，默认模型是 `deepseek-v4-flash`，API Key 默认留空，由用户在设置中填写。升级旧配置时，`https://api.deepseek.com/v1` 会规范化为新的 Base URL，`deepseek-chat` 与 `deepseek-reasoner` 会迁移为 `deepseek-v4-flash`，已保存的 API Key 会保留。DeepSeek 请求会显式发送 `thinking: { type: "disabled" }`，避免文本润色路径输出思考内容或引入额外延迟。
+
 ## 3. 现有零散文档
 
 不强迫迁移，原地保留，通过本文件链接收编：
