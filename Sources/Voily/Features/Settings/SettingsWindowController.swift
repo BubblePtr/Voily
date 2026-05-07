@@ -23,6 +23,7 @@ struct SettingsWindowSceneView: View {
             asrConnectionTester: asrConnectionTester,
             managedASRModels: managedASRModels
         )
+        .environment(\.locale, Locale(identifier: settings.appInterfaceLanguage.rawValue))
         .frame(minHeight: 760)
         .background(SettingsWindowLifecycleObserver(registerWindow: registerWindow, onHide: onWindowHide))
         .onAppear {
@@ -141,29 +142,29 @@ private enum SettingsPage: String, CaseIterable, Identifiable, Hashable {
 
     var id: String { rawValue }
 
-    var title: String {
+    func title(languageCode: String) -> String {
         switch self {
         case .home:
-            return "首页"
+            return AppLocalization.localized("首页", languageCode: languageCode)
         case .model:
-            return "模型"
+            return AppLocalization.localized("模型", languageCode: languageCode)
         case .glossary:
-            return "词库"
+            return AppLocalization.localized("词库", languageCode: languageCode)
         case .settings:
-            return "设置"
+            return AppLocalization.localized("设置", languageCode: languageCode)
         }
     }
 
-    var subtitle: String {
+    func subtitle(languageCode: String) -> String {
         switch self {
         case .home:
-            return "今天的语音输入情况、趋势变化和完整历史都集中放在这里。"
+            return AppLocalization.localized("今天的语音输入情况、趋势变化和完整历史都集中放在这里。", languageCode: languageCode)
         case .model:
-            return "按模型角色选择默认 provider。触发键单击用于普通听写，长按用于快捷翻译；触发键可在“设置”页调整。"
+            return AppLocalization.localized("按模型角色选择默认 provider。触发键单击用于普通听写，长按用于快捷翻译；触发键可在“设置”页调整。", languageCode: languageCode)
         case .glossary:
-            return "选择默认术语包，并维护自定义词条。该词库会参与 LLM 文本润色。"
+            return AppLocalization.localized("选择默认术语包，并维护自定义词条。该词库会参与 LLM 文本润色。", languageCode: languageCode)
         case .settings:
-            return "在这里管理输入语言和 app 的通用行为说明。模型、文本处理和词库配置分别保留在各自页面。"
+            return AppLocalization.localized("在这里管理输入语言和 app 的通用行为说明。模型、文本处理和词库配置分别保留在各自页面。", languageCode: languageCode)
         }
     }
 
@@ -196,6 +197,8 @@ private struct SettingsRootView: View {
     }
 
     var body: some View {
+        let interfaceLanguageCode = settings.appInterfaceLanguageCode
+
         NavigationSplitView {
             List(selection: $selection) {
                 Section {
@@ -213,9 +216,10 @@ private struct SettingsRootView: View {
                                 .scaledToFit()
                                 .frame(width: 18, height: 18)
 
-                            Text(page.title)
+                            Text(page.title(languageCode: interfaceLanguageCode))
                                 .font(.system(size: 14, weight: .medium))
                         }
+                        .id("\(page.id)-\(interfaceLanguageCode)")
                         .tag(page)
                     }
                 }
@@ -241,8 +245,8 @@ private struct SettingsRootView: View {
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .navigationTitle(currentPage.title)
-            .navigationSubtitle(currentPage.subtitle)
+            .navigationTitle(currentPage.title(languageCode: interfaceLanguageCode))
+            .navigationSubtitle(currentPage.subtitle(languageCode: interfaceLanguageCode))
         }
     }
 }
@@ -539,10 +543,10 @@ private struct ModelSettingsPage: View {
                                 subtitle: provider.providerSummary,
                                 logoName: provider.logoAssetName,
                                 logoFallbackText: provider.logoFallbackText,
-                                tag: "云端",
+                                tag: AppLocalization.localized("云端"),
                                 isSelected: draftSelectedTextProvider == provider,
                                 isConfigured: isConfigured,
-                                statusText: isConfigured ? "已配置" : "未配置",
+                                statusText: isConfigured ? AppLocalization.localized("已配置") : AppLocalization.localized("未配置"),
                                 onOpen: { presentedSheet = .text(provider) }
                             )
                         }
@@ -592,7 +596,10 @@ private struct ModelSettingsPage: View {
                     onSave: { config in
                         asrDrafts[provider] = config
                         settings.setASRConfig(config, for: provider)
-                        statusMessage = "已保存 \(provider.displayName) 配置。"
+                        statusMessage = String(
+                            format: AppLocalization.localized("已保存 %@ 配置。"),
+                            provider.displayName
+                        )
                     }
                 )
             case let .text(provider):
@@ -604,7 +611,10 @@ private struct ModelSettingsPage: View {
                     onSave: { config in
                         textDrafts[provider] = config
                         settings.setTextRefinementConfig(config, for: provider)
-                        statusMessage = "已保存 \(provider.displayName) 配置。"
+                        statusMessage = String(
+                            format: AppLocalization.localized("已保存 %@ 配置。"),
+                            provider.displayName
+                        )
                     }
                 )
             }
@@ -644,7 +654,10 @@ private struct ModelSettingsPage: View {
         case .cloud:
             let config = asrDrafts[provider] ?? .empty
             let isConfigured = config.isConfigured(for: provider)
-            return (isConfigured, isConfigured ? "已配置" : "未配置")
+            return (
+                isConfigured,
+                isConfigured ? AppLocalization.localized("已配置") : AppLocalization.localized("未配置")
+            )
         }
     }
 }
@@ -756,13 +769,13 @@ private struct DefaultModelSelectorColumn<SelectionValue: Hashable & CaseIterabl
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text(title)
+            Text(LocalizedStringKey(title))
                 .font(.system(size: 16, weight: .semibold))
 
             Menu {
                 ForEach(menuSections) { section in
                     if let title = section.title {
-                        Section(title) {
+                        Section(LocalizedStringKey(title)) {
                             sectionButtons(for: section.options)
                         }
                     } else {
@@ -802,7 +815,7 @@ private struct DefaultModelSelectorColumn<SelectionValue: Hashable & CaseIterabl
                     .foregroundStyle(.primary)
             }
 
-            Text(description)
+            Text(LocalizedStringKey(description))
                 .font(.system(size: 13))
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -889,7 +902,7 @@ private struct SectionTitle: View {
     let title: String
 
     var body: some View {
-        Text(title)
+        Text(LocalizedStringKey(title))
             .font(.system(size: 18, weight: .semibold))
     }
 }
@@ -919,18 +932,18 @@ private struct ProviderServiceCard: View {
                             TagBadge(text: tag)
 
                             if isSelected {
-                                TagBadge(text: "默认")
+                                TagBadge(text: AppLocalization.localized("默认"))
                             }
                         }
 
-                        Text(subtitle)
+                        Text(LocalizedStringKey(subtitle))
                             .font(.system(size: 13))
                             .foregroundStyle(.secondary)
                             .lineLimit(1)
                             .truncationMode(.tail)
 
                         if let statusText {
-                            Text(statusText)
+                            Text(LocalizedStringKey(statusText))
                                 .font(.system(size: 12, weight: .medium))
                                 .foregroundStyle(.secondary)
                         }
@@ -1048,7 +1061,7 @@ private struct ASRProviderConfigSheet: View {
             }
 
             SheetFooter(
-                statusText: provider.category == .local ? "本地模型由应用托管下载和卸载。" : provider.cloudStatusText,
+                statusText: provider.category == .local ? AppLocalization.localized("本地模型由应用托管下载和卸载。") : provider.cloudStatusText,
                 onCancel: { dismiss() },
                 onSave: {
                     onSave(normalizedConfig(draftConfig))
@@ -1090,7 +1103,7 @@ private struct ASRProviderConfigSheet: View {
                 }
             }
         }
-        .alert("下载 \(provider.displayName)", isPresented: $showingInstallConfirmation) {
+        .alert(installConfirmationTitle, isPresented: $showingInstallConfirmation) {
             Button("取消", role: .cancel) {}
             Button("确认下载") {
                 onInstall()
@@ -1101,12 +1114,12 @@ private struct ASRProviderConfigSheet: View {
     }
 
     private var defaultTestingHint: String {
-        "会使用当前表单内容发起一次真实握手。"
+        AppLocalization.localized("会使用当前表单内容发起一次真实握手。")
     }
 
     private func testConnection() {
         isTesting = true
-        statusMessage = "正在测试连接..."
+        statusMessage = AppLocalization.localized("正在测试连接...")
         draftConfig = normalizedConfig(draftConfig)
 
         Task {
@@ -1118,11 +1131,18 @@ private struct ASRProviderConfigSheet: View {
                     config: draftConfig,
                     languageCode: languageCode
                 )
-                statusMessage = "连接成功，可以用于实时识别。"
+                statusMessage = AppLocalization.localized("连接成功，可以用于实时识别。")
             } catch {
-                statusMessage = "测试失败：\(error.localizedDescription)"
+                statusMessage = String(
+                    format: AppLocalization.localized("测试失败：%@"),
+                    error.localizedDescription
+                )
             }
         }
+    }
+
+    private var installConfirmationTitle: String {
+        String(format: AppLocalization.localized("下载 %@"), provider.displayName)
     }
 
     private func normalizedConfig(_ config: ASRProviderConfig) -> ASRProviderConfig {
@@ -1208,12 +1228,12 @@ private struct TextRefinementProviderConfigSheet: View {
     }
 
     private var defaultTestingHint: String {
-        "会使用当前表单内容发起一次真实请求。"
+        AppLocalization.localized("会使用当前表单内容发起一次真实请求。")
     }
 
     private func testConnection() {
         isTesting = true
-        statusMessage = "正在测试连接..."
+        statusMessage = AppLocalization.localized("正在测试连接...")
 
         let suiteName = "Voily.SettingsSheet.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!
@@ -1227,9 +1247,12 @@ private struct TextRefinementProviderConfigSheet: View {
 
             do {
                 try await llmService.testConnection(settings: tempSettings)
-                statusMessage = "连接成功，可以用于文本处理。"
+                statusMessage = AppLocalization.localized("连接成功，可以用于文本处理。")
             } catch {
-                statusMessage = "测试失败：\(error.localizedDescription)"
+                statusMessage = String(
+                    format: AppLocalization.localized("测试失败：%@"),
+                    error.localizedDescription
+                )
             }
         }
     }
@@ -1325,16 +1348,6 @@ private enum BrandIconLoader {
     }
 }
 
-private enum ResourceBundle {
-    static var current: Bundle {
-#if SWIFT_PACKAGE
-        return .module
-#else
-        return Bundle.main
-#endif
-    }
-}
-
 private struct ManagedLocalProviderFields: View {
     let provider: ASRProvider
     let managedState: ManagedASRInstallState
@@ -1357,7 +1370,7 @@ private struct ManagedLocalProviderFields: View {
             }
 
             SettingsFormField(title: "下载内容") {
-                Text("\(provider.displayName) 的 MLX 模型文件，\(estimatedDownload)")
+                Text(downloadDescription)
                     .font(.system(size: 13))
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -1591,7 +1604,10 @@ private struct GlossarySettingsPage: View {
                                 ForEach(settings.customGlossaryTerms, id: \.self) { term in
                                     EditableGlossaryTag(text: term) {
                                         settings.removeCustomGlossaryTerm(term)
-                                        statusMessage = "已删除自定义词条：\(term)"
+                                        statusMessage = String(
+                                            format: AppLocalization.localized("已删除自定义词条：%@"),
+                                            term
+                                        )
                                     }
                                 }
                             }
@@ -1600,11 +1616,11 @@ private struct GlossarySettingsPage: View {
                         HStack(spacing: 12) {
                             Button("清空自定义词条") {
                                 settings.clearCustomGlossaryTerms()
-                                statusMessage = "自定义词条已清空。"
+                                statusMessage = AppLocalization.localized("自定义词条已清空。")
                             }
                             .disabled(settings.customGlossaryTerms.isEmpty)
 
-                            Text(statusMessage.isEmpty ? "当前共 \(settings.customGlossaryTerms.count) 条自定义词条。" : statusMessage)
+                            Text(statusMessage.isEmpty ? customGlossaryCountStatus : statusMessage)
                                 .font(.system(size: 12))
                                 .foregroundStyle(.secondary)
                         }
@@ -1618,10 +1634,10 @@ private struct GlossarySettingsPage: View {
                     } else {
                         VStack(alignment: .leading, spacing: 16) {
                             HStack(spacing: 12) {
-                                TagBadge(text: "共 \(settings.effectiveGlossaryItems.count) 条")
-                                TagBadge(text: "默认包 \(settings.enabledGlossaryPresetIDs.count) 个")
+                                TagBadge(text: String(format: AppLocalization.localized("共 %@ 条"), "\(settings.effectiveGlossaryItems.count)"))
+                                TagBadge(text: String(format: AppLocalization.localized("默认包 %@ 个"), "\(settings.enabledGlossaryPresetIDs.count)"))
                                 if !settings.customGlossaryTerms.isEmpty {
-                                    TagBadge(text: "自定义 \(settings.customGlossaryTerms.count) 条")
+                                    TagBadge(text: String(format: AppLocalization.localized("自定义 %@ 条"), "\(settings.customGlossaryTerms.count)"))
                                 }
                             }
 
@@ -1631,7 +1647,7 @@ private struct GlossarySettingsPage: View {
                                         Text(section.title)
                                             .font(.system(size: 14, weight: .semibold))
 
-                                        Text("\(section.items.count) 条")
+                                        Text(String(format: AppLocalization.localized("%@ 条"), "\(section.items.count)"))
                                             .font(.system(size: 12))
                                             .foregroundStyle(.secondary)
                                     }
@@ -1643,7 +1659,7 @@ private struct GlossarySettingsPage: View {
                                     }
 
                                     if section.items.count > 8 {
-                                        Text("还有 \(section.items.count - 8) 条未展开")
+                                        Text(String(format: AppLocalization.localized("还有 %@ 条未展开"), "\(section.items.count - 8)"))
                                             .font(.system(size: 12))
                                             .foregroundStyle(.secondary)
                                     }
@@ -1663,7 +1679,11 @@ private struct GlossarySettingsPage: View {
     private func togglePreset(_ presetID: GlossaryPresetID, name: String) {
         let isCurrentlyEnabled = settings.enabledGlossaryPresetIDs.contains(presetID)
         settings.toggleGlossaryPreset(presetID)
-        statusMessage = isCurrentlyEnabled ? "已停用术语包：\(name)" : "已启用术语包：\(name)"
+        if isCurrentlyEnabled {
+            statusMessage = String(format: AppLocalization.localized("已停用术语包：%@"), name)
+        } else {
+            statusMessage = String(format: AppLocalization.localized("已启用术语包：%@"), name)
+        }
     }
 
     private func addCustomTerm() {
@@ -1672,10 +1692,20 @@ private struct GlossarySettingsPage: View {
 
         if settings.addCustomGlossaryTerm(term) {
             draftCustomTerm = ""
-            statusMessage = "已添加自定义词条：\(term)"
+            statusMessage = String(
+                format: AppLocalization.localized("已添加自定义词条：%@"),
+                term
+            )
         } else {
-            statusMessage = "词条已存在或内容为空。"
+            statusMessage = AppLocalization.localized("词条已存在或内容为空。")
         }
+    }
+
+    private var customGlossaryCountStatus: String {
+        String(
+            format: AppLocalization.localized("当前共 %@ 条自定义词条。"),
+            "\(settings.customGlossaryTerms.count)"
+        )
     }
 }
 
@@ -1697,6 +1727,22 @@ private struct GeneralSettingsPage: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 24) {
+                SettingsCard(title: "界面语言", subtitle: "选择 Voily 的界面显示语言") {
+                    VStack(alignment: .leading, spacing: 14) {
+                        Picker("界面语言", selection: $settings.appInterfaceLanguage) {
+                            ForEach(AppInterfaceLanguage.allCases) { language in
+                                Text(language.displayName).tag(language)
+                            }
+                        }
+                        .pickerStyle(.menu)
+                        .labelsHidden()
+
+                        Text("界面会立即按所选语言更新。")
+                            .font(.system(size: 12))
+                            .foregroundStyle(.secondary)
+                    }
+                }
+
                 SettingsCard(title: "输入语言", subtitle: "普通听写默认使用这里选择的语言") {
                     VStack(alignment: .leading, spacing: 14) {
                         Picker("输入语言", selection: $settings.selectedLanguage) {
@@ -1816,10 +1862,10 @@ private struct GeneralSettingNoteRow: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text(title)
+            Text(LocalizedStringKey(title))
                 .font(.system(size: 14, weight: .semibold))
 
-            Text(detail)
+            Text(LocalizedStringKey(detail))
                 .font(.system(size: 13))
                 .foregroundStyle(.secondary)
         }
@@ -1846,21 +1892,30 @@ private struct MicrophoneInputSettingsCard: View {
     private var selectedDeviceDescription: String {
         if let preferredMicrophoneUID,
            let device = availableDevices.first(where: { $0.uid == preferredMicrophoneUID }) {
-            return "当前使用 \(device.name)，普通听写和快捷翻译都会立即生效。"
+            return String(
+                format: AppLocalization.localized("当前使用 %@，普通听写和快捷翻译都会立即生效。"),
+                device.name
+            )
         }
 
         if let automaticallySelectedDevice {
-            return "当前自动选择 \(automaticallySelectedDevice.name)。优先级为 USB > 内置麦克风 > 蓝牙，普通听写和快捷翻译都会立即生效。"
+            return String(
+                format: AppLocalization.localized("当前自动选择 %@。优先级为 USB > 内置麦克风 > 蓝牙，普通听写和快捷翻译都会立即生效。"),
+                automaticallySelectedDevice.name
+            )
         }
 
-        return "当前自动选择可用输入设备。优先级为 USB > 内置麦克风 > 蓝牙，普通听写和快捷翻译都会立即生效。"
+        return AppLocalization.localized("当前自动选择可用输入设备。优先级为 USB > 内置麦克风 > 蓝牙，普通听写和快捷翻译都会立即生效。")
     }
 
     private var automaticSelectionLabel: String {
         if let automaticallySelectedDevice {
-            return "自动选择（当前会用 \(automaticallySelectedDevice.name)）"
+            return String(
+                format: AppLocalization.localized("自动选择（当前会用 %@）"),
+                automaticallySelectedDevice.name
+            )
         }
-        return "自动选择"
+        return AppLocalization.localized("自动选择")
     }
 
     var body: some View {
@@ -1898,12 +1953,22 @@ private struct MicrophoneInputSettingsCard: View {
 
     private func deviceLabel(for device: AudioInputDevice) -> String {
         if automaticallySelectedDevice?.uid == device.uid {
-            return "\(device.name)（自动优先）"
+            return String(format: AppLocalization.localized("%@（自动优先）"), device.name)
         }
         if device.isDefault {
-            return "\(device.name)（系统默认）"
+            return String(format: AppLocalization.localized("%@（系统默认）"), device.name)
         }
         return device.name
+    }
+}
+
+private extension ManagedLocalProviderFields {
+    var downloadDescription: String {
+        String(
+            format: AppLocalization.localized("%@ 的 MLX 模型文件，%@"),
+            provider.displayName,
+            estimatedDownload
+        )
     }
 }
 
@@ -1999,10 +2064,10 @@ struct SettingsCard<Content: View>: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
             VStack(alignment: .leading, spacing: 4) {
-                Text(title)
+                Text(LocalizedStringKey(title))
                     .font(.system(size: 17, weight: .semibold))
 
-                Text(subtitle)
+                Text(LocalizedStringKey(subtitle))
                     .font(.system(size: 12))
                     .foregroundStyle(.secondary)
             }
@@ -2028,7 +2093,7 @@ private struct SettingsFormField<Content: View>: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(title)
+            Text(LocalizedStringKey(title))
                 .font(.system(size: 13, weight: .semibold))
                 .foregroundStyle(.secondary)
 
@@ -2043,7 +2108,7 @@ private struct SettingsInfoRow: View {
 
     var body: some View {
         HStack {
-            Text(label)
+            Text(LocalizedStringKey(label))
                 .foregroundStyle(.secondary)
             Spacer()
             Text(value)
@@ -2206,15 +2271,15 @@ private extension ASRProvider {
     var providerSummary: String {
         switch self {
         case .senseVoice:
-            return "本地常驻识别，偏向中文输入。"
+            return AppLocalization.localized("本地常驻识别，偏向中文输入。")
         case .doubaoStreaming:
-            return "豆包大模型流式识别，适合低延迟输入。"
+            return AppLocalization.localized("豆包大模型流式识别，适合低延迟输入。")
         case .funASR:
-            return "通义实验室流式识别，偏中文听写和方言口音场景。"
+            return AppLocalization.localized("通义实验室流式识别，偏中文听写和方言口音场景。")
         case .qwenASR:
-            return "阿里云实时识别，支持流式返回。"
+            return AppLocalization.localized("阿里云实时识别，支持流式返回。")
         case .stepfunASR:
-            return "跃阶星辰流式识别，当前按官方文档只接中文/英文。"
+            return AppLocalization.localized("跃阶星辰流式识别，当前按官方文档只接中文/英文。")
         }
     }
 
@@ -2307,15 +2372,15 @@ private extension ASRProvider {
     var cloudStatusText: String {
         switch self {
         case .funASR:
-            return "云端流式 provider 会直接建立 Fun-ASR WebSocket 会话，按需同步词库热词，并发送 16k PCM 音频。"
+            return AppLocalization.localized("云端流式 provider 会直接建立 Fun-ASR WebSocket 会话，按需同步词库热词，并发送 16k PCM 音频。")
         case .qwenASR:
-            return "云端流式 provider 会直接建立阿里云实时 ASR WebSocket 会话。"
+            return AppLocalization.localized("云端流式 provider 会直接建立阿里云实时 ASR WebSocket 会话。")
         case .doubaoStreaming:
-            return "云端流式 provider 会直接建立豆包大模型流式识别 WebSocket 会话。"
+            return AppLocalization.localized("云端流式 provider 会直接建立豆包大模型流式识别 WebSocket 会话。")
         case .stepfunASR:
-            return "云端流式 provider 会直接建立跃阶星辰实时 ASR WebSocket 会话。"
+            return AppLocalization.localized("云端流式 provider 会直接建立跃阶星辰实时 ASR WebSocket 会话。")
         case .senseVoice:
-            return "本地模型由应用托管下载和卸载。"
+            return AppLocalization.localized("本地模型由应用托管下载和卸载。")
         }
     }
 
@@ -2335,17 +2400,17 @@ private extension TextRefinementProvider {
     var providerSummary: String {
         switch self {
         case .deepSeek:
-            return "速度优先，适合文本纠错和保守润色。"
+            return AppLocalization.localized("速度优先，适合文本纠错和保守润色。")
         case .dashScope:
-            return "阿里云百炼通道，便于后续扩展 Qwen 系列。"
+            return AppLocalization.localized("阿里云百炼通道，便于后续扩展 Qwen 系列。")
         case .volcengine:
-            return "火山引擎通道，适合后续接入豆包大模型。"
+            return AppLocalization.localized("火山引擎通道，适合后续接入豆包大模型。")
         case .minimax:
-            return "MiniMax OpenAI 兼容通道，适合低成本文本处理。"
+            return AppLocalization.localized("MiniMax OpenAI 兼容通道，适合低成本文本处理。")
         case .kimi:
-            return "Kimi OpenAI 兼容通道，适合中文文本纠错。"
+            return AppLocalization.localized("Kimi OpenAI 兼容通道，适合中文文本纠错。")
         case .zhipu:
-            return "智谱 OpenAI 兼容通道，便于接入 GLM 系列。"
+            return AppLocalization.localized("智谱 OpenAI 兼容通道，便于接入 GLM 系列。")
         }
     }
 

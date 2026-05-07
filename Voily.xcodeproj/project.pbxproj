@@ -45,6 +45,9 @@
 		A001002E0000000000000000 /* BrandIconResourceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00200310000000000000000 /* BrandIconResourceTests.swift */; };
 		A001002F0000000000000000 /* TranscriptLogic.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00200320000000000000000 /* TranscriptLogic.swift */; };
 		A00100300000000000000000 /* DebugLog.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00200330000000000000000 /* DebugLog.swift */; };
+		B00100010000000000000000 /* Localizable.strings in Resources */ = {isa = PBXBuildFile; fileRef = B00400010000000000000000 /* Localizable.strings */; };
+		B00100020000000000000000 /* InfoPlist.strings in Resources */ = {isa = PBXBuildFile; fileRef = B00400020000000000000000 /* InfoPlist.strings */; };
+		B00100030000000000000000 /* AppLocalization.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00200090000000000000000 /* AppLocalization.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -99,6 +102,15 @@
 		A00200310000000000000000 /* BrandIconResourceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrandIconResourceTests.swift; sourceTree = "<group>"; };
 		A00200320000000000000000 /* TranscriptLogic.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptLogic.swift; sourceTree = "<group>"; };
 		A00200330000000000000000 /* DebugLog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DebugLog.swift; sourceTree = "<group>"; };
+		B00200010000000000000000 /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = Resources/en.lproj/Localizable.strings; sourceTree = SOURCE_ROOT; };
+		B00200020000000000000000 /* zh-Hans */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hans"; path = "Resources/zh-Hans.lproj/Localizable.strings"; sourceTree = SOURCE_ROOT; };
+		B00200030000000000000000 /* zh-Hant */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hant"; path = "Resources/zh-Hant.lproj/Localizable.strings"; sourceTree = SOURCE_ROOT; };
+		B00200040000000000000000 /* ja */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = ja; path = Resources/ja.lproj/Localizable.strings; sourceTree = SOURCE_ROOT; };
+		B00200050000000000000000 /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = Resources/en.lproj/InfoPlist.strings; sourceTree = SOURCE_ROOT; };
+		B00200060000000000000000 /* zh-Hans */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hans"; path = "Resources/zh-Hans.lproj/InfoPlist.strings"; sourceTree = SOURCE_ROOT; };
+		B00200070000000000000000 /* zh-Hant */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hant"; path = "Resources/zh-Hant.lproj/InfoPlist.strings"; sourceTree = SOURCE_ROOT; };
+		B00200080000000000000000 /* ja */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = ja; path = Resources/ja.lproj/InfoPlist.strings; sourceTree = SOURCE_ROOT; };
+		B00200090000000000000000 /* AppLocalization.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppLocalization.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -136,6 +148,8 @@
 				A00400020000000000000000 /* Sources/Voily */,
 				A00400050000000000000000 /* Tests/VoilyTests */,
 				A002001F0000000000000000 /* Resources/Assets.xcassets */,
+				B00400010000000000000000 /* Localizable.strings */,
+				B00400020000000000000000 /* InfoPlist.strings */,
 				A00400030000000000000000 /* Config */,
 				A00400040000000000000000 /* Products */,
 				75A5D1952F9328CC00667CCE /* Recovered References */,
@@ -331,12 +345,38 @@
 		A00400150000000000000000 /* Support */ = {
 			isa = PBXGroup;
 			children = (
+				B00200090000000000000000 /* AppLocalization.swift */,
 				A00200330000000000000000 /* DebugLog.swift */,
 			);
 			path = Support;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
+
+/* Begin PBXVariantGroup section */
+		B00400010000000000000000 /* Localizable.strings */ = {
+			isa = PBXVariantGroup;
+			children = (
+				B00200010000000000000000 /* en */,
+				B00200020000000000000000 /* zh-Hans */,
+				B00200030000000000000000 /* zh-Hant */,
+				B00200040000000000000000 /* ja */,
+			);
+			name = Localizable.strings;
+			sourceTree = "<group>";
+		};
+		B00400020000000000000000 /* InfoPlist.strings */ = {
+			isa = PBXVariantGroup;
+			children = (
+				B00200050000000000000000 /* en */,
+				B00200060000000000000000 /* zh-Hans */,
+				B00200070000000000000000 /* zh-Hant */,
+				B00200080000000000000000 /* ja */,
+			);
+			name = InfoPlist.strings;
+			sourceTree = "<group>";
+		};
+/* End PBXVariantGroup section */
 
 /* Begin PBXNativeTarget section */
 		A00500010000000000000000 /* Voily */ = {
@@ -402,6 +442,9 @@
 			knownRegions = (
 				en,
 				Base,
+				"zh-Hans",
+				"zh-Hant",
+				ja,
 			);
 			mainGroup = A00400010000000000000000;
 			minimizedProjectReferenceProxies = 1;
@@ -421,6 +464,8 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				B00100010000000000000000 /* Localizable.strings in Resources */,
+				B00100020000000000000000 /* InfoPlist.strings in Resources */,
 				A001001C0000000000000000 /* Resources/Assets.xcassets in Resources */,
 				A00100110000000000000000 /* Resources/BrandIcons in Resources */,
 			);
@@ -460,6 +505,7 @@
 				A001002F0000000000000000 /* TranscriptLogic.swift in Sources */,
 				A00100130000000000000000 /* UsageStore.swift in Sources */,
 				A001000E0000000000000000 /* VoilyApp.swift in Sources */,
+				B00100030000000000000000 /* AppLocalization.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

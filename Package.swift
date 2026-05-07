@@ -37,6 +37,7 @@ let package = Package(
                 "Services/Audio/TranscriptLogic.swift",
                 "Services/Text/LLMRefinementService.swift",
                 "Storage/UsageStore.swift",
+                "Support/AppLocalization.swift",
                 "Support/DebugLog.swift",
             ],
             linkerSettings: [

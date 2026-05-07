@@ -17,11 +17,11 @@ enum ManagedASRInstallState: Equatable {
     var statusText: String {
         switch self {
         case .notInstalled:
-            return "未下载"
+            return AppLocalization.localized("未下载")
         case let .installing(message):
             return message
         case .installed:
-            return "已下载"
+            return AppLocalization.localized("已下载")
         case let .failed(message):
             return message
         }
@@ -121,12 +121,12 @@ final class ManagedASRModelStore {
             try fileManager.createDirectory(at: installRoot, withIntermediateDirectories: true)
 
             if let runtimePackageURL = spec.runtimePackageURL, let runtimeArchiveName = spec.runtimeArchiveName {
-                states[provider] = .installing("正在下载运行时...")
+                states[provider] = .installing(AppLocalization.localized("正在下载运行时..."))
                 let runtimeArchiveURL = installRoot.appending(path: runtimeArchiveName)
                 try await Self.downloadFile(from: runtimePackageURL, to: runtimeArchiveURL)
 
                 try Task.checkCancellation()
-                states[provider] = .installing("正在安装运行时...")
+                states[provider] = .installing(AppLocalization.localized("正在安装运行时..."))
                 try await Self.extractArchive(at: runtimeArchiveURL, to: installRoot)
                 try? fileManager.removeItem(at: runtimeArchiveURL)
             }
@@ -134,8 +134,8 @@ final class ManagedASRModelStore {
             for (index, modelFile) in spec.modelFiles.enumerated() {
                 try Task.checkCancellation()
                 let message = spec.modelFiles.count == 1
-                    ? "正在下载模型..."
-                    : "正在下载模型文件 \(index + 1)/\(spec.modelFiles.count)..."
+                    ? AppLocalization.localized("正在下载模型...")
+                    : String(format: AppLocalization.localized("正在下载模型文件 %@..."), "\(index + 1)/\(spec.modelFiles.count)")
                 states[provider] = .installing(message)
                 let destination = installRoot.appending(path: modelFile.relativePath)
                 try fileManager.createDirectory(at: destination.deletingLastPathComponent(), withIntermediateDirectories: true)
@@ -268,11 +268,11 @@ enum ManagedASRModelError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .invalidDownloadURL:
-            return "模型下载地址无效。"
+            return AppLocalization.localized("模型下载地址无效。")
         case let .commandFailed(message):
             return message
         case .installationIncomplete:
-            return "模型安装完成，但关键文件缺失。"
+            return AppLocalization.localized("模型安装完成，但关键文件缺失。")
         }
     }
 }

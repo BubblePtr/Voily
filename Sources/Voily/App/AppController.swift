@@ -134,6 +134,7 @@ final class AppController: NSObject {
     private var statusMenu: NSMenu?
     private var dashboardMenuItem: NSMenuItem?
     private var dashboardHostingView: NSHostingView<MenuDashboardMenuItemView>?
+    private var appInterfaceLanguageObserver: NSObjectProtocol?
     private var currentPhase: OverlayPhase = .idle
     private var currentOverlayControls: OverlayControls = .none
     private var currentText = ""
@@ -178,6 +179,7 @@ final class AppController: NSObject {
         debugLog("AppController.start()")
         configureMainMenu()
         configureStatusItem()
+        observeAppInterfaceLanguagePreference()
         observeDockIconPreference()
         observeAppIconPreference()
         observeTriggerKeyPreference()
@@ -193,6 +195,10 @@ final class AppController: NSObject {
         hasStopped = true
 
         debugLog("AppController.stop()")
+        if let appInterfaceLanguageObserver {
+            NotificationCenter.default.removeObserver(appInterfaceLanguageObserver)
+            self.appInterfaceLanguageObserver = nil
+        }
         triggerKeyMonitor.stop()
         audioCaptureService.stop()
         await activeASRSession?.session.cancel()
@@ -407,15 +413,27 @@ final class AppController: NSObject {
         let appMenuItem = NSMenuItem()
         let appMenu = NSMenu(title: "Voily")
 
-        let openSettingsItem = NSMenuItem(title: "设置…", action: #selector(openSettings), keyEquivalent: ",")
+        let openSettingsItem = NSMenuItem(
+            title: AppLocalization.localized("设置…"),
+            action: #selector(openSettings),
+            keyEquivalent: ","
+        )
         openSettingsItem.target = self
         appMenu.addItem(openSettingsItem)
 
-        let hideItem = NSMenuItem(title: "隐藏 Voily", action: #selector(NSApplication.hide(_:)), keyEquivalent: "h")
+        let hideItem = NSMenuItem(
+            title: AppLocalization.localized("隐藏 Voily"),
+            action: #selector(NSApplication.hide(_:)),
+            keyEquivalent: "h"
+        )
         appMenu.addItem(hideItem)
         appMenu.addItem(.separator())
 
-        let quitItem = NSMenuItem(title: "退出 Voily", action: #selector(quit), keyEquivalent: "q")
+        let quitItem = NSMenuItem(
+            title: AppLocalization.localized("退出 Voily"),
+            action: #selector(quit),
+            keyEquivalent: "q"
+        )
         quitItem.target = self
         appMenu.addItem(quitItem)
 
@@ -423,15 +441,41 @@ final class AppController: NSObject {
         mainMenu.addItem(appMenuItem)
 
         let editMenuItem = NSMenuItem()
-        let editMenu = NSMenu(title: "Edit")
-        editMenu.addItem(withTitle: "Cut", action: #selector(NSText.cut(_:)), keyEquivalent: "x")
-        editMenu.addItem(withTitle: "Copy", action: #selector(NSText.copy(_:)), keyEquivalent: "c")
-        editMenu.addItem(withTitle: "Paste", action: #selector(NSText.paste(_:)), keyEquivalent: "v")
-        editMenu.addItem(withTitle: "Select All", action: #selector(NSText.selectAll(_:)), keyEquivalent: "a")
+        let editMenu = NSMenu(title: AppLocalization.localized("Edit"))
+        editMenu.addItem(withTitle: AppLocalization.localized("Cut"), action: #selector(NSText.cut(_:)), keyEquivalent: "x")
+        editMenu.addItem(withTitle: AppLocalization.localized("Copy"), action: #selector(NSText.copy(_:)), keyEquivalent: "c")
+        editMenu.addItem(withTitle: AppLocalization.localized("Paste"), action: #selector(NSText.paste(_:)), keyEquivalent: "v")
+        editMenu.addItem(withTitle: AppLocalization.localized("Select All"), action: #selector(NSText.selectAll(_:)), keyEquivalent: "a")
         editMenuItem.submenu = editMenu
         mainMenu.addItem(editMenuItem)
 
         NSApp.mainMenu = mainMenu
+    }
+
+    private func observeAppInterfaceLanguagePreference() {
+        if let appInterfaceLanguageObserver {
+            NotificationCenter.default.removeObserver(appInterfaceLanguageObserver)
+            self.appInterfaceLanguageObserver = nil
+        }
+        appInterfaceLanguageObserver = NotificationCenter.default.addObserver(
+            forName: AppSettings.appInterfaceLanguageDidChange,
+            object: settings,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in
+                self?.applyAppInterfaceLanguage()
+            }
+        }
+    }
+
+    private func applyAppInterfaceLanguage() {
+        configureMainMenu()
+        if let statusItem {
+            let menu = makeMenu()
+            statusItem.menu = menu
+            statusMenu = menu
+        }
+        refreshDashboardMenuItem()
     }
 
     private func makeMenu() -> NSMenu {
@@ -446,11 +490,11 @@ final class AppController: NSObject {
 
         menu.addItem(.separator())
 
-        let voilyItem = NSMenuItem(title: "显示 Voily", action: #selector(openSettings), keyEquivalent: "")
+        let voilyItem = NSMenuItem(title: AppLocalization.localized("显示 Voily"), action: #selector(openSettings), keyEquivalent: "")
         voilyItem.target = self
         menu.addItem(voilyItem)
 
-        let quitItem = NSMenuItem(title: "Quit", action: #selector(quit), keyEquivalent: "q")
+        let quitItem = NSMenuItem(title: AppLocalization.localized("Quit"), action: #selector(quit), keyEquivalent: "q")
         quitItem.target = self
         menu.addItem(quitItem)
 
@@ -578,7 +622,7 @@ final class AppController: NSObject {
         debugLog("beginRecording mode=\(mode.debugName)")
         if mode == .quickTranslationZhToEn, !settings.isTextRefinementConfigured {
             triggerKeyMonitor.setSessionMode(.idle)
-            await showTransientMessage("Set up a text model in Settings first.")
+            await showTransientMessage(AppLocalization.localized("Set up a text model in Settings first."))
             return
         }
 
@@ -721,7 +765,7 @@ final class AppController: NSObject {
                 didApplyTextProcessing = true
             } catch {
                 NSLog("LLM translation failed: \(error.localizedDescription)")
-                await showTransientMessage("Translation failed. Try again.")
+                await showTransientMessage(AppLocalization.localized("Translation failed. Try again."))
                 await cleanupCurrentSession(hideOverlay: true)
                 return
             }

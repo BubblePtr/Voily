@@ -104,6 +104,48 @@ final class AppSettingsTests: XCTestCase {
         XCTAssertEqual(reloaded.selectedLanguage, .english)
     }
 
+    func testAppInterfaceLanguageDefaultsToSimplifiedChinese() {
+        let defaults = makeDefaults()
+        let settings = AppSettings(defaults: defaults)
+
+        XCTAssertEqual(settings.appInterfaceLanguage, .simplifiedChinese)
+        XCTAssertEqual(defaults.string(forKey: "appInterfaceLanguageCode"), AppInterfaceLanguage.simplifiedChinese.rawValue)
+        XCTAssertEqual(defaults.stringArray(forKey: "AppleLanguages"), [AppInterfaceLanguage.simplifiedChinese.rawValue])
+    }
+
+    func testAppInterfaceLanguagePersistsAcrossReload() {
+        let defaults = makeDefaults()
+        let settings = AppSettings(defaults: defaults)
+
+        settings.appInterfaceLanguage = .japanese
+
+        let reloaded = AppSettings(defaults: defaults)
+        XCTAssertEqual(reloaded.appInterfaceLanguage, .japanese)
+        XCTAssertEqual(reloaded.appInterfaceLanguageCode, AppInterfaceLanguage.japanese.rawValue)
+    }
+
+    func testInvalidAppInterfaceLanguageFallsBackToSimplifiedChinese() {
+        let defaults = makeDefaults()
+        defaults.set("ko", forKey: "appInterfaceLanguageCode")
+
+        let settings = AppSettings(defaults: defaults)
+
+        XCTAssertEqual(settings.appInterfaceLanguage, .simplifiedChinese)
+        XCTAssertEqual(settings.appInterfaceLanguageCode, AppInterfaceLanguage.simplifiedChinese.rawValue)
+        XCTAssertEqual(defaults.stringArray(forKey: "AppleLanguages"), [AppInterfaceLanguage.simplifiedChinese.rawValue])
+    }
+
+    func testAppInterfaceLanguageWritesAppleLanguagesOnChange() {
+        let defaults = makeDefaults()
+        let settings = AppSettings(defaults: defaults)
+
+        settings.appInterfaceLanguage = .traditionalChinese
+
+        XCTAssertEqual(defaults.string(forKey: "appInterfaceLanguageCode"), AppInterfaceLanguage.traditionalChinese.rawValue)
+        XCTAssertEqual(defaults.stringArray(forKey: "AppleLanguages"), [AppInterfaceLanguage.traditionalChinese.rawValue])
+        XCTAssertEqual(AppLocalization.currentLanguageCode, AppInterfaceLanguage.traditionalChinese.rawValue)
+    }
+
     func testLegacyModelSnapshotWithoutTriggerKeyDefaultsToFn() throws {
         let defaults = makeDefaults()
         defaults.set(try legacyModelSnapshotData(), forKey: "modelSettingsSnapshot")
