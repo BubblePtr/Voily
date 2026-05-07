@@ -24,3 +24,27 @@ enum SupportedLanguage: String, CaseIterable, Identifiable {
         }
     }
 }
+
+enum AppInterfaceLanguage: String, CaseIterable, Identifiable {
+    case simplifiedChinese = "zh-Hans"
+    case traditionalChinese = "zh-Hant"
+    case english = "en"
+    case japanese = "ja"
+
+    static let defaultLanguage: AppInterfaceLanguage = .simplifiedChinese
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .simplifiedChinese:
+            return "简体中文"
+        case .traditionalChinese:
+            return "繁體中文"
+        case .english:
+            return "English"
+        case .japanese:
+            return "日本語"
+        }
+    }
+}

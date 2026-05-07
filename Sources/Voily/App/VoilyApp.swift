@@ -24,7 +24,7 @@ private struct SettingsWindowCommands: Commands {
         registerOpenSettingsWindowAction()
 
         return CommandGroup(replacing: .appSettings) {
-            Button("Settings...") {
+            Button(AppLocalization.localized("Settings...")) {
                 appController.showSettingsWindow()
             }
             .keyboardShortcut(",", modifiers: .command)

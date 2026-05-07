@@ -73,22 +73,22 @@ enum DictationProcessingSkill: String, CaseIterable, Codable, Identifiable {
     var displayName: String {
         switch self {
         case .removeFillers:
-            return "去语气词"
+            return AppLocalization.localized("去语气词")
         case .formalize:
-            return "更正式"
+            return AppLocalization.localized("更正式")
         case .orderedList:
-            return "整理成有序列表"
+            return AppLocalization.localized("整理成有序列表")
         }
     }
 
     var summary: String {
         switch self {
         case .removeFillers:
-            return "删除明显语气词和停顿赘词，尽量不改句子结构。"
+            return AppLocalization.localized("删除明显语气词和停顿赘词，尽量不改句子结构。")
         case .formalize:
-            return "将口述表达整理为中性书面语，不扩写、不总结。"
+            return AppLocalization.localized("将口述表达整理为中性书面语，不扩写、不总结。")
         case .orderedList:
-            return "当内容包含 2 个及以上清晰事项时，整理为纯文本编号列表。"
+            return AppLocalization.localized("当内容包含 2 个及以上清晰事项时，整理为纯文本编号列表。")
         }
     }
 }
@@ -100,9 +100,9 @@ enum ProviderCategory: String, Codable {
     var displayName: String {
         switch self {
         case .local:
-            return "本地"
+            return AppLocalization.localized("本地")
         case .cloud:
-            return "云端"
+            return AppLocalization.localized("云端")
         }
     }
 }
@@ -116,9 +116,9 @@ enum AppIconVariant: String, CaseIterable, Codable, Identifiable {
     var displayName: String {
         switch self {
         case .default:
-            return "默认图标"
+            return AppLocalization.localized("默认图标")
         case .easterEggSVG4:
-            return "彩蛋图标"
+            return AppLocalization.localized("彩蛋图标")
         }
     }
 
@@ -150,9 +150,9 @@ enum TriggerKey: String, CaseIterable, Codable, Identifiable {
     var summary: String {
         switch self {
         case .fn:
-            return "单击 Fn 开始普通听写，再单击一次 Fn 结束；长按 Fn 0.8 秒启动快捷翻译。"
+            return AppLocalization.localized("单击 Fn 开始普通听写，再单击一次 Fn 结束；长按 Fn 0.8 秒启动快捷翻译。")
         case .rightCommand:
-            return "单击右 Command 开始普通听写，再单击一次右 Command 结束；长按右 Command 0.8 秒启动快捷翻译。"
+            return AppLocalization.localized("单击右 Command 开始普通听写，再单击一次右 Command 结束；长按右 Command 0.8 秒启动快捷翻译。")
         }
     }
 }
@@ -659,7 +659,11 @@ private extension String {
 @MainActor
 @Observable
 final class AppSettings {
+    static let appInterfaceLanguageDidChange = Notification.Name("VoilyAppInterfaceLanguageDidChange")
+
     private enum Keys {
+        static let appInterfaceLanguageCode = "appInterfaceLanguageCode"
+        static let appleLanguages = "AppleLanguages"
         static let selectedLanguageCode = "selectedLanguageCode"
         static let glossaryEntries = "glossaryEntries"
         static let glossarySettingsSnapshot = "glossarySettingsSnapshot"
@@ -677,6 +681,24 @@ final class AppSettings {
         didSet {
             defaults.set(selectedLanguageCode, forKey: Keys.selectedLanguageCode)
             flushDefaults()
+        }
+    }
+
+    var appInterfaceLanguageCode: String {
+        didSet {
+            let normalizedCode = Self.normalizedInterfaceLanguageCode(appInterfaceLanguageCode)
+            let previousCode = Self.normalizedInterfaceLanguageCode(oldValue)
+            if normalizedCode != appInterfaceLanguageCode {
+                appInterfaceLanguageCode = normalizedCode
+                return
+            }
+            defaults.set(normalizedCode, forKey: Keys.appInterfaceLanguageCode)
+            defaults.set([normalizedCode], forKey: Keys.appleLanguages)
+            AppLocalization.setLanguageCode(normalizedCode)
+            flushDefaults()
+            if previousCode != normalizedCode {
+                NotificationCenter.default.post(name: Self.appInterfaceLanguageDidChange, object: self)
+            }
         }
     }
 
@@ -773,6 +795,9 @@ final class AppSettings {
     init(defaults: UserDefaults = .standard) {
         let legacyGlossaryEntries = defaults.string(forKey: Keys.glossaryEntries) ?? ""
         self.defaults = defaults
+        self.appInterfaceLanguageCode = Self.normalizedInterfaceLanguageCode(
+            defaults.string(forKey: Keys.appInterfaceLanguageCode)
+        )
         self.selectedLanguageCode = defaults.string(forKey: Keys.selectedLanguageCode) ?? SupportedLanguage.simplifiedChinese.rawValue
         self.glossaryEntries = legacyGlossaryEntries
         self.glossaryState = Self.loadGlossarySnapshot(from: defaults)
@@ -794,9 +819,15 @@ final class AppSettings {
             rawValue: defaults.string(forKey: Keys.selectedAppIconVariant) ?? AppIconVariant.default.rawValue
         ) ?? .default
 
+        syncAppInterfaceLanguage()
         persistSnapshot()
         persistGlossaryState()
         syncLegacyGlossaryEntries()
+    }
+
+    var appInterfaceLanguage: AppInterfaceLanguage {
+        get { AppInterfaceLanguage(rawValue: appInterfaceLanguageCode) ?? .defaultLanguage }
+        set { appInterfaceLanguageCode = newValue.rawValue }
     }
 
     var selectedLanguage: SupportedLanguage {
@@ -977,6 +1008,14 @@ final class AppSettings {
         flushDefaults()
     }
 
+    private func syncAppInterfaceLanguage() {
+        let normalizedCode = Self.normalizedInterfaceLanguageCode(appInterfaceLanguageCode)
+        defaults.set(normalizedCode, forKey: Keys.appInterfaceLanguageCode)
+        defaults.set([normalizedCode], forKey: Keys.appleLanguages)
+        AppLocalization.setLanguageCode(normalizedCode)
+        flushDefaults()
+    }
+
     private func syncLegacyGlossaryEntries() {
         let normalizedEntries = glossaryState.customTerms.joined(separator: "\n")
         guard glossaryEntries != normalizedEntries else {
@@ -1053,6 +1092,15 @@ final class AppSettings {
             enabledPresetIDs: [],
             customTerms: normalizeTerms(parseLegacyGlossaryEntries(entries))
         )
+    }
+
+    private static func normalizedInterfaceLanguageCode(_ code: String?) -> String {
+        guard let code,
+              let language = AppInterfaceLanguage(rawValue: code)
+        else {
+            return AppInterfaceLanguage.defaultLanguage.rawValue
+        }
+        return language.rawValue
     }
 
     private static func normalizedSnapshot(_ snapshot: ModelSettingsSnapshot) -> ModelSettingsSnapshot {

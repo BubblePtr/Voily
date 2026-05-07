@@ -209,23 +209,23 @@ struct OverlayRootView: View {
             return ""
         case .recording:
             if state.text.isEmpty {
-                return state.controls == .confirmCancel ? "Speak in Chinese…" : "Listening…"
+                return state.controls == .confirmCancel ? AppLocalization.localized("Speak in Chinese…") : AppLocalization.localized("Listening…")
             }
             return state.text
         case .recordingPartial:
             if state.text.isEmpty {
-                return state.controls == .confirmCancel ? "Speak in Chinese…" : "Listening…"
+                return state.controls == .confirmCancel ? AppLocalization.localized("Speak in Chinese…") : AppLocalization.localized("Listening…")
             }
             return state.text
         case .transcribing:
             let text = state.text.trimmingCharacters(in: .whitespacesAndNewlines)
-            return text.isEmpty ? "Transcribing…" : "Transcribing… \(text)"
+            return text.isEmpty ? AppLocalization.localized("Transcribing…") : String(format: AppLocalization.localized("Transcribing… %@"), text)
         case .refining:
-            return "Refining..."
+            return AppLocalization.localized("Refining...")
         case .translating:
-            return state.text.isEmpty ? "Translating..." : state.text
+            return state.text.isEmpty ? AppLocalization.localized("Translating...") : state.text
         case .injecting:
-            return state.text.isEmpty ? "Injecting…" : state.text
+            return state.text.isEmpty ? AppLocalization.localized("Injecting…") : state.text
         }
     }
 }
@@ -237,10 +237,10 @@ private struct OverlayActionButtons: View {
     var body: some View {
         HStack(spacing: 8) {
             actionButton(systemName: "xmark", action: onCancel)
-                .accessibilityLabel("Discard translation")
+                .accessibilityLabel(Text("Discard translation"))
 
             actionButton(systemName: "checkmark", action: onConfirm)
-                .accessibilityLabel("Finish recording")
+                .accessibilityLabel(Text("Finish recording"))
         }
     }
 
