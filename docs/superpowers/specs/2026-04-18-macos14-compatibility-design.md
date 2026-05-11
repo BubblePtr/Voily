@@ -49,7 +49,7 @@ Because macOS 14 is the new floor, the implementation should prefer direct macOS
 Update all project metadata that currently declares macOS 26:
 
 - Xcode deployment target entries
-- `LSMinimumSystemVersion` in `Config/Info.plist`
+- `LSMinimumSystemVersion` in `Resources/VoilyApp/Info.plist`
 - README and README_CN version statements and badges
 
 Expected result: the project advertises and builds for macOS 14.0+ consistently.

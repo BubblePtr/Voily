@@ -1,6 +1,7 @@
 import XCTest
 import AVFoundation
 @testable import Voily
+@testable import VoilyCore
 
 private enum TestCaptureSessionError: Error, Equatable {
     case expected

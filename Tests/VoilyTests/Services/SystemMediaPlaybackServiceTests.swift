@@ -1,6 +1,7 @@
 import CoreAudio
 import XCTest
 @testable import Voily
+@testable import VoilyCore
 
 final class SystemMediaPlaybackServiceTests: XCTestCase {
     func testMuteIfNeededReturnsNilWhenOutputIsAlreadyMuted() async {

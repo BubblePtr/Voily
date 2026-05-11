@@ -5,21 +5,27 @@
 ## 1. 模块分层
 
 ```
-Sources/Voily/
-├── App/             # 应用生命周期、Fn 键监听、权限协调
-├── Configuration/   # 用户设置、语言枚举
-├── Features/        # 业务 UI（SwiftUI）
-│   ├── Overlay/     # 录音/转写浮窗
-│   └── Settings/    # 设置窗口与 dashboard
-├── Services/        # 核心能力实现
-│   ├── Audio/       # 录音 + ASR provider
-│   ├── Text/        # LLM 润色 + 文本注入
-│   └── Media/       # 系统播放静音
-├── Storage/         # 使用统计本地持久化
-└── Resources/       # Assets / 配置资源
+Sources/
+├── VoilyCore/       # SwiftPM library，承载可脱离 app bundle 测试的核心逻辑
+│   ├── Configuration/
+│   ├── Services/
+│   │   ├── Audio/   # Fun-ASR 消息/词库、转写文本累积与 partial 节流
+│   │   └── Text/    # LLM 润色/翻译请求构造
+│   ├── Storage/
+│   └── Support/
+└── VoilyApp/        # SwiftUI/AppKit app，承载系统集成与 UI
+    ├── App/
+    ├── Features/
+    └── Services/
+        ├── Audio/   # 录音、ASR capture session、云端/本地 app-hosted provider
+        ├── Text/    # 粘贴注入
+        └── Media/   # 系统播放静音
+
+Resources/VoilyApp/  # Info.plist、entitlements、Assets、lproj、BrandIcons
+project.yml          # XcodeGen 源文件，本地生成 Voily.xcodeproj
 ```
 
-依赖方向：`App` → `Features` → `Services` / `Storage` → `Configuration`。下层不反向依赖上层。
+依赖方向：`VoilyApp` → `VoilyCore`。`VoilyCore` 不依赖 SwiftUI/AppKit UI、app bundle 生命周期、麦克风、辅助功能或代码签名状态。
 
 ## 2. 关键流程
 
@@ -35,7 +41,7 @@ Sources/Voily/
 
 ### 2.2 ASR provider
 
-统一会话抽象在 `Services/Audio/ASRCaptureSession.swift`，provider 选择集中在 `LiveASRCaptureSessionFactory`。当前实现：
+统一会话抽象在 `Sources/VoilyApp/Services/Audio/ASRCaptureSession.swift`，provider 选择集中在 `LiveASRCaptureSessionFactory`。当前实现：
 
 - `SenseVoiceResidentService`（本地，MLX 常驻服务）
 - `DoubaoStreamingASRService`（云端，WebSocket）
@@ -68,6 +74,7 @@ DeepSeek 的默认 Base URL 是 `https://api.deepseek.com`，默认模型是 `de
 - `make run` — 构建并运行
 - `make install` — 安装到 `~/Applications`
 - `make test` — 运行 SwiftPM 逻辑测试和 Xcode app/unit 测试；详见 [testing.md](testing.md)
+- `make generate` — 用 XcodeGen 从 `project.yml` 生成本地 `Voily.xcodeproj`
 - 更多目标见 [Makefile](../Makefile)
 
 ## 5. 权限与系统集成

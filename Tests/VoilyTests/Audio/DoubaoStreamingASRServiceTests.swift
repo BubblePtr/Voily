@@ -1,5 +1,6 @@
 import XCTest
 @testable import Voily
+@testable import VoilyCore
 
 final class DoubaoStreamingASRServiceTests: XCTestCase {
     func testStartRequestPayloadIncludesEnglishLanguage() throws {

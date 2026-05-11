@@ -1,5 +1,6 @@
 import XCTest
 @testable import Voily
+@testable import VoilyCore
 
 final class BrandIconResourceTests: XCTestCase {
     func testDomesticTextProviderBrandIconsExist() {
@@ -17,6 +18,6 @@ final class BrandIconResourceTests: XCTestCase {
             .deletingLastPathComponent()
             .deletingLastPathComponent()
             .deletingLastPathComponent()
-            .appendingPathComponent("Sources/Voily/Resources/BrandIcons", isDirectory: true)
+            .appendingPathComponent("Resources/VoilyApp/BrandIcons", isDirectory: true)
     }
 }

@@ -1,5 +1,6 @@
 import XCTest
 @testable import Voily
+@testable import VoilyCore
 
 private actor ProbeRecorder {
     private(set) var invokedProvider: ASRProvider?
