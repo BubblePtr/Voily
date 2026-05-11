@@ -3,6 +3,7 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PROJECT_PATH="${VOILY_PROJECT_PATH:-$ROOT_DIR/Voily.xcodeproj}"
+XCODEGEN_PATH="${VOILY_XCODEGEN_PATH:-xcodegen}"
 SCHEME="${VOILY_SCHEME:-Voily}"
 APP_NAME="${VOILY_APP_NAME:-Voily}"
 RELEASE_ROOT="${VOILY_RELEASE_DIR:-$ROOT_DIR/build/release}"
@@ -30,6 +31,16 @@ die() {
 
 require_cmd() {
   command -v "$1" >/dev/null 2>&1 || die "Missing required command: $1"
+}
+
+ensure_generated_project() {
+  if [[ -d "$PROJECT_PATH" ]]; then
+    return 0
+  fi
+
+  require_cmd "$XCODEGEN_PATH"
+  log "Generating Xcode project from project.yml"
+  (cd "$ROOT_DIR" && "$XCODEGEN_PATH" generate)
 }
 
 ensure_release_dirs() {
@@ -81,6 +92,7 @@ discover_artifact_signing_identity() {
 archive_app() {
   require_cmd xcodebuild
   require_cmd ditto
+  ensure_generated_project
 
   ensure_release_dirs
   rm -rf "$ARCHIVE_PATH" "$APP_PATH" "$EXPORT_PATH"
@@ -356,6 +368,7 @@ Commands:
   verify         Verify bundle id, hardened runtime, codesign, and Gatekeeper status
 
 Environment:
+  VOILY_XCODEGEN_PATH        Optional xcodegen executable path
   VOILY_CODE_SIGN_IDENTITY   Optional explicit signing identity for xcodebuild archive
   VOILY_DEVELOPMENT_TEAM     Optional development team override for xcodebuild archive
   VOILY_NOTARY_PROFILE       Required for notarize; maps to a notarytool keychain profile

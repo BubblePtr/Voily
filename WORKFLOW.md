@@ -100,15 +100,16 @@ Issue 描述：
      --scratch-path "$PWD/.build"
    ```
    适用范围包括：
-   - `Sources/Voily/Configuration/`
-   - `Sources/Voily/Services/Audio/FunASRRealtimeService.swift`
-   - `Sources/Voily/Services/Audio/FunASRVocabularyService.swift`
-   - `Sources/Voily/Services/Audio/TranscriptLogic.swift`
-   - `Sources/Voily/Services/Text/LLMRefinementService.swift`
-   - `Sources/Voily/Storage/`
+   - `Sources/VoilyCore/Configuration/`
+   - `Sources/VoilyCore/Services/Audio/FunASRRealtimeService.swift`
+   - `Sources/VoilyCore/Services/Audio/FunASRVocabularyService.swift`
+   - `Sources/VoilyCore/Services/Audio/TranscriptLogic.swift`
+   - `Sources/VoilyCore/Services/Text/LLMRefinementService.swift`
+   - `Sources/VoilyCore/Storage/`
    - 其他明显不依赖 `Voily.app`、XCTest runner、GUI、系统权限、音频设备的纯逻辑改动
-8. 如果改动命中了 app-hosted 代码路径，但当前任务只需要确认可编译，不需要实际运行 XCTest runner，则只运行下面这条完整命令；不要先尝试不带 `OTHER_SWIFT_FLAGS='$(inherited) -disable-sandbox'` 的旧版 `xcodebuild` 命令：
+8. 如果改动命中了 app-hosted 代码路径，但当前任务只需要确认可编译，不需要实际运行 XCTest runner，则先生成本地 Xcode 工程，再运行下面这组完整命令；不要先尝试不带 `OTHER_SWIFT_FLAGS='$(inherited) -disable-sandbox'` 的旧版 `xcodebuild` 命令：
    ```bash
+   make generate
    env CLANG_MODULE_CACHE_PATH="$PWD/.xcodebuild/ModuleCache" \
      xcodebuild \
      -project "$PWD/Voily.xcodeproj" \
@@ -121,17 +122,18 @@ Issue 描述：
      ENABLE_USER_SCRIPT_SANDBOXING=NO \
      OTHER_SWIFT_FLAGS='$(inherited) -disable-sandbox'
    ```
-   只有这条完整命令失败后，才允许把 app-hosted 编译验证标记为当前环境阻塞。
+   只有这组完整命令失败后，才允许把 app-hosted 编译验证标记为当前环境阻塞。
 9. 只有 issue 明确依赖 app/runtime 行为，或者改动落在下列 runner-required 范围时，才允许运行 app-hosted XCTest：
-   - `Sources/Voily/App/`
-   - `Sources/Voily/Services/Audio/ASRCaptureSession.swift`
-   - `Sources/Voily/Services/Audio/ASRConnectionTester.swift`
-   - `Sources/Voily/Services/Audio/AudioCaptureService.swift`
-   - `Sources/Voily/Services/Audio/DoubaoStreamingASRService.swift`
-   - `Sources/Voily/Services/Media/SystemMediaPlaybackService.swift`
+   - `Sources/VoilyApp/App/`
+   - `Sources/VoilyApp/Services/Audio/ASRCaptureSession.swift`
+   - `Sources/VoilyApp/Services/Audio/ASRConnectionTester.swift`
+   - `Sources/VoilyApp/Services/Audio/AudioCaptureService.swift`
+   - `Sources/VoilyApp/Services/Audio/DoubaoStreamingASRService.swift`
+   - `Sources/VoilyApp/Services/Media/SystemMediaPlaybackService.swift`
    - app resource、brand icon、trigger key 相关代码
    对应命令是：
    ```bash
+   make generate
    env CLANG_MODULE_CACHE_PATH="$PWD/.xcodebuild/ModuleCache" \
      xcodebuild \
      -project "$PWD/Voily.xcodeproj" \
@@ -144,7 +146,7 @@ Issue 描述：
      ENABLE_USER_SCRIPT_SANDBOXING=NO \
      OTHER_SWIFT_FLAGS='$(inherited) -disable-sandbox'
    ```
-   如果这条完整命令因为当前 sandbox、test runner 或系统服务边界失败，要在 `## Codex Workpad` 中明确记录，不要再升级到更宽的验证范围。
+   如果这组完整命令因为当前 sandbox、test runner 或系统服务边界失败，要在 `## Codex Workpad` 中明确记录，不要再升级到更宽的验证范围。
 10. 不要运行需要人工交互的 GUI 验证流程来阻塞会话；遇到这类需求时按上面的停止规则处理，并把人工验收路径写入 `Acceptance Criteria`。
 11. 每次有实质进展都更新 `## Codex Workpad`，至少包括：复现/定位完成、代码改动完成、每条验证命令及结果、阻塞或剩余人工步骤。
 12. 移动到 `In Review` 之前，重新打开并刷新 `## Codex Workpad`，确保 `Plan`、`Acceptance Criteria`、`Validation` 与实际完成状态一致。

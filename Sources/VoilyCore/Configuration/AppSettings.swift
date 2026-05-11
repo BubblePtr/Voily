@@ -1,0 +1,1190 @@
+import Foundation
+import Observation
+
+public enum ASRProvider: String, CaseIterable, Codable, Identifiable, Sendable {
+    case senseVoice
+    case doubaoStreaming
+    case funASR
+    case qwenASR
+    case stepfunASR
+
+    public var id: String { rawValue }
+
+    public var displayName: String {
+        switch self {
+        case .senseVoice:
+            return "SenseVoice Small"
+        case .doubaoStreaming:
+            return "Doubao ASR"
+        case .funASR:
+            return "Fun-ASR"
+        case .qwenASR:
+            return "Qwen ASR"
+        case .stepfunASR:
+            return "StepFun ASR"
+        }
+    }
+
+    public var category: ProviderCategory {
+        switch self {
+        case .senseVoice:
+            return .local
+        case .doubaoStreaming, .funASR, .qwenASR, .stepfunASR:
+            return .cloud
+        }
+    }
+}
+
+public enum TextRefinementProvider: String, CaseIterable, Codable, Identifiable, Sendable {
+    case deepSeek
+    case dashScope
+    case volcengine
+    case minimax
+    case kimi
+    case zhipu
+
+    public var id: String { rawValue }
+
+    public var displayName: String {
+        switch self {
+        case .deepSeek:
+            return "DeepSeek"
+        case .dashScope:
+            return "阿里云百炼"
+        case .volcengine:
+            return "火山引擎"
+        case .minimax:
+            return "MiniMax"
+        case .kimi:
+            return "Kimi"
+        case .zhipu:
+            return "智谱"
+        }
+    }
+}
+
+public enum DictationProcessingSkill: String, CaseIterable, Codable, Identifiable, Sendable {
+    case removeFillers
+    case formalize
+    case orderedList
+
+    public var id: String { rawValue }
+
+    public var displayName: String {
+        switch self {
+        case .removeFillers:
+            return AppLocalization.localized("去语气词")
+        case .formalize:
+            return AppLocalization.localized("更正式")
+        case .orderedList:
+            return AppLocalization.localized("整理成有序列表")
+        }
+    }
+
+    public var summary: String {
+        switch self {
+        case .removeFillers:
+            return AppLocalization.localized("删除明显语气词和停顿赘词，尽量不改句子结构。")
+        case .formalize:
+            return AppLocalization.localized("将口述表达整理为中性书面语，不扩写、不总结。")
+        case .orderedList:
+            return AppLocalization.localized("当内容包含 2 个及以上清晰事项时，整理为纯文本编号列表。")
+        }
+    }
+}
+
+public enum ProviderCategory: String, Codable, Sendable {
+    case local
+    case cloud
+
+    public var displayName: String {
+        switch self {
+        case .local:
+            return AppLocalization.localized("本地")
+        case .cloud:
+            return AppLocalization.localized("云端")
+        }
+    }
+}
+
+public enum AppIconVariant: String, CaseIterable, Codable, Identifiable, Sendable {
+    case `default`
+    case easterEggSVG4
+
+    public var id: String { rawValue }
+
+    public var displayName: String {
+        switch self {
+        case .default:
+            return AppLocalization.localized("默认图标")
+        case .easterEggSVG4:
+            return AppLocalization.localized("彩蛋图标")
+        }
+    }
+
+    public var imageAssetName: String {
+        switch self {
+        case .default:
+            return "AppIconDefaultImage"
+        case .easterEggSVG4:
+            return "AppIconEasterEggSVG4Image"
+        }
+    }
+}
+
+public enum TriggerKey: String, CaseIterable, Codable, Identifiable, Sendable {
+    case fn
+    case rightCommand
+
+    public var id: String { rawValue }
+
+    public var displayName: String {
+        switch self {
+        case .fn:
+            return "Fn"
+        case .rightCommand:
+            return "右 Command"
+        }
+    }
+
+    public var summary: String {
+        switch self {
+        case .fn:
+            return AppLocalization.localized("单击 Fn 开始普通听写，再单击一次 Fn 结束；长按 Fn 0.8 秒启动快捷翻译。")
+        case .rightCommand:
+            return AppLocalization.localized("单击右 Command 开始普通听写，再单击一次右 Command 结束；长按右 Command 0.8 秒启动快捷翻译。")
+        }
+    }
+}
+
+public struct ASRProviderConfig: Codable, Equatable, Sendable {
+    public var executablePath: String
+    public var modelPath: String
+    public var additionalArguments: String
+    public var baseURL: String
+    public var apiKey: String
+    public var model: String
+    public var appID: String
+    public var vocabularyID: String
+    public var vocabularyTargetModel: String
+    public var vocabularyRevision: String
+
+    public static let empty = ASRProviderConfig(
+        executablePath: "",
+        modelPath: "",
+        additionalArguments: "",
+        baseURL: "",
+        apiKey: "",
+        model: "",
+        appID: "",
+        vocabularyID: "",
+        vocabularyTargetModel: "",
+        vocabularyRevision: ""
+    )
+
+    private enum CodingKeys: String, CodingKey {
+        case executablePath
+        case modelPath
+        case additionalArguments
+        case baseURL
+        case apiKey
+        case model
+        case appID
+        case vocabularyID
+        case vocabularyTargetModel
+        case vocabularyRevision
+    }
+
+    public init(
+        executablePath: String,
+        modelPath: String,
+        additionalArguments: String,
+        baseURL: String,
+        apiKey: String,
+        model: String,
+        appID: String = "",
+        vocabularyID: String = "",
+        vocabularyTargetModel: String = "",
+        vocabularyRevision: String = ""
+    ) {
+        self.executablePath = executablePath
+        self.modelPath = modelPath
+        self.additionalArguments = additionalArguments
+        self.baseURL = baseURL
+        self.apiKey = apiKey
+        self.model = model
+        self.appID = appID
+        self.vocabularyID = vocabularyID
+        self.vocabularyTargetModel = vocabularyTargetModel
+        self.vocabularyRevision = vocabularyRevision
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        executablePath = try container.decodeIfPresent(String.self, forKey: .executablePath) ?? ""
+        modelPath = try container.decodeIfPresent(String.self, forKey: .modelPath) ?? ""
+        additionalArguments = try container.decodeIfPresent(String.self, forKey: .additionalArguments) ?? ""
+        baseURL = try container.decodeIfPresent(String.self, forKey: .baseURL) ?? ""
+        apiKey = try container.decodeIfPresent(String.self, forKey: .apiKey) ?? ""
+        model = try container.decodeIfPresent(String.self, forKey: .model) ?? ""
+        appID = try container.decodeIfPresent(String.self, forKey: .appID) ?? ""
+        vocabularyID = try container.decodeIfPresent(String.self, forKey: .vocabularyID) ?? ""
+        vocabularyTargetModel = try container.decodeIfPresent(String.self, forKey: .vocabularyTargetModel) ?? ""
+        vocabularyRevision = try container.decodeIfPresent(String.self, forKey: .vocabularyRevision) ?? ""
+    }
+
+    public func isConfigured(for provider: ASRProvider) -> Bool {
+        switch provider {
+        case .senseVoice:
+            return !modelPath.trimmed.isEmpty || !executablePath.trimmed.isEmpty
+        case .funASR, .qwenASR, .stepfunASR:
+            return !baseURL.trimmed.isEmpty && !apiKey.trimmed.isEmpty && !model.trimmed.isEmpty
+        case .doubaoStreaming:
+            return !baseURL.trimmed.isEmpty
+                && !apiKey.trimmed.isEmpty
+                && !model.trimmed.isEmpty
+                && !appID.trimmed.isEmpty
+        }
+    }
+
+    public func updatingFunASRVocabulary(
+        vocabularyID: String,
+        vocabularyTargetModel: String,
+        vocabularyRevision: String
+    ) -> ASRProviderConfig {
+        var updated = self
+        updated.vocabularyID = vocabularyID
+        updated.vocabularyTargetModel = vocabularyTargetModel
+        updated.vocabularyRevision = vocabularyRevision
+        return updated
+    }
+
+    public func clearingFunASRVocabulary() -> ASRProviderConfig {
+        updatingFunASRVocabulary(
+            vocabularyID: "",
+            vocabularyTargetModel: "",
+            vocabularyRevision: ""
+        )
+    }
+}
+
+public struct TextRefinementProviderConfig: Codable, Equatable, Sendable {
+    public var baseURL: String
+    public var apiKey: String
+    public var model: String
+
+    public static let empty = TextRefinementProviderConfig(baseURL: "", apiKey: "", model: "")
+
+    public init(baseURL: String, apiKey: String, model: String) {
+        self.baseURL = baseURL
+        self.apiKey = apiKey
+        self.model = model
+    }
+
+    public var isConfigured: Bool {
+        !baseURL.trimmed.isEmpty && !apiKey.trimmed.isEmpty && !model.trimmed.isEmpty
+    }
+}
+
+struct ModelSettingsSnapshot: Codable, Equatable, Sendable {
+    public var selectedASRProvider: ASRProvider
+    public var selectedTextProvider: TextRefinementProvider
+    public var textRefinementEnabled: Bool
+    public var triggerKey: TriggerKey
+    public var interruptSystemMediaPlayback: Bool
+    public var dockIconVisible: Bool
+    public var preferredMicrophoneUID: String?
+    public var enabledDictationSkills: [DictationProcessingSkill]
+    public var asrConfigsByProvider: [ASRProvider: ASRProviderConfig]
+    public var textConfigsByProvider: [TextRefinementProvider: TextRefinementProviderConfig]
+
+    static let `default` = ModelSettingsSnapshot(
+        selectedASRProvider: .senseVoice,
+        selectedTextProvider: .deepSeek,
+        textRefinementEnabled: false,
+        triggerKey: .fn,
+        interruptSystemMediaPlayback: false,
+        dockIconVisible: true,
+        preferredMicrophoneUID: nil,
+        enabledDictationSkills: [],
+        asrConfigsByProvider: {
+            var configs: [ASRProvider: ASRProviderConfig] = Dictionary(
+                uniqueKeysWithValues: ASRProvider.allCases.map { ($0, ASRProviderConfig.empty) }
+            )
+            configs[.qwenASR] = ASRProviderConfig(
+                executablePath: "",
+                modelPath: "",
+                additionalArguments: "",
+                baseURL: "wss://dashscope.aliyuncs.com/api-ws/v1/realtime",
+                apiKey: "",
+                model: "qwen3-asr-flash-realtime",
+                appID: ""
+            )
+            configs[.doubaoStreaming] = ASRProviderConfig(
+                executablePath: "",
+                modelPath: "",
+                additionalArguments: "",
+                baseURL: "wss://openspeech.bytedance.com/api/v3/sauc/bigmodel_async",
+                apiKey: "",
+                model: "volc.seedasr.sauc.duration",
+                appID: ""
+            )
+            configs[.funASR] = ASRProviderConfig(
+                executablePath: "",
+                modelPath: "",
+                additionalArguments: "",
+                baseURL: "wss://dashscope.aliyuncs.com/api-ws/v1/inference",
+                apiKey: "",
+                model: "fun-asr-realtime",
+                appID: ""
+            )
+            configs[.stepfunASR] = ASRProviderConfig(
+                executablePath: "",
+                modelPath: "",
+                additionalArguments: "",
+                baseURL: "wss://api.stepfun.com/v1/realtime/asr/stream",
+                apiKey: "",
+                model: "step-asr-1.1-stream",
+                appID: ""
+            )
+            return configs
+        }(),
+        textConfigsByProvider: {
+            var configs: [TextRefinementProvider: TextRefinementProviderConfig] = Dictionary(
+                uniqueKeysWithValues: TextRefinementProvider.allCases.map { ($0, .empty) }
+            )
+            configs[.deepSeek] = TextRefinementProviderConfig(
+                baseURL: "https://api.deepseek.com",
+                apiKey: "",
+                model: "deepseek-v4-flash"
+            )
+            return configs
+        }()
+    )
+
+    private enum CodingKeys: String, CodingKey {
+        case selectedASRProvider
+        case selectedTextProvider
+        case textRefinementEnabled
+        case triggerKey
+        case interruptSystemMediaPlayback
+        case dockIconVisible
+        case preferredMicrophoneUID
+        case enabledDictationSkills
+        case asrConfigsByProvider
+        case textConfigsByProvider
+    }
+
+    public init(
+        selectedASRProvider: ASRProvider,
+        selectedTextProvider: TextRefinementProvider,
+        textRefinementEnabled: Bool,
+        triggerKey: TriggerKey,
+        interruptSystemMediaPlayback: Bool,
+        dockIconVisible: Bool,
+        preferredMicrophoneUID: String?,
+        enabledDictationSkills: [DictationProcessingSkill],
+        asrConfigsByProvider: [ASRProvider: ASRProviderConfig],
+        textConfigsByProvider: [TextRefinementProvider: TextRefinementProviderConfig]
+    ) {
+        self.selectedASRProvider = selectedASRProvider
+        self.selectedTextProvider = selectedTextProvider
+        self.textRefinementEnabled = textRefinementEnabled
+        self.triggerKey = triggerKey
+        self.interruptSystemMediaPlayback = interruptSystemMediaPlayback
+        self.dockIconVisible = dockIconVisible
+        self.preferredMicrophoneUID = preferredMicrophoneUID
+        self.enabledDictationSkills = enabledDictationSkills
+        self.asrConfigsByProvider = asrConfigsByProvider
+        self.textConfigsByProvider = textConfigsByProvider
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let selectedASRRawValue = try container.decodeIfPresent(String.self, forKey: .selectedASRProvider)
+        selectedASRProvider = Self.migratedSelectedASRProvider(from: selectedASRRawValue)
+        selectedTextProvider = try container.decodeIfPresent(TextRefinementProvider.self, forKey: .selectedTextProvider) ?? .deepSeek
+        textRefinementEnabled = try container.decode(Bool.self, forKey: .textRefinementEnabled)
+        triggerKey = try container.decodeIfPresent(TriggerKey.self, forKey: .triggerKey) ?? .fn
+        interruptSystemMediaPlayback = try container.decodeIfPresent(Bool.self, forKey: .interruptSystemMediaPlayback) ?? false
+        dockIconVisible = try container.decodeIfPresent(Bool.self, forKey: .dockIconVisible) ?? true
+        preferredMicrophoneUID = try container.decodeIfPresent(String.self, forKey: .preferredMicrophoneUID)
+        enabledDictationSkills = try container.decodeIfPresent([DictationProcessingSkill].self, forKey: .enabledDictationSkills) ?? []
+        let rawASRConfigs: [ASRProvider: ASRProviderConfig] = try Self.decodeRawConfigMap(
+            from: container,
+            forKey: .asrConfigsByProvider,
+            supportedKey: Self.supportedASRProvider(for:)
+        )
+        asrConfigsByProvider = rawASRConfigs.reduce(into: [:]) { partialResult, entry in
+            partialResult[entry.key] = entry.value
+        }
+        textConfigsByProvider = try Self.decodeRawConfigMap(
+            from: container,
+            forKey: .textConfigsByProvider,
+            supportedKey: TextRefinementProvider.init(rawValue:)
+        )
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(selectedASRProvider.rawValue, forKey: .selectedASRProvider)
+        try container.encode(selectedTextProvider, forKey: .selectedTextProvider)
+        try container.encode(textRefinementEnabled, forKey: .textRefinementEnabled)
+        try container.encode(triggerKey, forKey: .triggerKey)
+        try container.encode(interruptSystemMediaPlayback, forKey: .interruptSystemMediaPlayback)
+        try container.encode(dockIconVisible, forKey: .dockIconVisible)
+        try container.encodeIfPresent(preferredMicrophoneUID, forKey: .preferredMicrophoneUID)
+        try container.encode(enabledDictationSkills, forKey: .enabledDictationSkills)
+        try container.encode(
+            Dictionary(uniqueKeysWithValues: asrConfigsByProvider.map { ($0.key.rawValue, $0.value) }),
+            forKey: .asrConfigsByProvider
+        )
+        try container.encode(
+            Dictionary(uniqueKeysWithValues: textConfigsByProvider.map { ($0.key.rawValue, $0.value) }),
+            forKey: .textConfigsByProvider
+        )
+    }
+
+    private static func migratedSelectedASRProvider(from rawValue: String?) -> ASRProvider {
+        guard let rawValue else {
+            return .senseVoice
+        }
+        if rawValue == "whisperCpp" {
+            return .senseVoice
+        }
+        return supportedASRProvider(for: rawValue) ?? .senseVoice
+    }
+
+    private static func supportedASRProvider(for rawValue: String) -> ASRProvider? {
+        ASRProvider(rawValue: rawValue)
+    }
+
+    private static func decodeRawConfigMap<Key: Hashable, Value: Decodable>(
+        from container: KeyedDecodingContainer<CodingKeys>,
+        forKey codingKey: CodingKeys,
+        supportedKey: (String) -> Key?
+    ) throws -> [Key: Value] {
+        if let rawDictionary = try? container.decode([String: Value].self, forKey: codingKey) {
+            return rawDictionary.reduce(into: [:]) { partialResult, entry in
+                guard let key = supportedKey(entry.key) else { return }
+                partialResult[key] = entry.value
+            }
+        }
+
+        guard container.contains(codingKey) else {
+            return [:]
+        }
+
+        var rawPairs = try container.nestedUnkeyedContainer(forKey: codingKey)
+        var decoded: [Key: Value] = [:]
+
+        while !rawPairs.isAtEnd {
+            let rawKey = try rawPairs.decode(String.self)
+            let value = try rawPairs.decode(Value.self)
+            guard let key = supportedKey(rawKey) else { continue }
+            decoded[key] = value
+        }
+
+        return decoded
+    }
+}
+
+public enum GlossaryPresetID: String, CaseIterable, Codable, Identifiable, Sendable {
+    case internetDevelopment
+    case internetTesting
+    case internetProductManager
+    case medical
+    case legal
+
+    public var id: String { rawValue }
+}
+
+public struct GlossaryPresetDefinition: Identifiable, Equatable, Sendable {
+    public let id: GlossaryPresetID
+    public let domainTitle: String
+    public let sceneTitle: String?
+    public let terms: [String]
+
+    public var title: String {
+        sceneTitle ?? domainTitle
+    }
+
+    public var fullTitle: String {
+        if let sceneTitle {
+            return "\(domainTitle)-\(sceneTitle)"
+        }
+        return domainTitle
+    }
+
+    public var itemCount: Int {
+        terms.count
+    }
+
+    public static let categories: [GlossaryPresetCategory] = [
+        GlossaryPresetCategory(
+            title: "glossary.domain.internet",
+            presets: [
+                GlossaryPresetDefinition(
+                    id: .internetDevelopment,
+                    domainTitle: "glossary.domain.internet",
+                    sceneTitle: "glossary.scene.development",
+                    terms: [
+                        "OpenAI",
+                        "ChatGPT",
+                        "API",
+                        "SDK",
+                        "JSON",
+                        "Python",
+                        "TypeScript",
+                        "SwiftUI",
+                        "Xcode",
+                        "GitHub",
+                        "iOS",
+                        "macOS",
+                    ]
+                ),
+                GlossaryPresetDefinition(
+                    id: .internetTesting,
+                    domainTitle: "glossary.domain.internet",
+                    sceneTitle: "glossary.scene.testing",
+                    terms: [
+                        "QA",
+                        "Test Case",
+                        "Bug",
+                        "Regression",
+                        "Smoke Test",
+                        "Integration Test",
+                        "E2E",
+                        "Selenium",
+                        "Playwright",
+                        "Jira",
+                    ]
+                ),
+                GlossaryPresetDefinition(
+                    id: .internetProductManager,
+                    domainTitle: "glossary.domain.internet",
+                    sceneTitle: "glossary.scene.productManagement",
+                    terms: [
+                        "PRD",
+                        "Roadmap",
+                        "Backlog",
+                        "MVP",
+                        "KPI",
+                        "OKR",
+                        "User Story",
+                        "Wireframe",
+                        "Prototype",
+                        "A/B Test",
+                    ]
+                ),
+            ]
+        ),
+        GlossaryPresetCategory(
+            title: "glossary.domain.medical",
+            presets: [
+                GlossaryPresetDefinition(
+                    id: .medical,
+                    domainTitle: "glossary.domain.medical",
+                    sceneTitle: nil,
+                    terms: [
+                        "门诊",
+                        "住院",
+                        "病历",
+                        "处方",
+                        "诊断",
+                        "CT",
+                        "MRI",
+                        "超声",
+                        "心电图",
+                        "检验科",
+                    ]
+                ),
+            ]
+        ),
+        GlossaryPresetCategory(
+            title: "glossary.domain.legal",
+            presets: [
+                GlossaryPresetDefinition(
+                    id: .legal,
+                    domainTitle: "glossary.domain.legal",
+                    sceneTitle: nil,
+                    terms: [
+                        "合同",
+                        "诉讼",
+                        "仲裁",
+                        "原告",
+                        "被告",
+                        "证据",
+                        "法务",
+                        "合规",
+                        "尽职调查",
+                        "知识产权",
+                    ]
+                ),
+            ]
+        ),
+    ]
+
+    public static let all: [GlossaryPresetDefinition] = categories.flatMap(\.presets)
+
+    public static func definition(for id: GlossaryPresetID) -> GlossaryPresetDefinition {
+        all.first(where: { $0.id == id }) ?? GlossaryPresetDefinition(
+            id: id,
+            domainTitle: "glossary.unknown",
+            sceneTitle: nil,
+            terms: []
+        )
+    }
+}
+
+public struct GlossaryPresetCategory: Identifiable, Equatable, Sendable {
+    public let title: String
+    public let presets: [GlossaryPresetDefinition]
+
+    public var id: String { title }
+}
+
+public struct GlossarySection: Equatable, Sendable {
+    public let title: String
+    public let items: [String]
+}
+
+struct GlossarySettingsSnapshot: Codable, Equatable, Sendable {
+    public var enabledPresetIDs: [GlossaryPresetID]
+    public var customTerms: [String]
+
+    static let `default` = GlossarySettingsSnapshot(enabledPresetIDs: [], customTerms: [])
+}
+
+private extension String {
+    var trimmed: String {
+        trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+}
+
+@MainActor
+@Observable
+public final class AppSettings {
+    public static let appInterfaceLanguageDidChange = Notification.Name("VoilyAppInterfaceLanguageDidChange")
+
+    private enum Keys {
+        static let appInterfaceLanguageCode = "appInterfaceLanguageCode"
+        static let appleLanguages = "AppleLanguages"
+        static let selectedLanguageCode = "selectedLanguageCode"
+        static let glossaryEntries = "glossaryEntries"
+        static let glossarySettingsSnapshot = "glossarySettingsSnapshot"
+        static let modelSettingsSnapshot = "modelSettingsSnapshot"
+        static let isEasterEggUnlocked = "isEasterEggUnlocked"
+        static let selectedAppIconVariant = "selectedAppIconVariant"
+
+        static let legacyLLMEnabled = "llmEnabled"
+        static let legacyLLMBaseURL = "llmBaseURL"
+        static let legacyLLMAPIKey = "llmAPIKey"
+        static let legacyLLMModel = "llmModel"
+    }
+
+    public var selectedLanguageCode: String {
+        didSet {
+            defaults.set(selectedLanguageCode, forKey: Keys.selectedLanguageCode)
+            flushDefaults()
+        }
+    }
+
+    public var appInterfaceLanguageCode: String {
+        didSet {
+            let normalizedCode = Self.normalizedInterfaceLanguageCode(appInterfaceLanguageCode)
+            let previousCode = Self.normalizedInterfaceLanguageCode(oldValue)
+            if normalizedCode != appInterfaceLanguageCode {
+                appInterfaceLanguageCode = normalizedCode
+                return
+            }
+            defaults.set(normalizedCode, forKey: Keys.appInterfaceLanguageCode)
+            defaults.set([normalizedCode], forKey: Keys.appleLanguages)
+            AppLocalization.setLanguageCode(normalizedCode)
+            flushDefaults()
+            if previousCode != normalizedCode {
+                NotificationCenter.default.post(name: Self.appInterfaceLanguageDidChange, object: self)
+            }
+        }
+    }
+
+    public var glossaryEntries: String {
+        didSet {
+            defaults.set(glossaryEntries, forKey: Keys.glossaryEntries)
+            flushDefaults()
+
+            guard !isSyncingLegacyGlossary else { return }
+
+            let normalizedTerms = Self.normalizeTerms(Self.parseLegacyGlossaryEntries(glossaryEntries))
+            guard normalizedTerms != glossaryState.customTerms else { return }
+
+            glossaryState = GlossarySettingsSnapshot(
+                enabledPresetIDs: glossaryState.enabledPresetIDs,
+                customTerms: normalizedTerms
+            )
+        }
+    }
+
+    public var selectedASRProvider: ASRProvider {
+        didSet { persistSnapshot() }
+    }
+
+    public var selectedTextProvider: TextRefinementProvider {
+        didSet { persistSnapshot() }
+    }
+
+    public var textRefinementEnabled: Bool {
+        didSet { persistSnapshot() }
+    }
+
+    public var triggerKey: TriggerKey {
+        didSet { persistSnapshot() }
+    }
+
+    public var interruptSystemMediaPlayback: Bool {
+        didSet { persistSnapshot() }
+    }
+
+    public var dockIconVisible: Bool {
+        didSet { persistSnapshot() }
+    }
+
+    public var preferredMicrophoneUID: String? {
+        didSet { persistSnapshot() }
+    }
+
+    public var enabledDictationSkills: [DictationProcessingSkill] {
+        didSet {
+            let normalized = Self.normalizedDictationSkills(enabledDictationSkills)
+            if normalized != enabledDictationSkills {
+                enabledDictationSkills = normalized
+                return
+            }
+            persistSnapshot()
+        }
+    }
+
+    public var asrConfigsByProvider: [ASRProvider: ASRProviderConfig] {
+        didSet { persistSnapshot() }
+    }
+
+    public var textConfigsByProvider: [TextRefinementProvider: TextRefinementProviderConfig] {
+        didSet { persistSnapshot() }
+    }
+
+    public var isEasterEggUnlocked: Bool {
+        didSet {
+            defaults.set(isEasterEggUnlocked, forKey: Keys.isEasterEggUnlocked)
+            flushDefaults()
+        }
+    }
+
+    public var selectedAppIconVariant: AppIconVariant {
+        didSet {
+            defaults.set(selectedAppIconVariant.rawValue, forKey: Keys.selectedAppIconVariant)
+            flushDefaults()
+        }
+    }
+
+    private var glossaryState: GlossarySettingsSnapshot {
+        didSet {
+            persistGlossaryState()
+            syncLegacyGlossaryEntries()
+        }
+    }
+
+    private let defaults: UserDefaults
+    private let encoder = JSONEncoder()
+    private let decoder = JSONDecoder()
+    private var isSyncingLegacyGlossary = false
+
+    public init(defaults: UserDefaults = .standard) {
+        let legacyGlossaryEntries = defaults.string(forKey: Keys.glossaryEntries) ?? ""
+        self.defaults = defaults
+        self.appInterfaceLanguageCode = Self.normalizedInterfaceLanguageCode(
+            defaults.string(forKey: Keys.appInterfaceLanguageCode)
+        )
+        self.selectedLanguageCode = defaults.string(forKey: Keys.selectedLanguageCode) ?? SupportedLanguage.simplifiedChinese.rawValue
+        self.glossaryEntries = legacyGlossaryEntries
+        self.glossaryState = Self.loadGlossarySnapshot(from: defaults)
+            ?? Self.makeLegacyGlossarySnapshot(entries: legacyGlossaryEntries)
+
+        let snapshot = Self.normalizedSnapshot(Self.loadSnapshot(from: defaults) ?? Self.makeLegacySnapshot(from: defaults))
+        self.selectedASRProvider = snapshot.selectedASRProvider
+        self.selectedTextProvider = snapshot.selectedTextProvider
+        self.textRefinementEnabled = snapshot.textRefinementEnabled
+        self.triggerKey = snapshot.triggerKey
+        self.interruptSystemMediaPlayback = snapshot.interruptSystemMediaPlayback
+        self.dockIconVisible = snapshot.dockIconVisible
+        self.preferredMicrophoneUID = snapshot.preferredMicrophoneUID?.trimmed.nilIfEmpty
+        self.enabledDictationSkills = snapshot.enabledDictationSkills
+        self.asrConfigsByProvider = snapshot.asrConfigsByProvider
+        self.textConfigsByProvider = snapshot.textConfigsByProvider
+        self.isEasterEggUnlocked = defaults.object(forKey: Keys.isEasterEggUnlocked) as? Bool ?? false
+        self.selectedAppIconVariant = AppIconVariant(
+            rawValue: defaults.string(forKey: Keys.selectedAppIconVariant) ?? AppIconVariant.default.rawValue
+        ) ?? .default
+
+        syncAppInterfaceLanguage()
+        persistSnapshot()
+        persistGlossaryState()
+        syncLegacyGlossaryEntries()
+    }
+
+    public var appInterfaceLanguage: AppInterfaceLanguage {
+        get { AppInterfaceLanguage(rawValue: appInterfaceLanguageCode) ?? .defaultLanguage }
+        set { appInterfaceLanguageCode = newValue.rawValue }
+    }
+
+    public var selectedLanguage: SupportedLanguage {
+        get { SupportedLanguage(rawValue: selectedLanguageCode) ?? .simplifiedChinese }
+        set { selectedLanguageCode = newValue.rawValue }
+    }
+
+    public var selectedASRConfig: ASRProviderConfig {
+        get { asrConfigsByProvider[selectedASRProvider] ?? .empty }
+        set { asrConfigsByProvider[selectedASRProvider] = newValue }
+    }
+
+    public var selectedTextProviderConfig: TextRefinementProviderConfig {
+        get { textConfigsByProvider[selectedTextProvider] ?? .empty }
+        set { textConfigsByProvider[selectedTextProvider] = newValue }
+    }
+
+    public var isTextRefinementConfigured: Bool {
+        selectedTextProviderConfig.isConfigured
+    }
+
+    public var enabledGlossaryPresetIDs: [GlossaryPresetID] {
+        get { glossaryState.enabledPresetIDs }
+        set {
+            setGlossaryState(
+                enabledPresetIDs: newValue,
+                customTerms: glossaryState.customTerms
+            )
+        }
+    }
+
+    public var customGlossaryTerms: [String] {
+        get { glossaryState.customTerms }
+        set {
+            setGlossaryState(
+                enabledPresetIDs: glossaryState.enabledPresetIDs,
+                customTerms: newValue
+            )
+        }
+    }
+
+    public var effectiveGlossarySections: [GlossarySection] {
+        var seen = Set<String>()
+        var sections: [GlossarySection] = []
+
+        let customItems = glossaryState.customTerms.filter { seen.insert($0).inserted }
+        if !customItems.isEmpty {
+            sections.append(GlossarySection(title: "glossary.customTerms", items: customItems))
+        }
+
+        for presetID in GlossaryPresetID.allCases where glossaryState.enabledPresetIDs.contains(presetID) {
+            let definition = GlossaryPresetDefinition.definition(for: presetID)
+            let uniqueItems = definition.terms
+                .map(\.trimmed)
+                .filter { !$0.isEmpty }
+                .filter { seen.insert($0).inserted }
+
+            if !uniqueItems.isEmpty {
+                sections.append(GlossarySection(title: definition.fullTitle, items: uniqueItems))
+            }
+        }
+
+        return sections
+    }
+
+    public var effectiveGlossaryItems: [String] {
+        effectiveGlossarySections.flatMap(\.items)
+    }
+
+    public var glossaryItems: [String] {
+        effectiveGlossaryItems
+    }
+
+    public func asrConfig(for provider: ASRProvider) -> ASRProviderConfig {
+        asrConfigsByProvider[provider] ?? .empty
+    }
+
+    public func setASRConfig(_ config: ASRProviderConfig, for provider: ASRProvider) {
+        asrConfigsByProvider[provider] = config
+    }
+
+    public func textRefinementConfig(for provider: TextRefinementProvider) -> TextRefinementProviderConfig {
+        textConfigsByProvider[provider] ?? .empty
+    }
+
+    public func setTextRefinementConfig(_ config: TextRefinementProviderConfig, for provider: TextRefinementProvider) {
+        textConfigsByProvider[provider] = config
+    }
+
+    public func setEnabledDictationSkills(_ skills: [DictationProcessingSkill]) {
+        enabledDictationSkills = Self.normalizedDictationSkills(skills)
+    }
+
+    public func toggleDictationSkill(_ skill: DictationProcessingSkill) {
+        var nextSkills = enabledDictationSkills
+        if let index = nextSkills.firstIndex(of: skill) {
+            nextSkills.remove(at: index)
+        } else {
+            nextSkills.append(skill)
+        }
+        setEnabledDictationSkills(nextSkills)
+    }
+
+    public func setGlossaryState(enabledPresetIDs: [GlossaryPresetID], customTerms: [String]) {
+        glossaryState = Self.normalizedGlossaryState(
+            GlossarySettingsSnapshot(
+                enabledPresetIDs: enabledPresetIDs,
+                customTerms: customTerms
+            )
+        )
+    }
+
+    public func toggleGlossaryPreset(_ presetID: GlossaryPresetID) {
+        var enabledPresetIDs = glossaryState.enabledPresetIDs
+        if let index = enabledPresetIDs.firstIndex(of: presetID) {
+            enabledPresetIDs.remove(at: index)
+        } else {
+            enabledPresetIDs.append(presetID)
+        }
+
+        setGlossaryState(enabledPresetIDs: enabledPresetIDs, customTerms: glossaryState.customTerms)
+    }
+
+    @discardableResult
+    public func addCustomGlossaryTerm(_ term: String) -> Bool {
+        let normalized = term.trimmed
+        guard !normalized.isEmpty else { return false }
+        guard !glossaryState.customTerms.contains(normalized) else { return false }
+
+        setGlossaryState(
+            enabledPresetIDs: glossaryState.enabledPresetIDs,
+            customTerms: glossaryState.customTerms + [normalized]
+        )
+        return true
+    }
+
+    public func removeCustomGlossaryTerm(_ term: String) {
+        setGlossaryState(
+            enabledPresetIDs: glossaryState.enabledPresetIDs,
+            customTerms: glossaryState.customTerms.filter { $0 != term }
+        )
+    }
+
+    public func clearCustomGlossaryTerms() {
+        setGlossaryState(enabledPresetIDs: glossaryState.enabledPresetIDs, customTerms: [])
+    }
+
+    private func persistSnapshot() {
+        let snapshot = ModelSettingsSnapshot(
+            selectedASRProvider: selectedASRProvider,
+            selectedTextProvider: selectedTextProvider,
+            textRefinementEnabled: textRefinementEnabled,
+            triggerKey: triggerKey,
+            interruptSystemMediaPlayback: interruptSystemMediaPlayback,
+            dockIconVisible: dockIconVisible,
+            preferredMicrophoneUID: preferredMicrophoneUID?.trimmed.nilIfEmpty,
+            enabledDictationSkills: enabledDictationSkills,
+            asrConfigsByProvider: Dictionary(
+                uniqueKeysWithValues: ASRProvider.allCases.map { provider in
+                    (provider, asrConfigsByProvider[provider] ?? .empty)
+                }
+            ),
+            textConfigsByProvider: Dictionary(
+                uniqueKeysWithValues: TextRefinementProvider.allCases.map { provider in
+                    (provider, textConfigsByProvider[provider] ?? .empty)
+                }
+            )
+        )
+
+        guard let data = try? encoder.encode(snapshot) else { return }
+        defaults.set(data, forKey: Keys.modelSettingsSnapshot)
+        flushDefaults()
+    }
+
+    private func persistGlossaryState() {
+        guard let data = try? encoder.encode(glossaryState) else { return }
+        defaults.set(data, forKey: Keys.glossarySettingsSnapshot)
+        flushDefaults()
+    }
+
+    private func syncAppInterfaceLanguage() {
+        let normalizedCode = Self.normalizedInterfaceLanguageCode(appInterfaceLanguageCode)
+        defaults.set(normalizedCode, forKey: Keys.appInterfaceLanguageCode)
+        defaults.set([normalizedCode], forKey: Keys.appleLanguages)
+        AppLocalization.setLanguageCode(normalizedCode)
+        flushDefaults()
+    }
+
+    private func syncLegacyGlossaryEntries() {
+        let normalizedEntries = glossaryState.customTerms.joined(separator: "\n")
+        guard glossaryEntries != normalizedEntries else {
+            defaults.set(glossaryEntries, forKey: Keys.glossaryEntries)
+            flushDefaults()
+            return
+        }
+
+        isSyncingLegacyGlossary = true
+        glossaryEntries = normalizedEntries
+        isSyncingLegacyGlossary = false
+    }
+
+    private func flushDefaults() {
+        // Xcode stop/re-run can terminate the app before UserDefaults async writes hit disk.
+        defaults.synchronize()
+    }
+
+    private static func loadSnapshot(from defaults: UserDefaults) -> ModelSettingsSnapshot? {
+        guard let data = defaults.data(forKey: Keys.modelSettingsSnapshot) else {
+            return nil
+        }
+
+        let decoder = JSONDecoder()
+        guard var snapshot = try? decoder.decode(ModelSettingsSnapshot.self, from: data) else {
+            return nil
+        }
+
+        for provider in ASRProvider.allCases where snapshot.asrConfigsByProvider[provider] == nil {
+            snapshot.asrConfigsByProvider[provider] = .empty
+        }
+
+        for provider in TextRefinementProvider.allCases where snapshot.textConfigsByProvider[provider] == nil {
+            snapshot.textConfigsByProvider[provider] = .empty
+        }
+
+        return normalizedSnapshot(snapshot)
+    }
+
+    private static func loadGlossarySnapshot(from defaults: UserDefaults) -> GlossarySettingsSnapshot? {
+        guard let data = defaults.data(forKey: Keys.glossarySettingsSnapshot) else {
+            return nil
+        }
+
+        let decoder = JSONDecoder()
+        guard let snapshot = try? decoder.decode(GlossarySettingsSnapshot.self, from: data) else {
+            return nil
+        }
+
+        return normalizedGlossaryState(snapshot)
+    }
+
+    private static func makeLegacySnapshot(from defaults: UserDefaults) -> ModelSettingsSnapshot {
+        var snapshot = ModelSettingsSnapshot.default
+        snapshot.textRefinementEnabled = defaults.object(forKey: Keys.legacyLLMEnabled) as? Bool ?? false
+
+        let baseURL = defaults.string(forKey: Keys.legacyLLMBaseURL) ?? ""
+        let apiKey = defaults.string(forKey: Keys.legacyLLMAPIKey) ?? ""
+        let model = defaults.string(forKey: Keys.legacyLLMModel) ?? ""
+
+        if !baseURL.trimmed.isEmpty || !apiKey.trimmed.isEmpty || !model.trimmed.isEmpty {
+            snapshot.textConfigsByProvider[TextRefinementProvider.deepSeek] = TextRefinementProviderConfig(
+                baseURL: baseURL,
+                apiKey: apiKey,
+                model: model
+            )
+        }
+
+        return snapshot
+    }
+
+    private static func makeLegacyGlossarySnapshot(entries: String) -> GlossarySettingsSnapshot {
+        GlossarySettingsSnapshot(
+            enabledPresetIDs: [],
+            customTerms: normalizeTerms(parseLegacyGlossaryEntries(entries))
+        )
+    }
+
+    private static func normalizedInterfaceLanguageCode(_ code: String?) -> String {
+        guard let code,
+              let language = AppInterfaceLanguage(rawValue: code)
+        else {
+            return AppInterfaceLanguage.defaultLanguage.rawValue
+        }
+        return language.rawValue
+    }
+
+    private static func normalizedSnapshot(_ snapshot: ModelSettingsSnapshot) -> ModelSettingsSnapshot {
+        var normalized = snapshot
+        normalized.preferredMicrophoneUID = normalized.preferredMicrophoneUID?.trimmed.nilIfEmpty
+        normalized.enabledDictationSkills = normalizedDictationSkills(snapshot.enabledDictationSkills)
+        var funASRConfig = normalized.asrConfigsByProvider[.funASR] ?? .empty
+        if funASRConfig.baseURL.trimmed.isEmpty {
+            funASRConfig.baseURL = "wss://dashscope.aliyuncs.com/api-ws/v1/inference"
+        }
+        if funASRConfig.model.trimmed.isEmpty {
+            funASRConfig.model = "fun-asr-realtime"
+        }
+        normalized.asrConfigsByProvider[.funASR] = funASRConfig
+        var qwenConfig = normalized.asrConfigsByProvider[.qwenASR] ?? .empty
+        if qwenConfig.baseURL.trimmed.isEmpty {
+            qwenConfig.baseURL = "wss://dashscope.aliyuncs.com/api-ws/v1/realtime"
+        }
+        if qwenConfig.model.trimmed.isEmpty {
+            qwenConfig.model = "qwen3-asr-flash-realtime"
+        }
+        normalized.asrConfigsByProvider[.qwenASR] = qwenConfig
+        var stepConfig = normalized.asrConfigsByProvider[.stepfunASR] ?? .empty
+        if stepConfig.baseURL.trimmed.isEmpty {
+            stepConfig.baseURL = "wss://api.stepfun.com/v1/realtime/asr/stream"
+        }
+        if stepConfig.model.trimmed.isEmpty {
+            stepConfig.model = "step-asr-1.1-stream"
+        }
+        normalized.asrConfigsByProvider[.stepfunASR] = stepConfig
+        var deepSeekConfig = normalized.textConfigsByProvider[.deepSeek] ?? .empty
+        if deepSeekConfig.baseURL.trimmed.isEmpty || deepSeekConfig.baseURL.trimmed == "https://api.deepseek.com/v1" {
+            deepSeekConfig.baseURL = "https://api.deepseek.com"
+        }
+        if deepSeekConfig.model.trimmed.isEmpty
+            || deepSeekConfig.model.trimmed == "deepseek-chat"
+            || deepSeekConfig.model.trimmed == "deepseek-reasoner"
+        {
+            deepSeekConfig.model = "deepseek-v4-flash"
+        }
+        normalized.textConfigsByProvider[.deepSeek] = deepSeekConfig
+        return normalized
+    }
+
+    private static func normalizedDictationSkills(_ skills: [DictationProcessingSkill]) -> [DictationProcessingSkill] {
+        let uniqueSkills = Set(skills)
+        return DictationProcessingSkill.allCases.filter { uniqueSkills.contains($0) }
+    }
+
+    private static func normalizedGlossaryState(_ snapshot: GlossarySettingsSnapshot) -> GlossarySettingsSnapshot {
+        GlossarySettingsSnapshot(
+            enabledPresetIDs: GlossaryPresetID.allCases.filter { snapshot.enabledPresetIDs.contains($0) },
+            customTerms: normalizeTerms(snapshot.customTerms)
+        )
+    }
+
+    private static func parseLegacyGlossaryEntries(_ entries: String) -> [String] {
+        entries
+            .split(whereSeparator: \.isNewline)
+            .map(String.init)
+    }
+
+    private static func normalizeTerms(_ terms: [String]) -> [String] {
+        var seen = Set<String>()
+        var normalizedTerms: [String] = []
+
+        for term in terms.map(\.trimmed) where !term.isEmpty {
+            if seen.insert(term).inserted {
+                normalizedTerms.append(term)
+            }
+        }
+
+        return normalizedTerms
+    }
+}
+
+private extension String {
+    var nilIfEmpty: String? {
+        isEmpty ? nil : self
+    }
+}

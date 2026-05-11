@@ -1,6 +1,7 @@
 import XCTest
 import AVFoundation
 @testable import Voily
+@testable import VoilyCore
 
 final class AudioSupportTests: XCTestCase {
     func testAudioPCMConverterProducesPCM16MonoData() throws {

@@ -12,7 +12,7 @@ Voily 需要同时支持本地引擎（SenseVoice）与多家云端流式 ASR（
 
 ## 决策
 
-所有 ASR 引擎通过统一会话抽象 `ASRCaptureSession`（位于 `Sources/Voily/Services/Audio/`）接入，暴露纯会话职责：
+所有 ASR 引擎通过统一会话抽象 `ASRCaptureSession`（位于 `Sources/VoilyApp/Services/Audio/`）接入，暴露纯会话职责：
 
 1. `start(onPartial:)`：启动一次实时会话并接收 partial 回调
 2. `append(_:)`：持续喂入录音 buffer；chunk 级错误直接向上抛出

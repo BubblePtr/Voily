@@ -49,6 +49,8 @@ make build
 make run
 ```
 
+`make build` regenerates `Voily.xcodeproj` from `project.yml` with XcodeGen before invoking Xcode. Install XcodeGen locally if the command is missing.
+
 ### Install to ~/Applications
 
 ```bash
@@ -135,16 +137,14 @@ The floating overlay shows real-time status:
 ## 🏗️ Project Structure
 
 ```
-Sources/Voily/
-├── App/                    # App entry point, delegate, Fn key monitor
-├── Configuration/          # Settings, language definitions
-├── Features/
-│   ├── Overlay/            # Floating transcription overlay
-│   └── Settings/           # Settings window
-├── Services/
-│   ├── Audio/              # ASR engines, audio capture, model management
-│   └── Text/               # Text injection, LLM refinement
-└── Storage/                # Usage statistics persistence
+Sources/
+├── VoilyCore/              # SwiftPM library: settings, storage, transcript logic, LLM/Fun-ASR core logic
+└── VoilyApp/               # SwiftUI/AppKit app: lifecycle, permissions, UI, audio capture, app-hosted services
+Resources/VoilyApp/         # Info.plist, entitlements, asset catalogs, localized strings, brand icons
+Tests/
+├── VoilyCoreTests/         # SwiftPM logic tests
+└── VoilyTests/             # Xcode app-hosted tests
+project.yml                 # XcodeGen source of truth for Voily.xcodeproj
 ```
 
 ## 📄 License
