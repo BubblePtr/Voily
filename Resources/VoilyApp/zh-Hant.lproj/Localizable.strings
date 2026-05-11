@@ -133,12 +133,14 @@
 "已启用术语包：%@" = "已啟用術語包：%@";
 "已添加自定义词条：%@" = "已新增自訂詞條：%@";
 "词条已存在或内容为空。" = "詞條已存在或內容為空。";
-"互联网" = "網際網路";
-"开发" = "開發";
-"测试" = "測試";
-"产品经理" = "產品經理";
-"医疗" = "醫療";
-"法律" = "法律";
+"glossary.customTerms" = "自訂詞條";
+"glossary.domain.internet" = "網際網路";
+"glossary.domain.medical" = "醫療";
+"glossary.domain.legal" = "法律";
+"glossary.scene.development" = "開發";
+"glossary.scene.testing" = "測試";
+"glossary.scene.productManagement" = "產品經理";
+"glossary.unknown" = "未知";
 "%@-%@" = "%@-%@";
 
 "近 7 天语音输入时长" = "近 7 天語音輸入時長";

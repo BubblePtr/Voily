@@ -133,12 +133,14 @@
 "已启用术语包：%@" = "已启用术语包：%@";
 "已添加自定义词条：%@" = "已添加自定义词条：%@";
 "词条已存在或内容为空。" = "词条已存在或内容为空。";
-"互联网" = "互联网";
-"开发" = "开发";
-"测试" = "测试";
-"产品经理" = "产品经理";
-"医疗" = "医疗";
-"法律" = "法律";
+"glossary.customTerms" = "自定义词条";
+"glossary.domain.internet" = "互联网";
+"glossary.domain.medical" = "医疗";
+"glossary.domain.legal" = "法律";
+"glossary.scene.development" = "开发";
+"glossary.scene.testing" = "测试";
+"glossary.scene.productManagement" = "产品经理";
+"glossary.unknown" = "未知";
 "%@-%@" = "%@-%@";
 
 "近 7 天语音输入时长" = "近 7 天语音输入时长";

@@ -522,12 +522,12 @@ public struct GlossaryPresetDefinition: Identifiable, Equatable, Sendable {
 
     public static let categories: [GlossaryPresetCategory] = [
         GlossaryPresetCategory(
-            title: "互联网",
+            title: "glossary.domain.internet",
             presets: [
                 GlossaryPresetDefinition(
                     id: .internetDevelopment,
-                    domainTitle: "互联网",
-                    sceneTitle: "开发",
+                    domainTitle: "glossary.domain.internet",
+                    sceneTitle: "glossary.scene.development",
                     terms: [
                         "OpenAI",
                         "ChatGPT",
@@ -545,8 +545,8 @@ public struct GlossaryPresetDefinition: Identifiable, Equatable, Sendable {
                 ),
                 GlossaryPresetDefinition(
                     id: .internetTesting,
-                    domainTitle: "互联网",
-                    sceneTitle: "测试",
+                    domainTitle: "glossary.domain.internet",
+                    sceneTitle: "glossary.scene.testing",
                     terms: [
                         "QA",
                         "Test Case",
@@ -562,8 +562,8 @@ public struct GlossaryPresetDefinition: Identifiable, Equatable, Sendable {
                 ),
                 GlossaryPresetDefinition(
                     id: .internetProductManager,
-                    domainTitle: "互联网",
-                    sceneTitle: "产品经理",
+                    domainTitle: "glossary.domain.internet",
+                    sceneTitle: "glossary.scene.productManagement",
                     terms: [
                         "PRD",
                         "Roadmap",
@@ -580,11 +580,11 @@ public struct GlossaryPresetDefinition: Identifiable, Equatable, Sendable {
             ]
         ),
         GlossaryPresetCategory(
-            title: "医疗",
+            title: "glossary.domain.medical",
             presets: [
                 GlossaryPresetDefinition(
                     id: .medical,
-                    domainTitle: "医疗",
+                    domainTitle: "glossary.domain.medical",
                     sceneTitle: nil,
                     terms: [
                         "门诊",
@@ -602,11 +602,11 @@ public struct GlossaryPresetDefinition: Identifiable, Equatable, Sendable {
             ]
         ),
         GlossaryPresetCategory(
-            title: "法律",
+            title: "glossary.domain.legal",
             presets: [
                 GlossaryPresetDefinition(
                     id: .legal,
-                    domainTitle: "法律",
+                    domainTitle: "glossary.domain.legal",
                     sceneTitle: nil,
                     terms: [
                         "合同",
@@ -630,7 +630,7 @@ public struct GlossaryPresetDefinition: Identifiable, Equatable, Sendable {
     public static func definition(for id: GlossaryPresetID) -> GlossaryPresetDefinition {
         all.first(where: { $0.id == id }) ?? GlossaryPresetDefinition(
             id: id,
-            domainTitle: "未知",
+            domainTitle: "glossary.unknown",
             sceneTitle: nil,
             terms: []
         )
@@ -881,7 +881,7 @@ public final class AppSettings {
 
         let customItems = glossaryState.customTerms.filter { seen.insert($0).inserted }
         if !customItems.isEmpty {
-            sections.append(GlossarySection(title: "自定义词条", items: customItems))
+            sections.append(GlossarySection(title: "glossary.customTerms", items: customItems))
         }
 
         for presetID in GlossaryPresetID.allCases where glossaryState.enabledPresetIDs.contains(presetID) {

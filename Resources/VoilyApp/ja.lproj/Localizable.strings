@@ -133,12 +133,14 @@
 "已启用术语包：%@" = "用語パックを有効にしました：%@";
 "已添加自定义词条：%@" = "カスタム用語を追加しました：%@";
 "词条已存在或内容为空。" = "用語は既に存在するか、空です。";
-"互联网" = "インターネット";
-"开发" = "開発";
-"测试" = "テスト";
-"产品经理" = "プロダクト管理";
-"医疗" = "医療";
-"法律" = "法律";
+"glossary.customTerms" = "カスタム用語";
+"glossary.domain.internet" = "インターネット";
+"glossary.domain.medical" = "医療";
+"glossary.domain.legal" = "法律";
+"glossary.scene.development" = "開発";
+"glossary.scene.testing" = "テスト";
+"glossary.scene.productManagement" = "プロダクト管理";
+"glossary.unknown" = "不明";
 "%@-%@" = "%@ - %@";
 
 "近 7 天语音输入时长" = "直近 7 日の音声入力時間";

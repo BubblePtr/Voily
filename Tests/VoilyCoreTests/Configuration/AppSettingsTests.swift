@@ -65,7 +65,7 @@ final class AppSettingsTests: XCTestCase {
 
         XCTAssertEqual(
             settings.effectiveGlossarySections.map(\.title),
-            ["互联网-开发", "医疗"]
+            ["glossary.domain.internet-glossary.scene.development", "glossary.domain.medical"]
         )
         XCTAssertTrue(settings.effectiveGlossaryItems.contains("SwiftUI"))
         XCTAssertTrue(settings.effectiveGlossaryItems.contains("门诊"))

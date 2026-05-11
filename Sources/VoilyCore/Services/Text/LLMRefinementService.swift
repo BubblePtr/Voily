@@ -162,7 +162,7 @@ public final class LLMRefinementService {
 
         let glossaryText = glossarySections
             .map { section in
-                "\(section.title)：\(section.items.joined(separator: "、"))"
+                "\(localizedGlossarySectionTitle(section.title))：\(section.items.joined(separator: "、"))"
             }
             .joined(separator: "\n")
 
@@ -174,6 +174,20 @@ public final class LLMRefinementService {
         - 词库仅用于纠错参考，不代表可以改写原句或补充新内容。
         \(glossaryText)
         """
+    }
+
+    private static func localizedGlossarySectionTitle(_ title: String) -> String {
+        let languageCode = AppInterfaceLanguage.defaultLanguage.rawValue
+        let parts = title.split(separator: "-", maxSplits: 1).map(String.init)
+        guard parts.count == 2 else {
+            return AppLocalization.localized(title, languageCode: languageCode)
+        }
+
+        return String(
+            format: AppLocalization.localized("%@-%@", languageCode: languageCode),
+            AppLocalization.localized(parts[0], languageCode: languageCode),
+            AppLocalization.localized(parts[1], languageCode: languageCode)
+        )
     }
 
     private static func skillInstructions(for skills: [DictationProcessingSkill]) -> String {

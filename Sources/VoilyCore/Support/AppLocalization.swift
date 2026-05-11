@@ -17,10 +17,14 @@ public enum AppLocalization: Sendable {
     }
 
     public static func localized(_ key: String, languageCode: String) -> String {
-        guard let bundle = bundle(for: languageCode) else {
-            return key
+        if let bundle = bundle(for: languageCode) {
+            let localized = bundle.localizedString(forKey: key, value: key, table: nil)
+            if localized != key {
+                return localized
+            }
         }
-        return bundle.localizedString(forKey: key, value: key, table: nil)
+
+        return fallbackStringsByLanguage[languageCode]?[key] ?? key
     }
 
     private static func bundle(for languageCode: String) -> Bundle? {
@@ -29,6 +33,20 @@ public enum AppLocalization: Sendable {
         }
         return Bundle(url: url)
     }
+
+    private static let fallbackStringsByLanguage: [String: [String: String]] = [
+        AppInterfaceLanguage.simplifiedChinese.rawValue: [
+            "glossary.customTerms": "自定义词条",
+            "glossary.domain.internet": "互联网",
+            "glossary.domain.medical": "医疗",
+            "glossary.domain.legal": "法律",
+            "glossary.scene.development": "开发",
+            "glossary.scene.testing": "测试",
+            "glossary.scene.productManagement": "产品经理",
+            "glossary.unknown": "未知",
+            "%@-%@": "%@-%@",
+        ],
+    ]
 }
 
 private final class AppLocalizationStorage: @unchecked Sendable {

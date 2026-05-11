@@ -903,7 +903,7 @@ private struct SectionTitle: View {
     let title: String
 
     var body: some View {
-        Text(LocalizedStringKey(title))
+        Text(AppLocalization.localized(title))
             .font(.system(size: 18, weight: .semibold))
     }
 }
@@ -2009,7 +2009,7 @@ private struct GlossaryPresetToggleCard: View {
             VStack(alignment: .leading, spacing: 10) {
                 HStack(alignment: .top, spacing: 10) {
                     VStack(alignment: .leading, spacing: 6) {
-                        Text(LocalizedStringKey(preset.title))
+                        Text(AppLocalization.localized(preset.title))
                             .font(.system(size: 15, weight: .semibold))
 
                         Text(String(format: AppLocalization.localized("%@ 条标准写法"), "\(preset.itemCount)"))
