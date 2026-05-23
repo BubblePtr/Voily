@@ -41,6 +41,25 @@ Then export it for the release commands:
 export VOILY_NOTARY_PROFILE=voily-notary
 ```
 
+## Versioning
+
+Voily release versions use semantic versioning in the `MAJOR.MINOR.PATCH` form.
+
+- `MARKETING_VERSION` in `project.yml` is the app version and must be a three-part semantic version, for example `1.0.0`.
+- Public release tags use the same version with a leading `v`, for example `v1.0.0`.
+- `CURRENT_PROJECT_VERSION` remains the build number and should stay an integer that can be incremented independently.
+- The automated release workflow rejects tags that do not match `vMAJOR.MINOR.PATCH`.
+- The automated release workflow also rejects tags that do not match `CFBundleShortVersionString`.
+
+The current release version is `1.0.0`, so the matching tag is:
+
+```bash
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+Pre-release identifiers such as `v1.0.0-rc.1` are not accepted by the public release workflow yet, because the macOS app version stored in `CFBundleShortVersionString` is kept to the stable `MAJOR.MINOR.PATCH` form.
+
 ## Release commands
 
 ### 1. Archive the Release build
@@ -98,9 +117,9 @@ If Gatekeeper rejects the app at this stage, that usually means the build is sti
 The recommended artifact to notarize is the dmg:
 
 ```bash
-ARTIFACT=build/release/artifacts/Voily-1.0-1.dmg make notarize
-ARTIFACT=build/release/artifacts/Voily-1.0-1.dmg make staple
-ARTIFACT=build/release/artifacts/Voily-1.0-1.dmg make verify-release
+ARTIFACT=build/release/artifacts/Voily-1.0.0-1.dmg make notarize
+ARTIFACT=build/release/artifacts/Voily-1.0.0-1.dmg make staple
+ARTIFACT=build/release/artifacts/Voily-1.0.0-1.dmg make verify-release
 ```
 
 Notes:
@@ -111,7 +130,31 @@ Notes:
 
 ## 5. Publish to GitHub Releases
 
-After verification succeeds:
+The preferred publishing path is the GitHub Actions release workflow. It runs on the self-hosted release runner with these labels:
+
+- `self-hosted`
+- `macOS`
+- `ARM64`
+- `voily-release`
+
+After the workflow is present on `main`, publish a release by creating and pushing the matching semantic version tag:
+
+```bash
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+The workflow will:
+
+1. Check out the tagged commit.
+2. Verify the runner, signing identity, and `VOILY_NOTARY_PROFILE`.
+3. Run `make release`.
+4. Confirm the tag matches `CFBundleShortVersionString`.
+5. Run `make package-dmg`.
+6. Run `make notarize`, `make staple`, and `make verify-release`.
+7. Create the GitHub Release if it does not exist, or upload the dmg to the existing release with `--clobber`.
+
+Manual publishing is still possible if the workflow is unavailable:
 
 1. Create a git tag for the release version.
 2. Push the tag to GitHub.
