@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "Existing semantic version tag to build, for example v1.0.0"
+        description: "Existing semantic version tag to build, for example v0.1.0"
         required: true
         type: string
 
@@ -72,12 +72,12 @@ jobs:
           app_version_pattern='^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$'
 
           if [[ ! "$RELEASE_TAG" =~ $semver_pattern ]]; then
-            printf 'Release tag %s is not a supported semantic version tag. Expected vMAJOR.MINOR.PATCH, for example v1.0.0.\n' "$RELEASE_TAG" >&2
+            printf 'Release tag %s is not a supported semantic version tag. Expected vMAJOR.MINOR.PATCH, for example v0.1.0.\n' "$RELEASE_TAG" >&2
             exit 1
           fi
 
           if [[ ! "$app_version" =~ $app_version_pattern ]]; then
-            printf 'App version %s is not a supported semantic version. Expected MAJOR.MINOR.PATCH, for example 1.0.0.\n' "$app_version" >&2
+            printf 'App version %s is not a supported semantic version. Expected MAJOR.MINOR.PATCH, for example 0.1.0.\n' "$app_version" >&2
             exit 1
           fi
 
