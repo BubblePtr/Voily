@@ -71,15 +71,55 @@ default_dmg_path() {
   printf "%s/%s.dmg" "$ARTIFACTS_DIR" "$(artifact_stem)"
 }
 
+team_id_from_signing_identity() {
+  local identity="$1"
+  if [[ "$identity" =~ \(([A-Z0-9]+)\)$ ]]; then
+    printf "%s\n" "${BASH_REMATCH[1]}"
+  fi
+  return 0
+}
+
 discover_code_sign_identity() {
   if [[ -n "${VOILY_CODE_SIGN_IDENTITY:-}" ]]; then
     printf "%s\n" "$VOILY_CODE_SIGN_IDENTITY"
     return 0
   fi
 
-  security find-identity -p codesigning -v 2>/dev/null \
-    | sed -n 's/.*"\(Developer ID Application:[^"]*\)".*/\1/p' \
-    | head -n 1
+  local first_identity="" identity identity_team_id
+  while IFS= read -r identity; do
+    [[ -z "$first_identity" ]] && first_identity="$identity"
+
+    if [[ -n "${VOILY_DEVELOPMENT_TEAM:-}" ]]; then
+      identity_team_id="$(team_id_from_signing_identity "$identity")"
+      if [[ "$identity_team_id" == "$VOILY_DEVELOPMENT_TEAM" ]]; then
+        printf "%s\n" "$identity"
+        return 0
+      fi
+    fi
+  done < <(
+    security find-identity -p codesigning -v 2>/dev/null \
+      | sed -n 's/.*"\(Developer ID Application:[^"]*\)".*/\1/p'
+  )
+
+  if [[ -z "${VOILY_DEVELOPMENT_TEAM:-}" && -n "$first_identity" ]]; then
+    printf "%s\n" "$first_identity"
+  fi
+  return 0
+}
+
+discover_developer_id_team_id() {
+  local subject team_id
+  while IFS= read -r subject; do
+    team_id="$(sed -n 's/.*OU=\([^,/]*\).*/\1/p' <<<"$subject")"
+    if [[ -n "$team_id" ]]; then
+      printf "%s\n" "$team_id"
+      return 0
+    fi
+  done < <(
+    security find-certificate -c 'Developer ID Application' -p 2>/dev/null \
+      | openssl x509 -noout -subject 2>/dev/null
+  )
+  return 0
 }
 
 discover_artifact_signing_identity() {
@@ -109,8 +149,13 @@ archive_app() {
   rm -rf "$ARCHIVE_PATH" "$APP_PATH" "$EXPORT_PATH"
   mkdir -p "$EXPORT_PATH"
 
-  local code_sign_identity
+  local code_sign_identity development_team identity_team_id
   code_sign_identity="$(discover_code_sign_identity)"
+  development_team="${VOILY_DEVELOPMENT_TEAM:-}"
+  if [[ -n "$code_sign_identity" ]]; then
+    identity_team_id="$(team_id_from_signing_identity "$code_sign_identity")"
+    [[ -n "$identity_team_id" ]] && development_team="$identity_team_id"
+  fi
 
   local cmd=(
     xcodebuild
@@ -122,8 +167,8 @@ archive_app() {
     archive
   )
 
-  if [[ -n "${VOILY_DEVELOPMENT_TEAM:-}" ]]; then
-    cmd+=("DEVELOPMENT_TEAM=${VOILY_DEVELOPMENT_TEAM}")
+  if [[ -n "$development_team" ]]; then
+    cmd+=("DEVELOPMENT_TEAM=${development_team}")
   fi
 
   if [[ -n "$code_sign_identity" ]]; then
@@ -144,13 +189,18 @@ archive_app() {
 }
 
 generate_export_options_plist() {
-  local team_id="${VOILY_DEVELOPMENT_TEAM:-$(security find-certificate -c 'Developer ID Application' -p 2>/dev/null | openssl x509 -noout -subject 2>/dev/null | sed -n 's/.*OU=\\([^,/]*\\).*/\\1/p' | head -n 1)}"
+  local team_id="${VOILY_DEVELOPMENT_TEAM:-}"
   local code_sign_identity
   local signing_style="automatic"
 
   code_sign_identity="$(discover_code_sign_identity)"
   if [[ -n "$code_sign_identity" ]]; then
     signing_style="manual"
+    local identity_team_id
+    identity_team_id="$(team_id_from_signing_identity "$code_sign_identity")"
+    [[ -n "$identity_team_id" ]] && team_id="$identity_team_id"
+  elif [[ -z "$team_id" ]]; then
+    team_id="$(discover_developer_id_team_id)"
   fi
 
   cat >"$EXPORT_OPTIONS_PLIST" <<EOF
