@@ -117,9 +117,9 @@ If Gatekeeper rejects the app at this stage, that usually means the build is sti
 The recommended artifact to notarize is the dmg:
 
 ```bash
-ARTIFACT=build/release/artifacts/Voily-0.1.0-1.dmg make notarize
-ARTIFACT=build/release/artifacts/Voily-0.1.0-1.dmg make staple
-ARTIFACT=build/release/artifacts/Voily-0.1.0-1.dmg make verify-release
+ARTIFACT=build/release/artifacts/Voily-0.1.0.dmg make notarize
+ARTIFACT=build/release/artifacts/Voily-0.1.0.dmg make staple
+ARTIFACT=build/release/artifacts/Voily-0.1.0.dmg make verify-release
 ```
 
 Notes:
