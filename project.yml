@@ -93,7 +93,7 @@ targets:
       base:
         PRODUCT_NAME: Voily
         PRODUCT_BUNDLE_IDENTIFIER: dev.kieranzhang.voily
-        MARKETING_VERSION: "1.0"
+        MARKETING_VERSION: "1.0.0"
         CURRENT_PROJECT_VERSION: "1"
         DEVELOPMENT_TEAM: 9KZ32XLVQW
         CODE_SIGN_STYLE: Automatic
@@ -130,7 +130,7 @@ targets:
       base:
         PRODUCT_NAME: VoilyTests
         PRODUCT_BUNDLE_IDENTIFIER: dev.kieranzhang.voilyTests
-        MARKETING_VERSION: "1.0"
+        MARKETING_VERSION: "1.0.0"
         CURRENT_PROJECT_VERSION: "1"
         GENERATE_INFOPLIST_FILE: YES
         CODE_SIGNING_ALLOWED: YES
