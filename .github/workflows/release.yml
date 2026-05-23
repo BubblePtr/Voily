@@ -113,9 +113,15 @@ jobs:
       - name: Notarize, staple, and verify
         run: |
           set -euo pipefail
-          ARTIFACT="${{ steps.package.outputs.artifact }}" make notarize
-          ARTIFACT="${{ steps.package.outputs.artifact }}" make staple
-          ARTIFACT="${{ steps.package.outputs.artifact }}" make verify-release
+
+          artifact="${{ steps.package.outputs.artifact }}"
+          xcrun notarytool submit "$artifact" \
+            --keychain "$VOILY_RELEASE_KEYCHAIN" \
+            --keychain-profile "$VOILY_NOTARY_PROFILE" \
+            --wait
+
+          ARTIFACT="$artifact" make staple
+          ARTIFACT="$artifact" make verify-release
 
       - name: Publish GitHub release
         run: |
