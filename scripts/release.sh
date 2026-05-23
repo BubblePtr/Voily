@@ -312,13 +312,19 @@ resolve_default_artifact() {
   zip_path="$(default_zip_path)"
 
   if [[ -f "$dmg_path" ]]; then
-    printf "%s\n" "$dmg_path"
-    return 0
+    if [[ "$dmg_path" -nt "$APP_PATH" ]]; then
+      printf "%s\n" "$dmg_path"
+      return 0
+    fi
+    note "Existing dmg is older than app bundle; rebuilding $dmg_path."
   fi
 
   if [[ -f "$zip_path" ]]; then
-    printf "%s\n" "$zip_path"
-    return 0
+    if [[ "$zip_path" -nt "$APP_PATH" ]]; then
+      printf "%s\n" "$zip_path"
+      return 0
+    fi
+    note "Existing zip is older than app bundle; ignoring $zip_path."
   fi
 
   package_dmg "$dmg_path" >/dev/null
