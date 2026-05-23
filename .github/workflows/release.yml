@@ -1,0 +1,115 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing release tag to build, for example v1.0"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.event.inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  release:
+    name: Build, notarize, and publish
+    runs-on: [self-hosted, macOS, ARM64, voily-release]
+    timeout-minutes: 90
+    env:
+      GH_TOKEN: ${{ github.token }}
+      VOILY_NOTARY_PROFILE: ${{ vars.VOILY_NOTARY_PROFILE }}
+      RELEASE_TAG: ${{ github.event.inputs.tag || github.ref_name }}
+
+    steps:
+      - name: Check out release tag
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
+          fetch-depth: 0
+
+      - name: Preflight runner
+        run: |
+          set -euo pipefail
+
+          test -n "$VOILY_NOTARY_PROFILE"
+
+          sw_vers
+          uname -m
+          xcode-select -p
+          xcodebuild -version
+          xcodegen --version
+          gh --version
+          security find-identity -p codesigning -v
+          xcrun notarytool history --keychain-profile "$VOILY_NOTARY_PROFILE"
+
+      - name: Build signed release app
+        run: |
+          set -euo pipefail
+          make clean-release
+          make release
+
+      - name: Validate tag and package DMG
+        id: package
+        run: |
+          set -euo pipefail
+
+          app_version="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' build/release/Voily.app/Contents/Info.plist)"
+          app_build="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' build/release/Voily.app/Contents/Info.plist)"
+          expected_tag="v${app_version}"
+
+          if [[ "$RELEASE_TAG" != "$expected_tag" ]]; then
+            printf 'Release tag %s does not match app version %s. Expected %s.\n' "$RELEASE_TAG" "$app_version" "$expected_tag" >&2
+            exit 1
+          fi
+
+          make package-dmg
+
+          shopt -s nullglob
+          artifacts=(build/release/artifacts/*.dmg)
+          if [[ "${#artifacts[@]}" -ne 1 ]]; then
+            printf 'Expected exactly one DMG artifact, found %s.\n' "${#artifacts[@]}" >&2
+            exit 1
+          fi
+
+          artifact="${artifacts[0]}"
+          {
+            printf 'artifact=%s\n' "$artifact"
+            printf 'app_version=%s\n' "$app_version"
+            printf 'app_build=%s\n' "$app_build"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Notarize, staple, and verify
+        run: |
+          set -euo pipefail
+          ARTIFACT="${{ steps.package.outputs.artifact }}" make notarize
+          ARTIFACT="${{ steps.package.outputs.artifact }}" make staple
+          ARTIFACT="${{ steps.package.outputs.artifact }}" make verify-release
+
+      - name: Publish GitHub release
+        run: |
+          set -euo pipefail
+
+          artifact="${{ steps.package.outputs.artifact }}"
+          title="Voily ${{ steps.package.outputs.app_version }}"
+          notes="Automated release for ${RELEASE_TAG}."
+
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            gh release upload "$RELEASE_TAG" "$artifact" --clobber
+          else
+            gh release create "$RELEASE_TAG" "$artifact" \
+              --title "$title" \
+              --notes "$notes" \
+              --verify-tag
+          fi
