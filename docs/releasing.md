@@ -41,6 +41,18 @@ Then export it for the release commands:
 export VOILY_NOTARY_PROFILE=voily-notary
 ```
 
+For the self-hosted release runner, store the `Developer ID Application` identity and the `voily-notary` profile in the dedicated release keychain:
+
+```bash
+/Users/openclaw/Library/Keychains/voily-release.keychain-db
+```
+
+The release workflow unlocks that keychain with the GitHub secret:
+
+```text
+VOILY_RELEASE_KEYCHAIN_PASSWORD
+```
+
 ## Versioning
 
 Voily release versions use semantic versioning in the `MAJOR.MINOR.PATCH` form.

@@ -14,6 +14,7 @@ APP_PATH="${VOILY_APP_PATH:-$RELEASE_ROOT/${APP_NAME}.app}"
 ARTIFACTS_DIR="${VOILY_ARTIFACTS_DIR:-$RELEASE_ROOT/artifacts}"
 EXPECTED_BUNDLE_ID="${VOILY_EXPECTED_BUNDLE_ID:-dev.kieranzhang.voily}"
 DEFAULT_NOTARY_PROFILE="${VOILY_NOTARY_PROFILE:-${NOTARY_PROFILE:-}}"
+DEFAULT_NOTARY_KEYCHAIN="${VOILY_NOTARY_KEYCHAIN:-${VOILY_RELEASE_KEYCHAIN:-}}"
 EXPORT_OPTIONS_PLIST="${VOILY_EXPORT_OPTIONS_PLIST:-$RELEASE_ROOT/ExportOptions.plist}"
 
 log() {
@@ -336,6 +337,7 @@ notarize_artifact() {
 
   local artifact_path="${1:-}"
   local profile="${2:-$DEFAULT_NOTARY_PROFILE}"
+  local keychain="${3:-$DEFAULT_NOTARY_KEYCHAIN}"
 
   if [[ -z "$artifact_path" ]]; then
     artifact_path="$(resolve_default_artifact)"
@@ -345,7 +347,11 @@ notarize_artifact() {
   [[ -n "$profile" ]] || die "Set VOILY_NOTARY_PROFILE (or NOTARY_PROFILE) to a notarytool keychain profile before notarizing."
 
   log "Submitting $artifact_path for notarization"
-  xcrun notarytool submit "$artifact_path" --keychain-profile "$profile" --wait
+  local cmd=(xcrun notarytool submit "$artifact_path" --keychain-profile "$profile" --wait)
+  if [[ -n "$keychain" ]]; then
+    cmd+=(--keychain "$keychain")
+  fi
+  "${cmd[@]}"
 }
 
 staple_artifact() {
@@ -449,6 +455,7 @@ Environment:
   VOILY_CODE_SIGN_IDENTITY   Optional explicit signing identity for xcodebuild archive
   VOILY_DEVELOPMENT_TEAM     Optional development team override for xcodebuild archive
   VOILY_NOTARY_PROFILE       Required for notarize; maps to a notarytool keychain profile
+  VOILY_NOTARY_KEYCHAIN      Optional keychain path containing the notarytool profile
   VOILY_EXPECTED_BUNDLE_ID   Override the expected bundle identifier (default: dev.kieranzhang.voily)
 EOF
 }

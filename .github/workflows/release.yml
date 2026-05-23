@@ -30,6 +30,8 @@ jobs:
     env:
       GH_TOKEN: ${{ github.token }}
       VOILY_NOTARY_PROFILE: ${{ vars.VOILY_NOTARY_PROFILE }}
+      VOILY_RELEASE_KEYCHAIN: /Users/openclaw/Library/Keychains/voily-release.keychain-db
+      VOILY_RELEASE_KEYCHAIN_PASSWORD: ${{ secrets.VOILY_RELEASE_KEYCHAIN_PASSWORD }}
       RELEASE_TAG: ${{ github.event.inputs.tag || github.ref_name }}
 
     steps:
@@ -45,6 +47,11 @@ jobs:
           set -euo pipefail
 
           test -n "$VOILY_NOTARY_PROFILE"
+          test -n "$VOILY_RELEASE_KEYCHAIN"
+          test -n "$VOILY_RELEASE_KEYCHAIN_PASSWORD"
+
+          security unlock-keychain -p "$VOILY_RELEASE_KEYCHAIN_PASSWORD" "$VOILY_RELEASE_KEYCHAIN"
+          security list-keychains -d user -s "$VOILY_RELEASE_KEYCHAIN" "$HOME/Library/Keychains/login.keychain-db"
 
           sw_vers
           uname -m
@@ -52,8 +59,8 @@ jobs:
           xcodebuild -version
           xcodegen --version
           gh --version
-          security find-identity -p codesigning -v
-          xcrun notarytool history --keychain-profile "$VOILY_NOTARY_PROFILE"
+          security find-identity -p codesigning -v "$VOILY_RELEASE_KEYCHAIN"
+          xcrun notarytool history --keychain "$VOILY_RELEASE_KEYCHAIN" --keychain-profile "$VOILY_NOTARY_PROFILE"
 
       - name: Build signed release app
         run: |
