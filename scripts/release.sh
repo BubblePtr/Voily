@@ -57,10 +57,9 @@ app_info_value() {
 }
 
 artifact_stem() {
-  local version build
+  local version
   version="$(app_info_value CFBundleShortVersionString)"
-  build="$(app_info_value CFBundleVersion)"
-  printf "%s-%s-%s" "$APP_NAME" "$version" "$build"
+  printf "%s-%s" "$APP_NAME" "$version"
 }
 
 default_zip_path() {
