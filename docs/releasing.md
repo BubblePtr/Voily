@@ -45,20 +45,20 @@ export VOILY_NOTARY_PROFILE=voily-notary
 
 Voily release versions use semantic versioning in the `MAJOR.MINOR.PATCH` form.
 
-- `MARKETING_VERSION` in `project.yml` is the app version and must be a three-part semantic version, for example `1.0.0`.
-- Public release tags use the same version with a leading `v`, for example `v1.0.0`.
+- `MARKETING_VERSION` in `project.yml` is the app version and must be a three-part semantic version, for example `0.1.0`.
+- Public release tags use the same version with a leading `v`, for example `v0.1.0`.
 - `CURRENT_PROJECT_VERSION` remains the build number and should stay an integer that can be incremented independently.
 - The automated release workflow rejects tags that do not match `vMAJOR.MINOR.PATCH`.
 - The automated release workflow also rejects tags that do not match `CFBundleShortVersionString`.
 
-The current release version is `1.0.0`, so the matching tag is:
+The current release version is `0.1.0`, so the matching tag is:
 
 ```bash
-git tag v1.0.0
-git push origin v1.0.0
+git tag v0.1.0
+git push origin v0.1.0
 ```
 
-Pre-release identifiers such as `v1.0.0-rc.1` are not accepted by the public release workflow yet, because the macOS app version stored in `CFBundleShortVersionString` is kept to the stable `MAJOR.MINOR.PATCH` form.
+Pre-release identifiers such as `v0.1.0-rc.1` are not accepted by the public release workflow yet, because the macOS app version stored in `CFBundleShortVersionString` is kept to the stable `MAJOR.MINOR.PATCH` form.
 
 ## Release commands
 
@@ -117,9 +117,9 @@ If Gatekeeper rejects the app at this stage, that usually means the build is sti
 The recommended artifact to notarize is the dmg:
 
 ```bash
-ARTIFACT=build/release/artifacts/Voily-1.0.0-1.dmg make notarize
-ARTIFACT=build/release/artifacts/Voily-1.0.0-1.dmg make staple
-ARTIFACT=build/release/artifacts/Voily-1.0.0-1.dmg make verify-release
+ARTIFACT=build/release/artifacts/Voily-0.1.0-1.dmg make notarize
+ARTIFACT=build/release/artifacts/Voily-0.1.0-1.dmg make staple
+ARTIFACT=build/release/artifacts/Voily-0.1.0-1.dmg make verify-release
 ```
 
 Notes:
@@ -140,8 +140,8 @@ The preferred publishing path is the GitHub Actions release workflow. It runs on
 After the workflow is present on `main`, publish a release by creating and pushing the matching semantic version tag:
 
 ```bash
-git tag v1.0.0
-git push origin v1.0.0
+git tag v0.1.0
+git push origin v0.1.0
 ```
 
 The workflow will:
