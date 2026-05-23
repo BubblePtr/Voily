@@ -84,6 +84,8 @@ targets:
         CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
     entitlements:
       path: Resources/VoilyApp/Voily.entitlements
+      properties:
+        com.apple.security.device.audio-input: true
     dependencies:
       - package: Voily
         product: VoilyCore
