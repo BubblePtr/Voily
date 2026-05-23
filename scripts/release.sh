@@ -71,6 +71,17 @@ default_dmg_path() {
   printf "%s/%s.dmg" "$ARTIFACTS_DIR" "$(artifact_stem)"
 }
 
+discover_code_sign_identity() {
+  if [[ -n "${VOILY_CODE_SIGN_IDENTITY:-}" ]]; then
+    printf "%s\n" "$VOILY_CODE_SIGN_IDENTITY"
+    return 0
+  fi
+
+  security find-identity -p codesigning -v 2>/dev/null \
+    | sed -n 's/.*"\(Developer ID Application:[^"]*\)".*/\1/p' \
+    | head -n 1
+}
+
 discover_artifact_signing_identity() {
   if [[ -n "${VOILY_DMG_SIGN_IDENTITY:-}" ]]; then
     printf "%s\n" "$VOILY_DMG_SIGN_IDENTITY"
@@ -98,6 +109,9 @@ archive_app() {
   rm -rf "$ARCHIVE_PATH" "$APP_PATH" "$EXPORT_PATH"
   mkdir -p "$EXPORT_PATH"
 
+  local code_sign_identity
+  code_sign_identity="$(discover_code_sign_identity)"
+
   local cmd=(
     xcodebuild
     -project "$PROJECT_PATH"
@@ -110,6 +124,10 @@ archive_app() {
 
   if [[ -n "${VOILY_DEVELOPMENT_TEAM:-}" ]]; then
     cmd+=("DEVELOPMENT_TEAM=${VOILY_DEVELOPMENT_TEAM}")
+  fi
+
+  if [[ -n "$code_sign_identity" ]]; then
+    cmd+=("CODE_SIGN_STYLE=Manual" "CODE_SIGN_IDENTITY=${code_sign_identity}")
   fi
 
   log "Archiving $APP_NAME (Release)"
@@ -127,7 +145,13 @@ archive_app() {
 
 generate_export_options_plist() {
   local team_id="${VOILY_DEVELOPMENT_TEAM:-$(security find-certificate -c 'Developer ID Application' -p 2>/dev/null | openssl x509 -noout -subject 2>/dev/null | sed -n 's/.*OU=\\([^,/]*\\).*/\\1/p' | head -n 1)}"
+  local code_sign_identity
   local signing_style="automatic"
+
+  code_sign_identity="$(discover_code_sign_identity)"
+  if [[ -n "$code_sign_identity" ]]; then
+    signing_style="manual"
+  fi
 
   cat >"$EXPORT_OPTIONS_PLIST" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
@@ -149,12 +173,10 @@ EOF
 EOF
   fi
 
-  if [[ -n "${VOILY_CODE_SIGN_IDENTITY:-}" ]]; then
+  if [[ -n "$code_sign_identity" ]]; then
     cat >>"$EXPORT_OPTIONS_PLIST" <<EOF
-  <key>signingStyle</key>
-  <string>manual</string>
   <key>signingCertificate</key>
-  <string>${VOILY_CODE_SIGN_IDENTITY}</string>
+  <string>${code_sign_identity}</string>
 EOF
   fi
 
