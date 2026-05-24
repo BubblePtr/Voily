@@ -62,6 +62,15 @@ jobs:
           security find-identity -p codesigning -v "$VOILY_RELEASE_KEYCHAIN"
           xcrun notarytool history --keychain "$VOILY_RELEASE_KEYCHAIN" --keychain-profile "$VOILY_NOTARY_PROFILE"
 
+      - name: Prepare Sparkle tools
+        run: |
+          set -euo pipefail
+
+          shasum -a 256 Vendor/Sparkle/Sparkle-for-Swift-Package-Manager.zip | grep -q '^b83e37436774556ed055e0244b297ef2c790e0737393bf65bf495fcbba6eed65 '
+          rm -rf /tmp/voily-sparkle
+          unzip -q Vendor/Sparkle/Sparkle-for-Swift-Package-Manager.zip -d /tmp/voily-sparkle
+          /tmp/voily-sparkle/bin/generate_keys -p
+
       - name: Build signed release app
         run: |
           set -euo pipefail
@@ -123,6 +132,19 @@ jobs:
           ARTIFACT="$artifact" make staple
           ARTIFACT="$artifact" make verify-release
 
+      - name: Generate Sparkle appcast
+        run: |
+          set -euo pipefail
+
+          download_url_prefix="https://github.com/${GITHUB_REPOSITORY}/releases/download/${RELEASE_TAG}/"
+          /tmp/voily-sparkle/bin/generate_appcast \
+            --download-url-prefix "$download_url_prefix" \
+            build/release/artifacts
+
+          test -f build/release/artifacts/appcast.xml
+          grep -q 'sparkle:edSignature' build/release/artifacts/appcast.xml
+          grep -q "$download_url_prefix" build/release/artifacts/appcast.xml
+
       - name: Publish GitHub release
         run: |
           set -euo pipefail
@@ -130,11 +152,13 @@ jobs:
           artifact="${{ steps.package.outputs.artifact }}"
           title="Voily ${{ steps.package.outputs.app_version }}"
           notes="Automated release for ${RELEASE_TAG}."
+          shopt -s nullglob
+          assets=("$artifact" build/release/artifacts/appcast.xml build/release/artifacts/*.delta)
 
           if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
-            gh release upload "$RELEASE_TAG" "$artifact" --clobber
+            gh release upload "$RELEASE_TAG" "${assets[@]}" --clobber
           else
-            gh release create "$RELEASE_TAG" "$artifact" \
+            gh release create "$RELEASE_TAG" "${assets[@]}" \
               --title "$title" \
               --notes "$notes" \
               --verify-tag
