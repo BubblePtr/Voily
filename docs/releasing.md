@@ -202,7 +202,10 @@ When enabling appcast publishing on the release machine, generate the appcast fr
 
 ```bash
 unzip -q Vendor/Sparkle/Sparkle-for-Swift-Package-Manager.zip -d /tmp/voily-sparkle
-/tmp/voily-sparkle/bin/generate_appcast build/release/artifacts
+RELEASE_TAG="v0.1.2"
+/tmp/voily-sparkle/bin/generate_appcast \
+  --download-url-prefix "https://github.com/BubblePtr/Voily/releases/download/${RELEASE_TAG}/" \
+  build/release/artifacts
 ```
 
 The generated appcast and any generated delta files must be uploaded with the release artifacts. Keep `CFBundleVersion` (`CURRENT_PROJECT_VERSION`) increasing for every public release, because Sparkle uses it as the machine-readable update version. Keep `CFBundleShortVersionString` (`MARKETING_VERSION`) as the user-facing semantic version that matches the release tag.

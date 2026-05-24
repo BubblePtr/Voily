@@ -139,7 +139,7 @@ ARTIFACT="build/release/artifacts/Voily-${VERSION}.dmg" make verify-release
 ```bash
 VERSION=0.1.2
 RELEASE_TAG="v${VERSION}"
-DOWNLOAD_URL_PREFIX="https://github.com/BubblePtr/Voily/releases/download/${RELEASE_TAG}"
+DOWNLOAD_URL_PREFIX="https://github.com/BubblePtr/Voily/releases/download/${RELEASE_TAG}/"
 ```
 
 在包含 notarized dmg 的 artifacts 目录上运行：
@@ -245,7 +245,7 @@ curl -fsSL https://github.com/BubblePtr/Voily/releases/latest/download/appcast.x
 检查 `--download-url-prefix`。它应该是：
 
 ```text
-https://github.com/BubblePtr/Voily/releases/download/v0.1.2
+https://github.com/BubblePtr/Voily/releases/download/v0.1.2/
 ```
 
 不要用 `releases/latest/download` 作为 enclosure 下载前缀；feed 可以走 latest，但单个 dmg 的 enclosure 最好固定到具体 tag。
