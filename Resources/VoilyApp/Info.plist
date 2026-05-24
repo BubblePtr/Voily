@@ -18,5 +18,7 @@
 	<string>$(MARKETING_VERSION)</string>
 	<key>CFBundleVersion</key>
 	<string>$(CURRENT_PROJECT_VERSION)</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Voily needs microphone access to record your voice when you press the trigger key and transcribe it into text.</string>
 </dict>
 </plist>
