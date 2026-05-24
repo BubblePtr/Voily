@@ -62,6 +62,8 @@ settings:
 packages:
   Voily:
     path: .
+  Sparkle:
+    path: Vendor/Sparkle
 
 targets:
   Voily:
@@ -83,6 +85,9 @@ targets:
         CFBundleShortVersionString: "$(MARKETING_VERSION)"
         CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
         NSMicrophoneUsageDescription: "Voily needs microphone access to record your voice when you press the trigger key and transcribe it into text."
+        SUFeedURL: "https://github.com/BubblePtr/Voily/releases/latest/download/appcast.xml"
+        SUPublicEDKey: "$(VOILY_SPARKLE_PUBLIC_ED_KEY)"
+        SUEnableAutomaticChecks: false
     entitlements:
       path: Resources/VoilyApp/Voily.entitlements
       properties:
@@ -90,12 +95,15 @@ targets:
     dependencies:
       - package: Voily
         product: VoilyCore
+      - package: Sparkle
+        product: Sparkle
     settings:
       base:
         PRODUCT_NAME: Voily
         PRODUCT_BUNDLE_IDENTIFIER: dev.kieranzhang.voily
         MARKETING_VERSION: "0.1.1"
         CURRENT_PROJECT_VERSION: "1"
+        VOILY_SPARKLE_PUBLIC_ED_KEY: ""
         DEVELOPMENT_TEAM: 9KZ32XLVQW
         CODE_SIGN_STYLE: Automatic
         GENERATE_INFOPLIST_FILE: NO

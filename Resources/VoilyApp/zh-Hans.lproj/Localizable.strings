@@ -1,5 +1,6 @@
 "Settings..." = "设置…";
 "设置…" = "设置…";
+"检查更新…" = "检查更新…";
 "隐藏 Voily" = "隐藏 Voily";
 "退出 Voily" = "退出 Voily";
 "显示 Voily" = "显示 Voily";
@@ -21,6 +22,9 @@
 "Finish recording" = "结束录音";
 "Set up a text model in Settings first." = "请先在设置中配置文本模型。";
 "Translation failed. Try again." = "翻译失败，请重试。";
+"应用内更新尚未配置" = "应用内更新尚未配置";
+"需要先在发布机生成 Sparkle EdDSA 公钥并发布 appcast。" = "需要先在发布机生成 Sparkle EdDSA 公钥并发布 appcast。";
+"OK" = "好";
 
 "首页" = "首页";
 "模型" = "模型";

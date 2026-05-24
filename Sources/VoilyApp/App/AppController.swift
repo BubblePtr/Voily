@@ -113,6 +113,7 @@ final class WindowActions {
 @MainActor
 final class AppController: NSObject {
     private let windowActions: WindowActions
+    private let appUpdater: AppUpdater
     private let settings = AppSettings()
     private let usageStore = UsageStore()
     private let permissionCoordinator = PermissionCoordinator()
@@ -170,9 +171,11 @@ final class AppController: NSObject {
 
     init(
         windowActions: WindowActions,
+        appUpdater: AppUpdater = AppUpdater(),
         asrCaptureSessionFactory: (any ASRCaptureSessionBuilding)? = nil
     ) {
         self.windowActions = windowActions
+        self.appUpdater = appUpdater
         self.injectedASRCaptureSessionFactory = asrCaptureSessionFactory
     }
 
@@ -422,6 +425,8 @@ final class AppController: NSObject {
         openSettingsItem.target = self
         appMenu.addItem(openSettingsItem)
 
+        appMenu.addItem(appUpdater.makeCheckForUpdatesMenuItem())
+
         let hideItem = NSMenuItem(
             title: AppLocalization.localized("隐藏 Voily"),
             action: #selector(NSApplication.hide(_:)),
@@ -494,6 +499,8 @@ final class AppController: NSObject {
         let voilyItem = NSMenuItem(title: AppLocalization.localized("显示 Voily"), action: #selector(openSettings), keyEquivalent: "")
         voilyItem.target = self
         menu.addItem(voilyItem)
+
+        menu.addItem(appUpdater.makeCheckForUpdatesMenuItem())
 
         let quitItem = NSMenuItem(title: AppLocalization.localized("Quit"), action: #selector(quit), keyEquivalent: "q")
         quitItem.target = self

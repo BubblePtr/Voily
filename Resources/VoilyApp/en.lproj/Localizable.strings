@@ -1,5 +1,6 @@
 "Settings..." = "Settings...";
 "设置…" = "Settings...";
+"检查更新…" = "Check for Updates...";
 "隐藏 Voily" = "Hide Voily";
 "退出 Voily" = "Quit Voily";
 "显示 Voily" = "Show Voily";
@@ -21,6 +22,9 @@
 "Finish recording" = "Finish recording";
 "Set up a text model in Settings first." = "Set up a text model in Settings first.";
 "Translation failed. Try again." = "Translation failed. Try again.";
+"应用内更新尚未配置" = "In-app updates are not configured";
+"需要先在发布机生成 Sparkle EdDSA 公钥并发布 appcast。" = "Generate the Sparkle EdDSA public key on the release machine and publish the appcast first.";
+"OK" = "OK";
 
 "首页" = "Home";
 "模型" = "Models";

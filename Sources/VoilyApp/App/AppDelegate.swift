@@ -4,7 +4,8 @@ import VoilyCore
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
     let windowActions = WindowActions()
-    lazy var appController = AppController(windowActions: windowActions)
+    private let appUpdater = AppUpdater()
+    lazy var appController = AppController(windowActions: windowActions, appUpdater: appUpdater)
     private var isTerminating = false
 
     func applicationDidFinishLaunching(_ notification: Notification) {
