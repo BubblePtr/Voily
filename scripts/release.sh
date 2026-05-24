@@ -376,10 +376,15 @@ verify_release() {
   ensure_app
 
   local artifact_path="${1:-}"
-  local bundle_id codesign_output entitlements_output spctl_output artifact_spctl_args
+  local bundle_id microphone_usage_description codesign_output entitlements_output spctl_output artifact_spctl_args
 
   bundle_id="$(app_info_value CFBundleIdentifier)"
   [[ "$bundle_id" == "$EXPECTED_BUNDLE_ID" ]] || die "Bundle identifier mismatch: expected $EXPECTED_BUNDLE_ID, found $bundle_id"
+
+  if ! microphone_usage_description="$(app_info_value NSMicrophoneUsageDescription 2>/dev/null)"; then
+    die "Release app bundle is missing NSMicrophoneUsageDescription in Info.plist."
+  fi
+  [[ -n "$microphone_usage_description" ]] || die "Release app bundle has an empty NSMicrophoneUsageDescription in Info.plist."
 
   log "Running codesign verification for $APP_PATH"
   codesign --verify --deep --strict "$APP_PATH"
