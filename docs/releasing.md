@@ -107,6 +107,8 @@ make package-zip
 
 Artifacts are written to `build/release/artifacts/`.
 
+`make package-dmg` creates the standard drag-to-install disk image: `Voily.app` appears on the left, an `Applications` shortcut appears on the right, and `Resources/Release/dmg-background.png` is used as the default Finder background image. `Resources/Release/dmg-background-source.png` keeps the original high-resolution image, while `dmg-background.png` is the Finder-ready derivative sized for the small installer window. The command writes the Finder icon-view layout when `osascript` can access Finder; if the layout cannot be written in the current environment, the disk image still contains both items and remains installable. To temporarily replace the background image, set `VOILY_DMG_BACKGROUND_PATH`.
+
 `make package-dmg` will try to sign the disk image with the same identity used by the archived app. If you need to override that identity, set `VOILY_DMG_SIGN_IDENTITY`.
 
 ## 3. Verify the release bundle locally

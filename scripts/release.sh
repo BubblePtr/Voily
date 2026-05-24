@@ -16,6 +16,7 @@ EXPECTED_BUNDLE_ID="${VOILY_EXPECTED_BUNDLE_ID:-dev.kieranzhang.voily}"
 DEFAULT_NOTARY_PROFILE="${VOILY_NOTARY_PROFILE:-${NOTARY_PROFILE:-}}"
 DEFAULT_NOTARY_KEYCHAIN="${VOILY_NOTARY_KEYCHAIN:-${VOILY_RELEASE_KEYCHAIN:-}}"
 EXPORT_OPTIONS_PLIST="${VOILY_EXPORT_OPTIONS_PLIST:-$RELEASE_ROOT/ExportOptions.plist}"
+DMG_BACKGROUND_PATH="${VOILY_DMG_BACKGROUND_PATH:-$ROOT_DIR/Resources/Release/dmg-background.png}"
 
 log() {
   printf "==> %s\n" "$*"
@@ -69,6 +70,92 @@ default_zip_path() {
 
 default_dmg_path() {
   printf "%s/%s.dmg" "$ARTIFACTS_DIR" "$(artifact_stem)"
+}
+
+disk_image_size_mb() {
+  local app_size_mb
+  app_size_mb="$(du -sm "$APP_PATH" | awk '{print $1}')"
+  printf "%s\n" "$((app_size_mb + 64))"
+}
+
+attach_disk_image() {
+  local image_path="$1"
+  local mount_dir="$2"
+  local attach_output device
+
+  attach_output="$(
+    hdiutil attach "$image_path" \
+      -readwrite \
+      -noautoopen \
+      -nobrowse \
+      -mountpoint "$mount_dir"
+  )"
+
+  device="$(awk '/^\/dev\/disk/ {print $1; exit}' <<<"$attach_output")"
+  [[ -n "$device" ]] || die "Attached disk image but could not resolve device from hdiutil output."
+  printf "%s\n" "$device"
+}
+
+detach_disk_image() {
+  local device="$1"
+
+  if hdiutil detach "$device" -quiet; then
+    return 0
+  fi
+
+  sleep 2
+  hdiutil detach "$device" -force -quiet
+}
+
+DMG_PACKAGE_MOUNTED_DEVICE=""
+DMG_PACKAGE_MOUNT_DIR=""
+DMG_PACKAGE_RW_PATH=""
+
+cleanup_dmg_packaging() {
+  if [[ -n "${DMG_PACKAGE_MOUNTED_DEVICE:-}" ]]; then
+    detach_disk_image "$DMG_PACKAGE_MOUNTED_DEVICE" >/dev/null 2>&1 || true
+    DMG_PACKAGE_MOUNTED_DEVICE=""
+  fi
+
+  [[ -n "${DMG_PACKAGE_MOUNT_DIR:-}" ]] && rm -rf "$DMG_PACKAGE_MOUNT_DIR"
+  [[ -n "${DMG_PACKAGE_RW_PATH:-}" ]] && rm -f "$DMG_PACKAGE_RW_PATH"
+  DMG_PACKAGE_MOUNT_DIR=""
+  DMG_PACKAGE_RW_PATH=""
+}
+
+configure_dmg_finder_layout() {
+  local mount_dir="$1"
+  local background_path="${2:-}"
+  local app_item="$APP_NAME.app"
+
+  command -v osascript >/dev/null 2>&1 || return 1
+
+  osascript <<EOF
+tell application "Finder"
+  set dmgFolder to POSIX file "$mount_dir" as alias
+  open dmgFolder
+  set dmgWindow to container window of dmgFolder
+  set current view of dmgWindow to icon view
+  set toolbar visible of dmgWindow to false
+  set statusbar visible of dmgWindow to false
+  set bounds of dmgWindow to {120, 120, 760, 533}
+  set viewOptions to icon view options of dmgWindow
+  set arrangement of viewOptions to not arranged
+  set icon size of viewOptions to 96
+  set text size of viewOptions to 13
+  set backgroundPicturePath to "$background_path"
+  if backgroundPicturePath is not "" then
+    set background picture of viewOptions to (POSIX file backgroundPicturePath as alias)
+  end if
+  set position of item "$app_item" of dmgFolder to {180, 290}
+  set position of item "Applications" of dmgFolder to {470, 290}
+  close dmgWindow
+  open dmgFolder
+  update dmgFolder without registering applications
+  delay 1
+  close container window of dmgFolder
+end tell
+EOF
 }
 
 team_id_from_signing_identity() {
@@ -273,21 +360,55 @@ package_dmg() {
   ensure_release_dirs
 
   local dmg_path="${1:-$(default_dmg_path)}"
-  local staging_dir="$RELEASE_ROOT/dmg-staging"
+  local rw_dmg_path="$RELEASE_ROOT/${APP_NAME}-rw.dmg"
+  local mount_dir="$RELEASE_ROOT/dmg-mount"
+  local dmg_background_path=""
+  local mounted_device=""
   local signing_identity=""
 
-  rm -rf "$staging_dir"
-  rm -f "$dmg_path"
-  mkdir -p "$staging_dir"
+  DMG_PACKAGE_MOUNTED_DEVICE=""
+  DMG_PACKAGE_MOUNT_DIR="$mount_dir"
+  DMG_PACKAGE_RW_PATH="$rw_dmg_path"
+  trap cleanup_dmg_packaging EXIT
 
-  ditto "$APP_PATH" "$staging_dir/$APP_NAME.app"
+  rm -rf "$mount_dir"
+  rm -f "$dmg_path" "$rw_dmg_path"
+  mkdir -p "$mount_dir"
+
+  log "Creating writable dmg staging image"
+  hdiutil create \
+    -size "$(disk_image_size_mb)m" \
+    -fs HFS+ \
+    -volname "$APP_NAME" \
+    "$rw_dmg_path"
+
+  mounted_device="$(attach_disk_image "$rw_dmg_path" "$mount_dir")"
+  DMG_PACKAGE_MOUNTED_DEVICE="$mounted_device"
+  ditto "$APP_PATH" "$mount_dir/$APP_NAME.app"
+  ln -s /Applications "$mount_dir/Applications"
+  if [[ -f "$DMG_BACKGROUND_PATH" ]]; then
+    mkdir -p "$mount_dir/.background"
+    dmg_background_path="$mount_dir/.background/dmg-background.png"
+    ditto "$DMG_BACKGROUND_PATH" "$dmg_background_path"
+  else
+    note "DMG background image not found at $DMG_BACKGROUND_PATH. Continuing without a custom background."
+  fi
+
+  log "Configuring dmg Finder layout"
+  if ! configure_dmg_finder_layout "$mount_dir" "$dmg_background_path"; then
+    note "Could not configure the Finder window. The dmg still contains Voily.app and an Applications shortcut."
+  fi
+
+  sync
+  detach_disk_image "$mounted_device"
+  mounted_device=""
+  DMG_PACKAGE_MOUNTED_DEVICE=""
 
   log "Packaging dmg archive"
-  hdiutil create \
-    -volname "$APP_NAME" \
-    -srcfolder "$staging_dir" \
+  hdiutil convert "$rw_dmg_path" \
     -format UDZO \
-    "$dmg_path"
+    -imagekey zlib-level=9 \
+    -o "$dmg_path"
 
   signing_identity="$(discover_artifact_signing_identity)"
   if [[ -n "$signing_identity" ]]; then
@@ -301,7 +422,8 @@ package_dmg() {
     note "No signing identity found for dmg. Continuing with an unsigned disk image."
   fi
 
-  rm -rf "$staging_dir"
+  cleanup_dmg_packaging
+  trap - EXIT
   log "Created $dmg_path"
 }
 
@@ -462,6 +584,7 @@ Environment:
   VOILY_NOTARY_PROFILE       Required for notarize; maps to a notarytool keychain profile
   VOILY_NOTARY_KEYCHAIN      Optional keychain path containing the notarytool profile
   VOILY_EXPECTED_BUNDLE_ID   Override the expected bundle identifier (default: dev.kieranzhang.voily)
+  VOILY_DMG_BACKGROUND_PATH  Override the dmg Finder background image path
 EOF
 }
 
