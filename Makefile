@@ -12,6 +12,26 @@ SWIFT := swift
 
 .PHONY: generate build test test-core test-logic test-app swift-build run install-dev install-debug clean release archive export-app package-zip package-dmg notarize staple verify-release clean-release
 
+define install_app
+	@set -e; \
+	tmp_path="$(INSTALL_PATH).tmp"; \
+	backup_path="$(INSTALL_PATH).backup"; \
+	restore_backup() { \
+		status=$$?; \
+		set +e; \
+		if [ $$status -ne 0 ] && [ -e "$$backup_path" ] && [ ! -e "$(INSTALL_PATH)" ]; then mv "$$backup_path" "$(INSTALL_PATH)"; fi; \
+		rm -rf "$$tmp_path"; \
+		exit $$status; \
+	}; \
+	trap restore_backup EXIT; \
+	rm -rf "$$tmp_path" "$$backup_path"; \
+	cp -R "$(1)" "$$tmp_path"; \
+	if [ -e "$(INSTALL_PATH)" ]; then mv "$(INSTALL_PATH)" "$$backup_path"; fi; \
+	mv "$$tmp_path" "$(INSTALL_PATH)"; \
+	rm -rf "$$backup_path"; \
+	trap - EXIT
+endef
+
 generate:
 	@command -v $(XCODEGEN) >/dev/null 2>&1 || { echo "Missing required command: $(XCODEGEN). Install XcodeGen before building Voily."; exit 1; }
 	$(XCODEGEN) generate
@@ -36,13 +56,11 @@ run: build
 	open "$(DEBUG_APP_PATH)"
 
 install-dev: release
-	rm -rf "$(INSTALL_PATH)"
-	cp -R "$(RELEASE_APP_PATH)" "$(INSTALL_PATH)"
+	$(call install_app,$(RELEASE_APP_PATH))
 	@echo "Installed Developer ID development build to $(INSTALL_PATH)"
 
 install-debug: build
-	rm -rf "$(INSTALL_PATH)"
-	cp -R "$(DEBUG_APP_PATH)" "$(INSTALL_PATH)"
+	$(call install_app,$(DEBUG_APP_PATH))
 	@echo "Installed Debug build to $(INSTALL_PATH)"
 
 release archive export-app: generate
