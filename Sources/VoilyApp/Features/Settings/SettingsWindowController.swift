@@ -12,6 +12,7 @@ struct SettingsWindowSceneView: View {
     let llmService: LLMRefinementService
     let asrConnectionTester: ASRConnectionTester
     let managedASRModels: ManagedASRModelStore
+    let appUpdater: AppUpdater
     let registerWindow: (NSWindow) -> Void
     let onInitialAppearance: () -> Void
     let onWindowHide: () -> Void
@@ -22,7 +23,8 @@ struct SettingsWindowSceneView: View {
             usageStore: usageStore,
             llmService: llmService,
             asrConnectionTester: asrConnectionTester,
-            managedASRModels: managedASRModels
+            managedASRModels: managedASRModels,
+            appUpdater: appUpdater
         )
         .environment(\.locale, Locale(identifier: settings.appInterfaceLanguage.rawValue))
         .frame(minHeight: 760)
@@ -139,9 +141,16 @@ private enum SettingsPage: String, CaseIterable, Identifiable, Hashable {
     case home
     case model
     case glossary
-    case settings
+    case general
+    case input
+    case appearance
+    case about
 
     var id: String { rawValue }
+
+    static let overviewPages: [SettingsPage] = [.home]
+    static let configurationPages: [SettingsPage] = [.model, .glossary, .general, .input, .appearance]
+    static let appPages: [SettingsPage] = [.about]
 
     func title(languageCode: String) -> String {
         switch self {
@@ -151,8 +160,14 @@ private enum SettingsPage: String, CaseIterable, Identifiable, Hashable {
             return AppLocalization.localized("模型", languageCode: languageCode)
         case .glossary:
             return AppLocalization.localized("词库", languageCode: languageCode)
-        case .settings:
-            return AppLocalization.localized("设置", languageCode: languageCode)
+        case .general:
+            return AppLocalization.localized("通用", languageCode: languageCode)
+        case .input:
+            return AppLocalization.localized("输入", languageCode: languageCode)
+        case .appearance:
+            return AppLocalization.localized("外观", languageCode: languageCode)
+        case .about:
+            return AppLocalization.localized("关于", languageCode: languageCode)
         }
     }
 
@@ -161,11 +176,17 @@ private enum SettingsPage: String, CaseIterable, Identifiable, Hashable {
         case .home:
             return AppLocalization.localized("今天的语音输入情况、趋势变化和完整历史都集中放在这里。", languageCode: languageCode)
         case .model:
-            return AppLocalization.localized("按模型角色选择默认 provider。触发键单击用于普通听写，长按用于快捷翻译；触发键可在“设置”页调整。", languageCode: languageCode)
+            return AppLocalization.localized("按模型角色选择默认 provider。触发键单击用于普通听写，长按用于快捷翻译；触发键可在“输入”页调整。", languageCode: languageCode)
         case .glossary:
             return AppLocalization.localized("选择默认术语包，并维护自定义词条。该词库会参与 LLM 文本润色。", languageCode: languageCode)
-        case .settings:
-            return AppLocalization.localized("在这里管理输入语言和 app 的通用行为说明。模型、文本处理和词库配置分别保留在各自页面。", languageCode: languageCode)
+        case .general:
+            return AppLocalization.localized("管理界面语言和设置窗口的通用说明。", languageCode: languageCode)
+        case .input:
+            return AppLocalization.localized("管理默认输入语言、麦克风、触发键和录音期间系统输出。", languageCode: languageCode)
+        case .appearance:
+            return AppLocalization.localized("控制 Dock、menu bar 和应用图标展示。", languageCode: languageCode)
+        case .about:
+            return AppLocalization.localized("查看版本信息，并手动检查软件更新。", languageCode: languageCode)
         }
     }
 
@@ -177,8 +198,14 @@ private enum SettingsPage: String, CaseIterable, Identifiable, Hashable {
             return Ph.cpu.regular
         case .glossary:
             return Ph.books.regular
-        case .settings:
+        case .general:
             return Ph.gear.regular
+        case .input:
+            return Image(systemName: "keyboard")
+        case .appearance:
+            return Image(systemName: "paintbrush")
+        case .about:
+            return Image(systemName: "info.circle")
         }
     }
 
@@ -190,6 +217,7 @@ private struct SettingsRootView: View {
     let llmService: LLMRefinementService
     let asrConnectionTester: ASRConnectionTester
     let managedASRModels: ManagedASRModelStore
+    let appUpdater: AppUpdater
 
     @State private var selection: SettingsPage? = .home
 
@@ -209,19 +237,21 @@ private struct SettingsRootView: View {
                         .listRowBackground(Color.clear)
                 }
 
-                Section {
-                    ForEach(SettingsPage.allCases) { page in
-                        HStack(spacing: 12) {
-                            page.sidebarIcon
-                                .renderingMode(.template)
-                                .scaledToFit()
-                                .frame(width: 18, height: 18)
+                Section(AppLocalization.localized("概览", languageCode: interfaceLanguageCode)) {
+                    ForEach(SettingsPage.overviewPages) { page in
+                        sidebarRow(for: page, languageCode: interfaceLanguageCode)
+                    }
+                }
 
-                            Text(page.title(languageCode: interfaceLanguageCode))
-                                .font(.system(size: 14, weight: .medium))
-                        }
-                        .id("\(page.id)-\(interfaceLanguageCode)")
-                        .tag(page)
+                Section(AppLocalization.localized("配置", languageCode: interfaceLanguageCode)) {
+                    ForEach(SettingsPage.configurationPages) { page in
+                        sidebarRow(for: page, languageCode: interfaceLanguageCode)
+                    }
+                }
+
+                Section(AppLocalization.localized("应用", languageCode: interfaceLanguageCode)) {
+                    ForEach(SettingsPage.appPages) { page in
+                        sidebarRow(for: page, languageCode: interfaceLanguageCode)
                     }
                 }
             }
@@ -241,14 +271,34 @@ private struct SettingsRootView: View {
                     )
                 case .glossary:
                     GlossarySettingsPage(settings: settings)
-                case .settings:
+                case .general:
                     GeneralSettingsPage(settings: settings)
+                case .input:
+                    InputSettingsPage(settings: settings)
+                case .appearance:
+                    AppearanceSettingsPage(settings: settings)
+                case .about:
+                    AboutSettingsPage(appUpdater: appUpdater)
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .navigationTitle(currentPage.title(languageCode: interfaceLanguageCode))
             .navigationSubtitle(currentPage.subtitle(languageCode: interfaceLanguageCode))
         }
+    }
+
+    private func sidebarRow(for page: SettingsPage, languageCode: String) -> some View {
+        HStack(spacing: 12) {
+            page.sidebarIcon
+                .renderingMode(.template)
+                .scaledToFit()
+                .frame(width: 18, height: 18)
+
+            Text(page.title(languageCode: languageCode))
+                .font(.system(size: 14, weight: .medium))
+        }
+        .id("\(page.id)-\(languageCode)")
+        .tag(page)
     }
 }
 
@@ -1738,18 +1788,6 @@ private struct GlossarySettingsPage: View {
 
 private struct GeneralSettingsPage: View {
     @Bindable var settings: AppSettings
-    let loadInputDevices: () -> [AudioInputDevice]
-
-    @State private var availableInputDevices: [AudioInputDevice] = []
-    @State private var deviceMonitor = AudioInputDeviceMonitor()
-
-    init(
-        settings: AppSettings,
-        loadInputDevices: @escaping () -> [AudioInputDevice] = { AudioInputDeviceCatalog().availableInputDevices() }
-    ) {
-        self.settings = settings
-        self.loadInputDevices = loadInputDevices
-    }
 
     var body: some View {
         ScrollView {
@@ -1770,6 +1808,50 @@ private struct GeneralSettingsPage: View {
                     }
                 }
 
+                SettingsCard(title: "通用说明", subtitle: "配置已经按职责拆分，通用页只保留不会频繁改动的基础说明") {
+                    VStack(alignment: .leading, spacing: 12) {
+                        GeneralSettingNoteRow(
+                            title: "打开方式",
+                            detail: "点击 menu bar 中的 Voily 可以随时回到当前设置窗口。"
+                        )
+
+                        GeneralSettingNoteRow(
+                            title: "快捷操作",
+                            detail: settings.triggerKey.summary
+                        )
+
+                        GeneralSettingNoteRow(
+                            title: "配置归位",
+                            detail: "界面语言在“通用”页管理；默认输入、麦克风、触发键和系统输出在“输入”页管理；Dock 与图标在“外观”页管理。"
+                        )
+                    }
+                }
+            }
+            .padding(28)
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .scrollIndicators(.hidden)
+    }
+}
+
+private struct InputSettingsPage: View {
+    @Bindable var settings: AppSettings
+    let loadInputDevices: () -> [AudioInputDevice]
+
+    @State private var availableInputDevices: [AudioInputDevice] = []
+    @State private var deviceMonitor = AudioInputDeviceMonitor()
+
+    init(
+        settings: AppSettings,
+        loadInputDevices: @escaping () -> [AudioInputDevice] = { AudioInputDeviceCatalog().availableInputDevices() }
+    ) {
+        self.settings = settings
+        self.loadInputDevices = loadInputDevices
+    }
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 24) {
                 SettingsCard(title: "输入语言", subtitle: "普通听写默认使用这里选择的语言") {
                     VStack(alignment: .leading, spacing: 14) {
                         Picker("输入语言", selection: $settings.selectedLanguage) {
@@ -1824,7 +1906,31 @@ private struct GeneralSettingsPage: View {
                             .foregroundStyle(.secondary)
                     }
                 }
+            }
+            .padding(28)
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .scrollIndicators(.hidden)
+        .onAppear {
+            reloadInputDevices()
+            deviceMonitor.start(onChange: reloadInputDevices)
+        }
+        .onDisappear {
+            deviceMonitor.stop()
+        }
+    }
 
+    private func reloadInputDevices() {
+        availableInputDevices = loadInputDevices()
+    }
+}
+
+private struct AppearanceSettingsPage: View {
+    @Bindable var settings: AppSettings
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 24) {
                 SettingsCard(title: "App 外观", subtitle: "控制 Dock 与 menu bar 的展示方式") {
                     VStack(alignment: .leading, spacing: 14) {
                         Toggle("显示 Dock 图标", isOn: $settings.dockIconVisible)
@@ -1845,23 +1951,62 @@ private struct GeneralSettingsPage: View {
                             .foregroundStyle(.secondary)
                     }
                 }
+            }
+            .padding(28)
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .scrollIndicators(.hidden)
+    }
+}
 
-                SettingsCard(title: "通用说明", subtitle: "menu bar 入口已经简化，配置统一移动到 settings") {
+private struct AboutSettingsPage: View {
+    let appUpdater: AppUpdater
+
+    var body: some View {
+        let versionInfo = appUpdater.versionInfo
+
+        ScrollView {
+            VStack(alignment: .leading, spacing: 24) {
+                SettingsCard(title: versionInfo.displayName, subtitle: "开源 macOS 听写应用") {
+                    HStack(alignment: .center, spacing: 18) {
+                        AppAboutIcon()
+                            .frame(width: 72, height: 72)
+
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text(versionInfo.versionSummary)
+                                .font(.system(size: 24, weight: .semibold))
+
+                            Text("按一下触发键开始录音，再按一下停止转写，自动粘贴到光标位置。")
+                                .font(.system(size: 13))
+                                .foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+
+                        Spacer(minLength: 16)
+                    }
+                }
+
+                SettingsCard(title: "版本信息", subtitle: "用于诊断、反馈和发布验证") {
                     VStack(alignment: .leading, spacing: 12) {
-                        GeneralSettingNoteRow(
-                            title: "打开方式",
-                            detail: "点击 menu bar 中的 Voily 可以随时回到当前设置窗口。"
+                        SettingsInfoRow(label: "版本", value: versionInfo.shortVersion)
+                        SettingsInfoRow(label: "构建", value: versionInfo.buildNumber.isEmpty ? "-" : versionInfo.buildNumber)
+                        SettingsInfoRow(
+                            label: "更新检查",
+                            value: appUpdater.isUpdateCheckConfigured ? AppLocalization.localized("已配置") : AppLocalization.localized("未配置")
                         )
+                    }
+                }
 
-                        GeneralSettingNoteRow(
-                            title: "快捷操作",
-                            detail: settings.triggerKey.summary
-                        )
+                SettingsCard(title: "软件更新", subtitle: "手动检查 Voily 是否有可用新版本") {
+                    VStack(alignment: .leading, spacing: 14) {
+                        Text(updateStatusDescription)
+                            .font(.system(size: 13))
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
 
-                        GeneralSettingNoteRow(
-                            title: "配置归位",
-                            detail: "语言在本页管理，模型与文本处理在“模型”页管理，术语相关内容在“词库”页管理。"
-                        )
+                        Button("检查更新…") {
+                            appUpdater.checkForUpdates()
+                        }
                     }
                 }
             }
@@ -1869,17 +2014,23 @@ private struct GeneralSettingsPage: View {
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .scrollIndicators(.hidden)
-        .onAppear {
-            reloadInputDevices()
-            deviceMonitor.start(onChange: reloadInputDevices)
-        }
-        .onDisappear {
-            deviceMonitor.stop()
-        }
     }
 
-    private func reloadInputDevices() {
-        availableInputDevices = loadInputDevices()
+    private var updateStatusDescription: String {
+        if appUpdater.isUpdateCheckConfigured {
+            return AppLocalization.localized("会通过 Sparkle 检查 GitHub Release appcast。")
+        }
+
+        return AppLocalization.localized("当前构建没有可用的 Sparkle 配置，点击检查更新会显示配置提示。")
+    }
+}
+
+private struct AppAboutIcon: View {
+    var body: some View {
+        Image(nsImage: NSWorkspace.shared.icon(forFile: Bundle.main.bundlePath))
+            .resizable()
+            .aspectRatio(contentMode: .fit)
+            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
     }
 }
 
@@ -2502,6 +2653,11 @@ private extension TextRefinementProvider {
 }
 
 #Preview("Settings General") {
+    GeneralSettingsPage(settings: SettingsPreviewData.configuredSettings())
+        .frame(width: 760, height: 700)
+}
+
+#Preview("Settings Input") {
     ScrollView {
         VStack(alignment: .leading, spacing: 20) {
             MicrophoneInputSettingsCard(
@@ -2531,4 +2687,21 @@ private extension TextRefinementProvider {
         .padding(28)
     }
     .frame(width: 760, height: 760)
+}
+
+#Preview("Settings Appearance") {
+    AppearanceSettingsPage(settings: SettingsPreviewData.configuredSettings())
+        .frame(width: 760, height: 700)
+}
+
+#Preview("Settings About") {
+    AboutSettingsPage(
+        appUpdater: AppUpdater(
+            configuration: SparkleUpdaterConfiguration(
+                feedURLString: "https://github.com/BubblePtr/Voily/releases/latest/download/appcast.xml",
+                publicEDKey: ""
+            )
+        )
+    )
+    .frame(width: 760, height: 700)
 }

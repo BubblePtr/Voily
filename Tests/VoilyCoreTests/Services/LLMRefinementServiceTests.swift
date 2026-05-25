@@ -129,6 +129,21 @@ final class LLMRefinementServiceTests: XCTestCase {
         XCTAssertFalse(prompt.contains("仅在启用下列技能时"))
     }
 
+    func testDictationPromptKeepsRecognizedEnglishByDefault() {
+        let prompt = LLMRefinementService.systemPrompt(
+            for: TextProcessingRequest(
+                text: "I think we should ship this version first",
+                languageCode: "zh-Hans",
+                mode: .dictation(skills: [])
+            ),
+            glossarySections: []
+        )
+
+        XCTAssertTrue(prompt.contains("如果输入主要是英文"))
+        XCTAssertTrue(prompt.contains("不要翻成中文"))
+        XCTAssertTrue(prompt.contains("语义明显不通"))
+    }
+
     func testDictationPromptIncludesSkillsInStableExecutionOrder() throws {
         let prompt = LLMRefinementService.systemPrompt(
             for: TextProcessingRequest(

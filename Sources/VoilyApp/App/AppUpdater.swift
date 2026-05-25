@@ -45,6 +45,36 @@ struct SparkleUpdaterConfiguration: Equatable {
     }
 }
 
+struct AppVersionInfo: Equatable {
+    let displayName: String
+    let shortVersion: String
+    let buildNumber: String
+
+    init(displayName: String, shortVersion: String, buildNumber: String) {
+        self.displayName = displayName
+        self.shortVersion = shortVersion
+        self.buildNumber = buildNumber
+    }
+
+    init(bundle: Bundle) {
+        let infoDictionary = bundle.infoDictionary ?? [:]
+        let bundleName = infoDictionary["CFBundleDisplayName"] as? String
+            ?? infoDictionary["CFBundleName"] as? String
+            ?? "Voily"
+        let version = infoDictionary["CFBundleShortVersionString"] as? String ?? "0.0.0"
+        let build = infoDictionary["CFBundleVersion"] as? String ?? ""
+
+        self.init(displayName: bundleName, shortVersion: version, buildNumber: build)
+    }
+
+    var versionSummary: String {
+        guard !buildNumber.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            return shortVersion
+        }
+        return "\(shortVersion) (\(buildNumber))"
+    }
+}
+
 @MainActor
 final class AppUpdater: NSObject {
     private let updaterController: SPUStandardUpdaterController?
@@ -68,6 +98,14 @@ final class AppUpdater: NSObject {
         super.init()
     }
 
+    var isUpdateCheckConfigured: Bool {
+        configuration.isReady
+    }
+
+    var versionInfo: AppVersionInfo {
+        AppVersionInfo(bundle: .main)
+    }
+
     func makeCheckForUpdatesMenuItem() -> NSMenuItem {
         let item = NSMenuItem(
             title: AppLocalization.localized("检查更新…"),
@@ -88,6 +126,14 @@ final class AppUpdater: NSObject {
         } else {
             item.target = self
             item.action = #selector(showUpdaterNotConfigured(_:))
+        }
+    }
+
+    func checkForUpdates() {
+        if let updaterController {
+            updaterController.checkForUpdates(nil)
+        } else {
+            showUpdaterNotConfigured(nil)
         }
     }
 

@@ -2,13 +2,35 @@ APP_NAME := Voily
 PROJECT := Voily.xcodeproj
 SCHEME := Voily
 BUILD_DIR := .xcodebuild
-APP_PATH := $(BUILD_DIR)/Build/Products/Debug/$(APP_NAME).app
+DEBUG_APP_PATH := $(BUILD_DIR)/Build/Products/Debug/$(APP_NAME).app
+RELEASE_APP_PATH := build/release/$(APP_NAME).app
+INSTALL_PATH := /Applications/$(APP_NAME).app
 RELEASE_SCRIPT := ./scripts/release.sh
 XCODEGEN := xcodegen
 XCODEBUILD := xcodebuild
 SWIFT := swift
 
-.PHONY: generate build test test-core test-logic test-app swift-build run install install-user install-system clean release archive export-app package-zip package-dmg notarize staple verify-release clean-release
+.PHONY: generate build test test-core test-logic test-app swift-build run install-dev install-debug clean release archive export-app package-zip package-dmg notarize staple verify-release clean-release
+
+define install_app
+	@set -e; \
+	tmp_path="$(INSTALL_PATH).tmp"; \
+	backup_path="$(INSTALL_PATH).backup"; \
+	restore_backup() { \
+		status=$$?; \
+		set +e; \
+		if [ $$status -ne 0 ] && [ -e "$$backup_path" ] && [ ! -e "$(INSTALL_PATH)" ]; then mv "$$backup_path" "$(INSTALL_PATH)"; fi; \
+		rm -rf "$$tmp_path"; \
+		exit $$status; \
+	}; \
+	trap restore_backup EXIT; \
+	rm -rf "$$tmp_path" "$$backup_path"; \
+	cp -R "$(1)" "$$tmp_path"; \
+	if [ -e "$(INSTALL_PATH)" ]; then mv "$(INSTALL_PATH)" "$$backup_path"; fi; \
+	mv "$$tmp_path" "$(INSTALL_PATH)"; \
+	rm -rf "$$backup_path"; \
+	trap - EXIT
+endef
 
 generate:
 	@command -v $(XCODEGEN) >/dev/null 2>&1 || { echo "Missing required command: $(XCODEGEN). Install XcodeGen before building Voily."; exit 1; }
@@ -31,20 +53,15 @@ test-app: generate
 	$(XCODEBUILD) -project $(PROJECT) -scheme $(SCHEME) -configuration Debug -derivedDataPath $(BUILD_DIR) test
 
 run: build
-	open "$(APP_PATH)"
+	open "$(DEBUG_APP_PATH)"
 
-install: install-user
+install-dev: release
+	$(call install_app,$(RELEASE_APP_PATH))
+	@echo "Installed Developer ID development build to $(INSTALL_PATH)"
 
-install-user: build
-	@mkdir -p "$(HOME)/Applications"
-	rm -rf "$(HOME)/Applications/$(APP_NAME).app"
-	cp -R "$(APP_PATH)" "$(HOME)/Applications/$(APP_NAME).app"
-	@echo "Installed to $(HOME)/Applications/$(APP_NAME).app"
-
-install-system: build
-	rm -rf "/Applications/$(APP_NAME).app"
-	cp -R "$(APP_PATH)" "/Applications/$(APP_NAME).app"
-	@echo "Installed to /Applications/$(APP_NAME).app"
+install-debug: build
+	$(call install_app,$(DEBUG_APP_PATH))
+	@echo "Installed Debug build to $(INSTALL_PATH)"
 
 release archive export-app: generate
 	$(RELEASE_SCRIPT) archive

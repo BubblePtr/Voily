@@ -344,6 +344,7 @@ final class AppController: NSObject {
                 funASRService: funASRRealtimeService
             ),
             managedASRModels: managedASRModels,
+            appUpdater: appUpdater,
             registerWindow: registerSettingsWindow(_:),
             onInitialAppearance: handleSettingsWindowInitialAppearance,
             onWindowHide: handleSettingsWindowDidHide

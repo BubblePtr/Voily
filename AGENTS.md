@@ -9,7 +9,7 @@
 - SwiftUI + AppKit（菜单栏 / 浮窗 / 系统集成走 AppKit，业务 UI 走 SwiftUI）
 - 最低系统版本：macOS 14.0 (Sonoma)
 - 包管理：SPM
-- 工程：`project.yml` 是 XcodeGen 源文件，`Voily.xcodeproj` 为本地生成物；命令行用 `make build` / `make run` / `make install`
+- 工程：`project.yml` 是 XcodeGen 源文件，`Voily.xcodeproj` 为本地生成物；命令行用 `make build` / `make run`，本地安装用 `make install-dev` 或 `make install-debug`
 
 ## 不能违反的约束
 

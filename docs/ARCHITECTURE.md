@@ -72,7 +72,8 @@ DeepSeek 的默认 Base URL 是 `https://api.deepseek.com`，默认模型是 `de
 
 - `make build` — debug 构建
 - `make run` — 构建并运行
-- `make install` — 安装到 `~/Applications`
+- `make install-dev` — 构建 Release/Developer ID 本地验收版并安装到 `/Applications`
+- `make install-debug` — 构建 Debug/Apple Development 版并安装到 `/Applications`
 - `make test` — 运行 SwiftPM 逻辑测试和 Xcode app/unit 测试；详见 [testing.md](testing.md)
 - `make generate` — 用 XcodeGen 从 `project.yml` 生成本地 `Voily.xcodeproj`
 - 更多目标见 [Makefile](../Makefile)
