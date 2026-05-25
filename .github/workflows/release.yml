@@ -32,7 +32,8 @@ jobs:
       VOILY_NOTARY_PROFILE: ${{ vars.VOILY_NOTARY_PROFILE }}
       VOILY_RELEASE_KEYCHAIN: /Users/openclaw/Library/Keychains/voily-release.keychain-db
       VOILY_RELEASE_KEYCHAIN_PASSWORD: ${{ secrets.VOILY_RELEASE_KEYCHAIN_PASSWORD }}
-      VOILY_SPARKLE_PRIVATE_KEY_FILE: ${{ vars.VOILY_SPARKLE_PRIVATE_KEY_FILE }}
+      VOILY_SPARKLE_KEYCHAIN_ACCOUNT: ed25519
+      VOILY_SPARKLE_KEYCHAIN_SERVICE: dev.voily.sparkle.ed25519-private-key
       RELEASE_TAG: ${{ github.event.inputs.tag || github.ref_name }}
 
     steps:
@@ -71,13 +72,14 @@ jobs:
           rm -rf /tmp/voily-sparkle
           unzip -q Vendor/Sparkle/Sparkle-for-Swift-Package-Manager.zip -d /tmp/voily-sparkle
 
-          sparkle_private_key_file="${VOILY_SPARKLE_PRIVATE_KEY_FILE:-$HOME/.voily-release/sparkle-ed25519-private-key.txt}"
-          if [[ ! -r "$sparkle_private_key_file" ]]; then
-            printf 'Sparkle private key file is not readable: %s\n' "$sparkle_private_key_file" >&2
-            printf 'Export the key on the release machine with generate_keys -x, keep it outside the repository, and set VOILY_SPARKLE_PRIVATE_KEY_FILE if using a custom path.\n' >&2
+          if ! security find-generic-password \
+            -a "$VOILY_SPARKLE_KEYCHAIN_ACCOUNT" \
+            -s "$VOILY_SPARKLE_KEYCHAIN_SERVICE" \
+            -w "$VOILY_RELEASE_KEYCHAIN" >/dev/null 2>&1; then
+            printf 'Sparkle private key was not found in release keychain: %s\n' "$VOILY_RELEASE_KEYCHAIN" >&2
+            printf 'Import it as a generic password with account "%s" and service "%s".\n' "$VOILY_SPARKLE_KEYCHAIN_ACCOUNT" "$VOILY_SPARKLE_KEYCHAIN_SERVICE" >&2
             exit 1
           fi
-          printf 'VOILY_SPARKLE_PRIVATE_KEY_FILE=%s\n' "$sparkle_private_key_file" >> "$GITHUB_ENV"
 
       - name: Build signed release app
         run: |
@@ -145,9 +147,13 @@ jobs:
           set -euo pipefail
 
           download_url_prefix="https://github.com/${GITHUB_REPOSITORY}/releases/download/${RELEASE_TAG}/"
+          security find-generic-password \
+            -a "$VOILY_SPARKLE_KEYCHAIN_ACCOUNT" \
+            -s "$VOILY_SPARKLE_KEYCHAIN_SERVICE" \
+            -w "$VOILY_RELEASE_KEYCHAIN" |
           /tmp/voily-sparkle/bin/generate_appcast \
             --download-url-prefix "$download_url_prefix" \
-            --ed-key-file "$VOILY_SPARKLE_PRIVATE_KEY_FILE" \
+            --ed-key-file - \
             build/release/artifacts
 
           test -f build/release/artifacts/appcast.xml
