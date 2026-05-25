@@ -11,6 +11,9 @@ let package = Package(
         .library(name: "VoilyCore", targets: ["VoilyCore"]),
         .executable(name: "VoilyApp", targets: ["VoilyApp"]),
     ],
+    dependencies: [
+        .package(path: "Vendor/Sparkle"),
+    ],
     targets: [
         .target(
             name: "VoilyCore",
@@ -21,7 +24,10 @@ let package = Package(
         ),
         .executableTarget(
             name: "VoilyApp",
-            dependencies: ["VoilyCore"],
+            dependencies: [
+                "VoilyCore",
+                .product(name: "Sparkle", package: "Sparkle"),
+            ],
             path: "Sources/VoilyApp"
         ),
         .testTarget(

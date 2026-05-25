@@ -17,6 +17,7 @@ Before running the release flow, make sure the current Mac has:
 - An Apple Developer membership
 - A `Developer ID Application` certificate installed in the local keychain
 - A configured `notarytool` keychain profile
+- A Sparkle EdDSA key pair for in-app updates, generated on the release machine
 
 Check the available signing identities:
 
@@ -52,6 +53,15 @@ The release workflow unlocks that keychain with the GitHub secret:
 ```text
 VOILY_RELEASE_KEYCHAIN_PASSWORD
 ```
+
+Sparkle uses a separate EdDSA key pair from Apple notarization. Generate it on the release machine and keep the private key in that Mac's Keychain:
+
+```bash
+unzip -q Vendor/Sparkle/Sparkle-for-Swift-Package-Manager.zip -d /tmp/voily-sparkle
+/tmp/voily-sparkle/bin/generate_keys
+```
+
+Add the printed public key to release builds through the `VOILY_SPARKLE_PUBLIC_ED_KEY` build setting. Do not commit the private key, API tokens, or keychain exports to the repository.
 
 ## Versioning
 
@@ -166,15 +176,40 @@ The workflow will:
 4. Confirm the tag matches `CFBundleShortVersionString`.
 5. Run `make package-dmg`.
 6. Run `make notarize`, `make staple`, and `make verify-release`.
-7. Create the GitHub Release if it does not exist, or upload the dmg to the existing release with `--clobber`.
+7. Generate `appcast.xml` and any Sparkle delta files from the notarized release artifacts.
+8. Create the GitHub Release if it does not exist, or upload the dmg, `appcast.xml`, and delta files to the existing release with `--clobber`.
 
 Manual publishing is still possible if the workflow is unavailable:
 
 1. Create a git tag for the release version.
 2. Push the tag to GitHub.
 3. Open a new GitHub Release.
-4. Upload the notarized `.dmg`.
+4. Upload the notarized `.dmg`, `appcast.xml`, and any generated `.delta` files.
 5. Add release notes, minimum macOS version, and first-launch permission guidance.
+
+## In-app updates with Sparkle
+
+Voily includes Sparkle 2.9.2 for manual in-app update checks. The first implementation intentionally keeps automatic checks disabled and only starts Sparkle when `SUPublicEDKey` is populated with a real EdDSA public key.
+
+The app currently points Sparkle at:
+
+```text
+https://github.com/BubblePtr/Voily/releases/latest/download/appcast.xml
+```
+
+Until the release machine has a Sparkle private key and publishes `appcast.xml`, the "Check for Updates..." menu item shows a local not-configured message instead of starting Sparkle.
+
+When enabling appcast publishing on the release machine, generate the appcast from the folder that contains the notarized release artifacts:
+
+```bash
+unzip -q Vendor/Sparkle/Sparkle-for-Swift-Package-Manager.zip -d /tmp/voily-sparkle
+RELEASE_TAG="v0.1.2"
+/tmp/voily-sparkle/bin/generate_appcast \
+  --download-url-prefix "https://github.com/BubblePtr/Voily/releases/download/${RELEASE_TAG}/" \
+  build/release/artifacts
+```
+
+The generated appcast and any generated delta files must be uploaded with the release artifacts. Keep `CFBundleVersion` (`CURRENT_PROJECT_VERSION`) increasing for every public release, because Sparkle uses it as the machine-readable update version. Keep `CFBundleShortVersionString` (`MARKETING_VERSION`) as the user-facing semantic version that matches the release tag.
 
 ## Recommended release notes checklist
 

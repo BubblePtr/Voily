@@ -20,5 +20,11 @@
 	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Voily needs microphone access to record your voice when you press the trigger key and transcribe it into text.</string>
+	<key>SUEnableAutomaticChecks</key>
+	<false/>
+	<key>SUFeedURL</key>
+	<string>https://github.com/BubblePtr/Voily/releases/latest/download/appcast.xml</string>
+	<key>SUPublicEDKey</key>
+	<string>$(VOILY_SPARKLE_PUBLIC_ED_KEY)</string>
 </dict>
 </plist>
