@@ -85,6 +85,12 @@ security add-generic-password -U \
   "$VOILY_RELEASE_KEYCHAIN"
 
 unset SPARKLE_PRIVATE_KEY
+
+security set-generic-password-partition-list \
+  -a "$VOILY_SPARKLE_KEYCHAIN_ACCOUNT" \
+  -s "$VOILY_SPARKLE_KEYCHAIN_SERVICE" \
+  -S apple-tool:,apple: \
+  "$VOILY_RELEASE_KEYCHAIN"
 ```
 
 The release workflow reads that generic password from:
