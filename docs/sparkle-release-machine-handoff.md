@@ -174,14 +174,14 @@ rg 'sparkle:edSignature|https://github.com/BubblePtr/Voily/releases/download' bu
 如果 release workflow 已经创建了 GitHub Release 并上传 dmg，只需要补传 `appcast.xml` 和 delta 文件：
 
 ```bash
-setopt null_glob
+shopt -s nullglob
 gh release upload "$RELEASE_TAG" build/release/artifacts/appcast.xml build/release/artifacts/*.delta --clobber
 ```
 
 如果是完全手工发布，则同时上传 dmg：
 
 ```bash
-setopt null_glob
+shopt -s nullglob
 gh release upload "$RELEASE_TAG" "build/release/artifacts/Voily-${VERSION}.dmg" build/release/artifacts/appcast.xml build/release/artifacts/*.delta --clobber
 ```
 

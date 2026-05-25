@@ -176,14 +176,15 @@ The workflow will:
 4. Confirm the tag matches `CFBundleShortVersionString`.
 5. Run `make package-dmg`.
 6. Run `make notarize`, `make staple`, and `make verify-release`.
-7. Create the GitHub Release if it does not exist, or upload the dmg to the existing release with `--clobber`.
+7. Generate `appcast.xml` and any Sparkle delta files from the notarized release artifacts.
+8. Create the GitHub Release if it does not exist, or upload the dmg, `appcast.xml`, and delta files to the existing release with `--clobber`.
 
 Manual publishing is still possible if the workflow is unavailable:
 
 1. Create a git tag for the release version.
 2. Push the tag to GitHub.
 3. Open a new GitHub Release.
-4. Upload the notarized `.dmg`.
+4. Upload the notarized `.dmg`, `appcast.xml`, and any generated `.delta` files.
 5. Add release notes, minimum macOS version, and first-launch permission guidance.
 
 ## In-app updates with Sparkle

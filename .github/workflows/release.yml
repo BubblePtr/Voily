@@ -142,6 +142,10 @@ jobs:
             build/release/artifacts
 
           test -f build/release/artifacts/appcast.xml
+          python3 - <<'PY'
+          import xml.etree.ElementTree as ET
+          ET.parse("build/release/artifacts/appcast.xml")
+          PY
           grep -q 'sparkle:edSignature' build/release/artifacts/appcast.xml
           grep -q "$download_url_prefix" build/release/artifacts/appcast.xml
 
