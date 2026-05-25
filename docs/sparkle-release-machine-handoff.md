@@ -161,7 +161,7 @@ make build
 示例命令：
 
 ```bash
-VERSION=0.1.2
+VERSION=0.1.3
 make clean-release
 make release
 make package-dmg
@@ -177,12 +177,18 @@ ARTIFACT="build/release/artifacts/Voily-${VERSION}.dmg" make verify-release
 先准备 release tag 和下载前缀：
 
 ```bash
-VERSION=0.1.2
+VERSION=0.1.3
 RELEASE_TAG="v${VERSION}"
 DOWNLOAD_URL_PREFIX="https://github.com/BubblePtr/Voily/releases/download/${RELEASE_TAG}/"
 ```
 
-在包含 notarized dmg 的 artifacts 目录上运行：
+先把仓库里的 release notes 复制成 dmg 同名文件。Sparkle 的 `generate_appcast` 会读取这个文件，并把它写进更新说明：
+
+```bash
+cp "docs/releases/${RELEASE_TAG}.md" "build/release/artifacts/Voily-${VERSION}.md"
+```
+
+在包含 notarized dmg 和同名 release notes 的 artifacts 目录上运行：
 
 ```bash
 security find-generic-password \
@@ -191,6 +197,7 @@ security find-generic-password \
   -w "$HOME/Library/Keychains/voily-release.keychain-db" |
 /tmp/voily-sparkle/bin/generate_appcast \
   --download-url-prefix "$DOWNLOAD_URL_PREFIX" \
+  --embed-release-notes \
   --ed-key-file - \
   build/release/artifacts
 ```
@@ -201,14 +208,14 @@ security find-generic-password \
 - 可能的 `.delta` 增量更新文件
 - 可能的 `old_updates/` 归档目录
 
-如果要给 Sparkle 更新弹窗显示 release notes，可以在运行 `generate_appcast` 前，把同名 `.md`、`.html` 或 `.txt` 放到 artifacts 目录。例如：
+要给 Sparkle 更新弹窗显示 release notes，运行 `generate_appcast` 前必须把同名 `.md`、`.html` 或 `.txt` 放到 artifacts 目录。例如：
 
 ```text
-build/release/artifacts/Voily-0.1.2.dmg
-build/release/artifacts/Voily-0.1.2.md
+build/release/artifacts/Voily-0.1.3.dmg
+build/release/artifacts/Voily-0.1.3.md
 ```
 
-生成后检查 appcast 至少包含 `sparkle:edSignature` 和 GitHub Release 下载 URL：
+自动 release workflow 已经从 `docs/releases/${RELEASE_TAG}.md` 执行这一步，并强制 `--embed-release-notes`，所以 GitHub Release 页面和 Sparkle 弹窗会使用同一份说明。生成后检查 appcast 至少包含 `sparkle:edSignature`、GitHub Release 下载 URL 和非空 `<description>`：
 
 ```bash
 rg 'sparkle:edSignature|https://github.com/BubblePtr/Voily/releases/download' build/release/artifacts/appcast.xml
@@ -309,7 +316,7 @@ GitHub Actions workflow 里如果看到 Keychain blocked 或 SSH/headless 相关
 检查 `--download-url-prefix`。它应该是：
 
 ```text
-https://github.com/BubblePtr/Voily/releases/download/v0.1.2/
+https://github.com/BubblePtr/Voily/releases/download/v0.1.3/
 ```
 
 不要用 `releases/latest/download` 作为 enclosure 下载前缀；feed 可以走 latest，但单个 dmg 的 enclosure 最好固定到具体 tag。

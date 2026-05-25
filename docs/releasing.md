@@ -121,12 +121,13 @@ Voily release versions use semantic versioning in the `MAJOR.MINOR.PATCH` form.
 - `CURRENT_PROJECT_VERSION` remains the build number and should stay an integer that can be incremented independently.
 - The automated release workflow rejects tags that do not match `vMAJOR.MINOR.PATCH`.
 - The automated release workflow also rejects tags that do not match `CFBundleShortVersionString`.
+- Each public release must include `docs/releases/vMAJOR.MINOR.PATCH.md`. The workflow uses that file for both the GitHub Release body and the Sparkle update notes embedded into `appcast.xml`.
 
-The current release version is `0.1.2`, so the matching tag is:
+The current release version is `0.1.3`, so the matching tag is:
 
 ```bash
-git tag v0.1.2
-git push origin v0.1.2
+git tag v0.1.3
+git push origin v0.1.3
 ```
 
 Pre-release identifiers such as `v0.1.0-rc.1` are not accepted by the public release workflow yet, because the macOS app version stored in `CFBundleShortVersionString` is kept to the stable `MAJOR.MINOR.PATCH` form.
@@ -190,9 +191,9 @@ If Gatekeeper rejects the app at this stage, that usually means the build is sti
 The recommended artifact to notarize is the dmg:
 
 ```bash
-ARTIFACT=build/release/artifacts/Voily-0.1.2.dmg make notarize
-ARTIFACT=build/release/artifacts/Voily-0.1.2.dmg make staple
-ARTIFACT=build/release/artifacts/Voily-0.1.2.dmg make verify-release
+ARTIFACT=build/release/artifacts/Voily-0.1.3.dmg make notarize
+ARTIFACT=build/release/artifacts/Voily-0.1.3.dmg make staple
+ARTIFACT=build/release/artifacts/Voily-0.1.3.dmg make verify-release
 ```
 
 Notes:
@@ -213,8 +214,8 @@ The preferred publishing path is the GitHub Actions release workflow. It runs on
 After the workflow is present on `main`, publish a release by creating and pushing the matching semantic version tag:
 
 ```bash
-git tag v0.1.2
-git push origin v0.1.2
+git tag v0.1.3
+git push origin v0.1.3
 ```
 
 The workflow will:
@@ -225,8 +226,9 @@ The workflow will:
 4. Confirm the tag matches `CFBundleShortVersionString`.
 5. Run `make package-dmg`.
 6. Run `make notarize`, `make staple`, and `make verify-release`.
-7. Generate `appcast.xml` and any Sparkle delta files from the notarized release artifacts.
-8. Create the GitHub Release if it does not exist, or upload the dmg, `appcast.xml`, and delta files to the existing release with `--clobber`.
+7. Copy `docs/releases/${RELEASE_TAG}.md` next to the dmg with the same basename so Sparkle can use it as release notes.
+8. Generate `appcast.xml` and any Sparkle delta files from the notarized release artifacts, with release notes embedded for the newest appcast item.
+9. Create the GitHub Release if it does not exist, or update its title and notes before uploading the dmg, `appcast.xml`, and delta files with `--clobber`.
 
 Manual publishing is still possible if the workflow is unavailable:
 
@@ -252,7 +254,7 @@ When enabling appcast publishing on the release machine, generate the appcast fr
 
 ```bash
 unzip -q Vendor/Sparkle/Sparkle-for-Swift-Package-Manager.zip -d /tmp/voily-sparkle
-RELEASE_TAG="v0.1.2"
+RELEASE_TAG="v0.1.3"
 security find-generic-password \
   -a ed25519 \
   -s dev.voily.sparkle.ed25519-private-key \
@@ -265,12 +267,15 @@ security find-generic-password \
 
 The generated appcast and any generated delta files must be uploaded with the release artifacts. Keep `CFBundleVersion` (`CURRENT_PROJECT_VERSION`) increasing for every public release, because Sparkle uses it as the machine-readable update version. Keep `CFBundleShortVersionString` (`MARKETING_VERSION`) as the user-facing semantic version that matches the release tag.
 
+The automated workflow reads `docs/releases/${RELEASE_TAG}.md`, copies it next to the dmg with the same basename, and passes `--embed-release-notes` to `generate_appcast`. Manual releases should do the same so the Sparkle update window and the GitHub Release page show the same user-facing changes.
+
 ## Recommended release notes checklist
 
 Include these user-facing details in each release:
 
 - Version number
 - Minimum system version: macOS 14.0+
+- User-visible fixes and release-process fixes that affect downloads, installation, or updates
 - First-launch permissions:
   - Microphone
   - Accessibility

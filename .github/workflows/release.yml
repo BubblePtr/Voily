@@ -154,11 +154,20 @@ jobs:
         run: |
           set -euo pipefail
 
+          release_notes_path="docs/releases/${RELEASE_TAG}.md"
+          if [[ ! -f "$release_notes_path" ]]; then
+            printf 'Release notes file was not found: %s\n' "$release_notes_path" >&2
+            exit 1
+          fi
+
           public_ed_key="$(/usr/libexec/PlistBuddy -c 'Print :SUPublicEDKey' build/release/Voily.app/Contents/Info.plist 2>/dev/null || true)"
           if [[ -z "$public_ed_key" || "$public_ed_key" =~ \$\( ]]; then
             printf 'SUPublicEDKey is missing or unresolved in release app Info.plist.\n' >&2
             exit 1
           fi
+
+          artifact="${{ steps.package.outputs.artifact }}"
+          cp "$release_notes_path" "${artifact%.*}.md"
 
           download_url_prefix="https://github.com/${GITHUB_REPOSITORY}/releases/download/${RELEASE_TAG}/"
           security find-generic-password \
@@ -167,13 +176,20 @@ jobs:
             -w "$VOILY_RELEASE_KEYCHAIN" |
           /tmp/voily-sparkle/bin/generate_appcast \
             --download-url-prefix "$download_url_prefix" \
+            --embed-release-notes \
             --ed-key-file - \
             build/release/artifacts
 
           test -f build/release/artifacts/appcast.xml
           python3 - <<'PY'
           import xml.etree.ElementTree as ET
-          ET.parse("build/release/artifacts/appcast.xml")
+          tree = ET.parse("build/release/artifacts/appcast.xml")
+          item = tree.getroot().find("channel/item")
+          if item is None:
+              raise SystemExit("appcast.xml does not contain an item")
+          description = item.findtext("description")
+          if description is None or len(description.strip()) < 80:
+              raise SystemExit("appcast item does not contain detailed release notes")
           PY
           grep -q 'sparkle:edSignature' build/release/artifacts/appcast.xml
           grep -q "$download_url_prefix" build/release/artifacts/appcast.xml
@@ -184,15 +200,23 @@ jobs:
 
           artifact="${{ steps.package.outputs.artifact }}"
           title="Voily ${{ steps.package.outputs.app_version }}"
-          notes="Automated release for ${RELEASE_TAG}."
+          release_notes_path="docs/releases/${RELEASE_TAG}.md"
+          if [[ ! -f "$release_notes_path" ]]; then
+            printf 'Release notes file was not found: %s\n' "$release_notes_path" >&2
+            exit 1
+          fi
+
           shopt -s nullglob
           assets=("$artifact" build/release/artifacts/appcast.xml build/release/artifacts/*.delta)
 
           if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            gh release edit "$RELEASE_TAG" \
+              --title "$title" \
+              --notes-file "$release_notes_path"
             gh release upload "$RELEASE_TAG" "${assets[@]}" --clobber
           else
             gh release create "$RELEASE_TAG" "${assets[@]}" \
               --title "$title" \
-              --notes "$notes" \
+              --notes-file "$release_notes_path" \
               --verify-tag
           fi
