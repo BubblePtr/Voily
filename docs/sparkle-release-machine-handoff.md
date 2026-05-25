@@ -93,6 +93,12 @@ security add-generic-password -U \
   "$VOILY_RELEASE_KEYCHAIN"
 
 unset SPARKLE_PRIVATE_KEY
+
+security set-generic-password-partition-list \
+  -a "$VOILY_SPARKLE_KEYCHAIN_ACCOUNT" \
+  -s "$VOILY_SPARKLE_KEYCHAIN_SERVICE" \
+  -S apple-tool:,apple: \
+  "$VOILY_RELEASE_KEYCHAIN"
 ```
 
 如果 `security find-generic-password` 找不到默认 Sparkle item，就在“钥匙串访问”里查找 `Private key for signing Sparkle updates`，显示密码后把值导入上面的 release keychain generic password。不要把 Sparkle 私钥长期保存为文本文件。
@@ -268,6 +274,16 @@ security find-generic-password \
   -a ed25519 \
   -s dev.voily.sparkle.ed25519-private-key \
   -w "$HOME/Library/Keychains/voily-release.keychain-db" >/dev/null
+```
+
+如果交互式终端能读，但 GitHub Actions 仍然读不到，通常是这个 generic password item 的访问控制还没允许命令行工具访问。workflow 会用 release keychain 密码自动设置 partition list；手工排查时也可以运行：
+
+```bash
+security set-generic-password-partition-list \
+  -a ed25519 \
+  -s dev.voily.sparkle.ed25519-private-key \
+  -S apple-tool:,apple: \
+  "$HOME/Library/Keychains/voily-release.keychain-db"
 ```
 
 GitHub Actions workflow 里如果看到 Keychain blocked 或 SSH/headless 相关错误，不要让 Sparkle 工具自己读默认 Keychain。workflow 应该从已解锁的 release keychain 读取 generic password，并通过 `--ed-key-file -` 传给 `generate_appcast`。
