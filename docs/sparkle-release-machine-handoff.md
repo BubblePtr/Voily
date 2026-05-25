@@ -30,8 +30,15 @@ https://github.com/BubblePtr/Voily/releases/latest/download/appcast.xml
 
 - 当前 checkout 包含 Sparkle 接入改动。
 - `Developer ID Application` 证书和 `VOILY_NOTARY_PROFILE` 已能完成现有发布流程。
+- `dmgbuild --help` 可用，用于生成不依赖 Finder GUI 自动化的 DMG 安装窗口布局。
 - GitHub CLI 已登录，并且有上传 release asset 的权限。
 - 发布操作使用的 macOS 用户可以解锁 `$HOME/Library/Keychains/voily-release.keychain-db`，并能从其中读取 Sparkle generic password。
+
+如果 `dmgbuild` 还没安装，先在发布用户下安装：
+
+```bash
+pipx install "dmgbuild==1.6.7"
+```
 
 先确认 vendored Sparkle 包没有变：
 

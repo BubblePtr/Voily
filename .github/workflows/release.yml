@@ -60,6 +60,7 @@ jobs:
           xcode-select -p
           xcodebuild -version
           xcodegen --version
+          dmgbuild --help >/dev/null
           gh --version
           security find-identity -p codesigning -v "$VOILY_RELEASE_KEYCHAIN"
           xcrun notarytool history --keychain "$VOILY_RELEASE_KEYCHAIN" --keychain-profile "$VOILY_NOTARY_PROFILE"

@@ -14,11 +14,20 @@ Voily is distributed as a signed macOS app through GitHub Releases rather than t
 Before running the release flow, make sure the current Mac has:
 
 - Xcode command line tools
+- `dmgbuild` for deterministic drag-install DMG layout generation
 - An Apple Developer membership
 - A `Developer ID Application` certificate installed in the local keychain
 - A configured `notarytool` keychain profile
 - A Sparkle EdDSA key pair for in-app updates, generated on the release machine
 - A Sparkle private key stored as a generic password in the self-hosted release runner's release keychain
+
+Install `dmgbuild` once on the release machine:
+
+```bash
+pipx install "dmgbuild==1.6.7"
+```
+
+If `pipx` is not available on the release machine, install `dmgbuild` into the release user's Python environment and make sure `dmgbuild --help` works in the GitHub Actions runner shell.
 
 Check the available signing identities:
 
@@ -157,7 +166,7 @@ make package-zip
 
 Artifacts are written to `build/release/artifacts/`.
 
-`make package-dmg` creates the standard drag-to-install disk image: `Voily.app` appears on the left, an `Applications` shortcut appears on the right, and `Resources/Release/dmg-background.png` is used as the default Finder background image. `Resources/Release/dmg-background-source.png` keeps the original high-resolution image, while `dmg-background.png` is the Finder-ready derivative sized for the small installer window. The command writes the Finder icon-view layout when `osascript` can access Finder; if the layout cannot be written in the current environment, the disk image still contains both items and remains installable. To temporarily replace the background image, set `VOILY_DMG_BACKGROUND_PATH`.
+`make package-dmg` creates the standard drag-to-install disk image with `dmgbuild`: `Voily.app` appears on the left, an `Applications` shortcut appears on the right, and `Resources/Release/dmg-background.png` is used as the Finder background image. `Resources/Release/dmg-background-source.png` keeps the original high-resolution image, while `dmg-background.png` is the Finder-ready derivative sized for the installer window. The layout is written directly into `.DS_Store`, so release packaging no longer depends on Finder or AppleScript access in the runner GUI session. To temporarily replace the background image, set `VOILY_DMG_BACKGROUND_PATH`.
 
 `make package-dmg` will try to sign the disk image with the same identity used by the archived app. If you need to override that identity, set `VOILY_DMG_SIGN_IDENTITY`.
 
