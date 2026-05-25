@@ -14,8 +14,8 @@
 https://github.com/BubblePtr/Voily/releases/latest/download/appcast.xml
 ```
 
-- `VOILY_SPARKLE_PUBLIC_ED_KEY` 目前仍为空。只要构建产物里的 `SUPublicEDKey` 为空或仍是未解析的 `$(...)`，应用会显示“应用内更新尚未配置”，不会启动 Sparkle。
-- appcast 生成和上传还没有接进 GitHub Actions release workflow，需要先在发布机手工跑通。
+- `VOILY_SPARKLE_PUBLIC_ED_KEY` 已配置为发布机生成的公钥。只要构建产物里的 `SUPublicEDKey` 为空或仍是未解析的 `$(...)`，应用会显示“应用内更新尚未配置”，不会启动 Sparkle。
+- appcast 生成和上传已经接进 GitHub Actions release workflow。发布机仍需要提供 Sparkle 私钥文件。
 
 ## 不要做的事
 
@@ -31,7 +31,7 @@ https://github.com/BubblePtr/Voily/releases/latest/download/appcast.xml
 - 当前 checkout 包含 Sparkle 接入改动。
 - `Developer ID Application` 证书和 `VOILY_NOTARY_PROFILE` 已能完成现有发布流程。
 - GitHub CLI 已登录，并且有上传 release asset 的权限。
-- 发布操作使用的 macOS 用户与后续运行 `generate_appcast` 的用户一致。
+- 发布操作使用的 macOS 用户可以读取 Sparkle 私钥文件。默认路径是 `$HOME/.voily-release/sparkle-ed25519-private-key.txt`。
 
 先确认 vendored Sparkle 包没有变：
 
@@ -68,7 +68,21 @@ unzip -q Vendor/Sparkle/Sparkle-for-Swift-Package-Manager.zip -d /tmp/voily-spar
 /tmp/voily-sparkle/bin/generate_keys
 ```
 
-这个命令会把私钥写入当前 macOS 用户的 Keychain，并打印公钥。保存打印出的公钥；私钥留在 Keychain，不要导出到仓库路径。
+这个命令会把私钥写入当前 macOS 用户的 Keychain，并打印公钥。保存打印出的公钥；私钥不要导出到仓库路径。
+
+GitHub Actions self-hosted runner 是 headless 环境，不能可靠读取 Sparkle 的 Keychain item。给 workflow 使用时，需要把私钥导出到发布用户本地的受保护文件：
+
+```bash
+mkdir -p "$HOME/.voily-release"
+/tmp/voily-sparkle/bin/generate_keys -x "$HOME/.voily-release/sparkle-ed25519-private-key.txt"
+chmod 600 "$HOME/.voily-release/sparkle-ed25519-private-key.txt"
+```
+
+如果不用默认路径，在仓库变量里设置：
+
+```text
+VOILY_SPARKLE_PRIVATE_KEY_FILE=/absolute/path/to/sparkle-ed25519-private-key.txt
+```
 
 如果必须从另一台机器迁移 Sparkle 私钥，只能使用 Sparkle 官方工具导入导出，并在导入后删除临时文件：
 
@@ -147,6 +161,7 @@ DOWNLOAD_URL_PREFIX="https://github.com/BubblePtr/Voily/releases/download/${RELE
 ```bash
 /tmp/voily-sparkle/bin/generate_appcast \
   --download-url-prefix "$DOWNLOAD_URL_PREFIX" \
+  --ed-key-file "$HOME/.voily-release/sparkle-ed25519-private-key.txt" \
   build/release/artifacts
 ```
 
@@ -206,7 +221,7 @@ curl -fsSL https://github.com/BubblePtr/Voily/releases/latest/download/appcast.x
 ## 验收清单
 
 - `SUPublicEDKey` 在最终 release app 里非空，且不是未解析的 build setting。
-- Sparkle 私钥只存在于发布用户 Keychain 或临时迁移文件中；临时文件已删除。
+- Sparkle 私钥只存在于发布用户 Keychain、受保护的本地 release 私钥文件或临时迁移文件中；临时文件已删除。
 - `appcast.xml` 已上传到 latest release asset URL。
 - `appcast.xml` 包含 `sparkle:edSignature`。
 - appcast 中的下载 URL 指向本次 release tag 下的 dmg。
@@ -223,13 +238,15 @@ curl -fsSL https://github.com/BubblePtr/Voily/releases/latest/download/appcast.x
 
 ### `generate_appcast` 没有签名或找不到 key
 
-通常是运行命令的 macOS 用户和生成 key 的用户不一致，或者 Keychain 弹窗没有允许访问。用同一个发布用户运行：
+本地手工生成时，通常是运行命令的 macOS 用户和生成 key 的用户不一致，或者 Keychain 弹窗没有允许访问。用同一个发布用户运行：
 
 ```bash
 /tmp/voily-sparkle/bin/generate_keys -p
 ```
 
 这个命令应该能打印已有公钥。
+
+GitHub Actions workflow 里如果看到 Keychain blocked 或 SSH/headless 相关错误，不要让 workflow 直接读 Keychain。改用 `--ed-key-file` 指向发布机本地受保护的 Sparkle 私钥文件。
 
 ### 应用提示没有可用更新
 
@@ -252,11 +269,11 @@ https://github.com/BubblePtr/Voily/releases/download/v0.1.2/
 
 ## 后续自动化
 
-第一版手工跑通后，可以再把 appcast 步骤接进 `.github/workflows/release.yml`：
+当前 `.github/workflows/release.yml` 已经执行 appcast 步骤：
 
-1. release runner 解锁包含 Sparkle 私钥的 Keychain。
-2. `make verify-release` 通过后运行 `generate_appcast --download-url-prefix ... build/release/artifacts`。
+1. release runner 解锁 Apple 发布 keychain。
+2. `make verify-release` 通过后运行 `generate_appcast --download-url-prefix ... --ed-key-file ... build/release/artifacts`。
 3. 上传 dmg、`appcast.xml` 和 delta 文件。
 4. 在 workflow 里保留 `PlistBuddy` 校验，防止公钥漏注入。
 
-不要把 Sparkle 私钥放进 GitHub secret 再通过 `--ed-key-file -` 传给工具，除非明确决定把私钥托管到 GitHub。当前更简单的方案是让私钥留在自托管发布机的 Keychain。
+不要把 Sparkle 私钥放进 GitHub secret 再通过 `--ed-key-file -` 传给工具，除非明确决定把私钥托管到 GitHub。当前更简单的方案是让私钥文件留在自托管发布机本地，并用文件权限限制访问。
