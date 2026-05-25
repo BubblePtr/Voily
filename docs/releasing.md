@@ -18,7 +18,7 @@ Before running the release flow, make sure the current Mac has:
 - A `Developer ID Application` certificate installed in the local keychain
 - A configured `notarytool` keychain profile
 - A Sparkle EdDSA key pair for in-app updates, generated on the release machine
-- A protected local Sparkle private key file readable by the self-hosted release runner
+- A Sparkle private key stored as a generic password in the self-hosted release runner's release keychain
 
 Check the available signing identities:
 
@@ -62,21 +62,40 @@ unzip -q Vendor/Sparkle/Sparkle-for-Swift-Package-Manager.zip -d /tmp/voily-spar
 /tmp/voily-sparkle/bin/generate_keys
 ```
 
-Add the printed public key to release builds through the `VOILY_SPARKLE_PUBLIC_ED_KEY` build setting. For the self-hosted GitHub Actions runner, export the private key to a protected file outside the repository because headless workflow jobs cannot reliably read Sparkle's Keychain item:
+Add the printed public key to release builds through the `VOILY_SPARKLE_PUBLIC_ED_KEY` build setting. Store the private key in the dedicated release keychain as a generic password so the headless self-hosted runner can read it after unlocking the keychain:
 
 ```bash
-mkdir -p "$HOME/.voily-release"
-/tmp/voily-sparkle/bin/generate_keys -x "$HOME/.voily-release/sparkle-ed25519-private-key.txt"
-chmod 600 "$HOME/.voily-release/sparkle-ed25519-private-key.txt"
+VOILY_RELEASE_KEYCHAIN="$HOME/Library/Keychains/voily-release.keychain-db"
+VOILY_SPARKLE_KEYCHAIN_ACCOUNT="ed25519"
+VOILY_SPARKLE_KEYCHAIN_SERVICE="dev.voily.sparkle.ed25519-private-key"
+
+SPARKLE_PRIVATE_KEY="$(
+  security find-generic-password \
+    -a "$VOILY_SPARKLE_KEYCHAIN_ACCOUNT" \
+    -s "Private key for signing Sparkle updates" \
+    -w "$HOME/Library/Keychains/login.keychain-db"
+)"
+
+security add-generic-password -U \
+  -a "$VOILY_SPARKLE_KEYCHAIN_ACCOUNT" \
+  -s "$VOILY_SPARKLE_KEYCHAIN_SERVICE" \
+  -l "Voily Sparkle EdDSA private key" \
+  -T /usr/bin/security \
+  -w "$SPARKLE_PRIVATE_KEY" \
+  "$VOILY_RELEASE_KEYCHAIN"
+
+unset SPARKLE_PRIVATE_KEY
 ```
 
-The release workflow uses this default path:
+The release workflow reads that generic password from:
 
 ```text
-$HOME/.voily-release/sparkle-ed25519-private-key.txt
+account: ed25519
+service: dev.voily.sparkle.ed25519-private-key
+keychain: $HOME/Library/Keychains/voily-release.keychain-db
 ```
 
-If the release machine uses another path, set the repository variable `VOILY_SPARKLE_PRIVATE_KEY_FILE` to that absolute path. Do not commit the private key, API tokens, or keychain exports to the repository.
+Do not commit the private key, API tokens, or keychain exports to the repository. Do not store the Sparkle private key in GitHub Secrets unless the release model is intentionally changed to GitHub-hosted CI.
 
 ## Versioning
 
@@ -219,9 +238,13 @@ When enabling appcast publishing on the release machine, generate the appcast fr
 ```bash
 unzip -q Vendor/Sparkle/Sparkle-for-Swift-Package-Manager.zip -d /tmp/voily-sparkle
 RELEASE_TAG="v0.1.2"
+security find-generic-password \
+  -a ed25519 \
+  -s dev.voily.sparkle.ed25519-private-key \
+  -w "$HOME/Library/Keychains/voily-release.keychain-db" |
 /tmp/voily-sparkle/bin/generate_appcast \
   --download-url-prefix "https://github.com/BubblePtr/Voily/releases/download/${RELEASE_TAG}/" \
-  --ed-key-file "$HOME/.voily-release/sparkle-ed25519-private-key.txt" \
+  --ed-key-file - \
   build/release/artifacts
 ```
 
