@@ -51,10 +51,16 @@ make run
 
 `make build` regenerates `Voily.xcodeproj` from `project.yml` with XcodeGen before invoking Xcode. Install XcodeGen locally if the command is missing.
 
-### Install to ~/Applications
+### Install to /Applications for local validation
 
 ```bash
-make install
+# Release configuration, Developer ID signing, installed to /Applications.
+# Use this for PR and feature validation on a development machine.
+make install-dev
+
+# Debug configuration, Apple Development signing, installed to /Applications.
+# Use this only when you need LLDB/debug-only behavior.
+make install-debug
 ```
 
 ### Install from GitHub Releases

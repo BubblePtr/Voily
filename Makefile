@@ -2,13 +2,15 @@ APP_NAME := Voily
 PROJECT := Voily.xcodeproj
 SCHEME := Voily
 BUILD_DIR := .xcodebuild
-APP_PATH := $(BUILD_DIR)/Build/Products/Debug/$(APP_NAME).app
+DEBUG_APP_PATH := $(BUILD_DIR)/Build/Products/Debug/$(APP_NAME).app
+RELEASE_APP_PATH := build/release/$(APP_NAME).app
+INSTALL_PATH := /Applications/$(APP_NAME).app
 RELEASE_SCRIPT := ./scripts/release.sh
 XCODEGEN := xcodegen
 XCODEBUILD := xcodebuild
 SWIFT := swift
 
-.PHONY: generate build test test-core test-logic test-app swift-build run install install-user install-system clean release archive export-app package-zip package-dmg notarize staple verify-release clean-release
+.PHONY: generate build test test-core test-logic test-app swift-build run install-dev install-debug clean release archive export-app package-zip package-dmg notarize staple verify-release clean-release
 
 generate:
 	@command -v $(XCODEGEN) >/dev/null 2>&1 || { echo "Missing required command: $(XCODEGEN). Install XcodeGen before building Voily."; exit 1; }
@@ -31,20 +33,17 @@ test-app: generate
 	$(XCODEBUILD) -project $(PROJECT) -scheme $(SCHEME) -configuration Debug -derivedDataPath $(BUILD_DIR) test
 
 run: build
-	open "$(APP_PATH)"
+	open "$(DEBUG_APP_PATH)"
 
-install: install-user
+install-dev: release
+	rm -rf "$(INSTALL_PATH)"
+	cp -R "$(RELEASE_APP_PATH)" "$(INSTALL_PATH)"
+	@echo "Installed Developer ID development build to $(INSTALL_PATH)"
 
-install-user: build
-	@mkdir -p "$(HOME)/Applications"
-	rm -rf "$(HOME)/Applications/$(APP_NAME).app"
-	cp -R "$(APP_PATH)" "$(HOME)/Applications/$(APP_NAME).app"
-	@echo "Installed to $(HOME)/Applications/$(APP_NAME).app"
-
-install-system: build
-	rm -rf "/Applications/$(APP_NAME).app"
-	cp -R "$(APP_PATH)" "/Applications/$(APP_NAME).app"
-	@echo "Installed to /Applications/$(APP_NAME).app"
+install-debug: build
+	rm -rf "$(INSTALL_PATH)"
+	cp -R "$(DEBUG_APP_PATH)" "$(INSTALL_PATH)"
+	@echo "Installed Debug build to $(INSTALL_PATH)"
 
 release archive export-app: generate
 	$(RELEASE_SCRIPT) archive

@@ -51,10 +51,16 @@ make run
 
 `make build` 会先用 XcodeGen 根据 `project.yml` 重新生成 `Voily.xcodeproj`，再调用 Xcode 构建。如果本机缺少 `xcodegen`，请先安装。
 
-### 安装到 ~/Applications
+### 安装到 /Applications 做本地验收
 
 ```bash
-make install
+# Release 配置，Developer ID 签名，安装到 /Applications。
+# 日常提 PR 前验功能用这个。
+make install-dev
+
+# Debug 配置，Apple Development 签名，安装到 /Applications。
+# 只有需要 LLDB 或 Debug 专用行为时才用。
+make install-debug
 ```
 
 ### 从 GitHub Releases 安装

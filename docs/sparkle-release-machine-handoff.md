@@ -247,7 +247,7 @@ curl -fsSL https://github.com/BubblePtr/Voily/releases/latest/download/appcast.x
 
 至少做一次从旧版本到新版本的真实验证：
 
-1. 安装一个 `CURRENT_PROJECT_VERSION` 更低的 Voily 到 `/Applications` 或 `~/Applications`。
+1. 安装一个 `CURRENT_PROJECT_VERSION` 更低的 Voily 到 `/Applications`。
 2. 启动旧版本。
 3. 点击菜单里的“检查更新...”。
 4. 确认 Sparkle 弹出可更新提示，并能下载、安装、重启到新版本。

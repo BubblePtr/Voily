@@ -145,6 +145,14 @@ This command:
 - archives the `Release` configuration
 - exports `Voily.app` to `build/release/Voily.app`
 
+For local feature validation on a development machine, install the exported app directly:
+
+```bash
+make install-dev
+```
+
+This uses the same Release/Developer ID app bundle shape as the public release path, but does not create, notarize, or staple a `.dmg`.
+
 If Xcode does not automatically pick the correct signing identity, pass it explicitly:
 
 ```bash
