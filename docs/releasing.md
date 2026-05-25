@@ -18,6 +18,7 @@ Before running the release flow, make sure the current Mac has:
 - A `Developer ID Application` certificate installed in the local keychain
 - A configured `notarytool` keychain profile
 - A Sparkle EdDSA key pair for in-app updates, generated on the release machine
+- A protected local Sparkle private key file readable by the self-hosted release runner
 
 Check the available signing identities:
 
@@ -54,14 +55,28 @@ The release workflow unlocks that keychain with the GitHub secret:
 VOILY_RELEASE_KEYCHAIN_PASSWORD
 ```
 
-Sparkle uses a separate EdDSA key pair from Apple notarization. Generate it on the release machine and keep the private key in that Mac's Keychain:
+Sparkle uses a separate EdDSA key pair from Apple notarization. Generate it on the release machine:
 
 ```bash
 unzip -q Vendor/Sparkle/Sparkle-for-Swift-Package-Manager.zip -d /tmp/voily-sparkle
 /tmp/voily-sparkle/bin/generate_keys
 ```
 
-Add the printed public key to release builds through the `VOILY_SPARKLE_PUBLIC_ED_KEY` build setting. Do not commit the private key, API tokens, or keychain exports to the repository.
+Add the printed public key to release builds through the `VOILY_SPARKLE_PUBLIC_ED_KEY` build setting. For the self-hosted GitHub Actions runner, export the private key to a protected file outside the repository because headless workflow jobs cannot reliably read Sparkle's Keychain item:
+
+```bash
+mkdir -p "$HOME/.voily-release"
+/tmp/voily-sparkle/bin/generate_keys -x "$HOME/.voily-release/sparkle-ed25519-private-key.txt"
+chmod 600 "$HOME/.voily-release/sparkle-ed25519-private-key.txt"
+```
+
+The release workflow uses this default path:
+
+```text
+$HOME/.voily-release/sparkle-ed25519-private-key.txt
+```
+
+If the release machine uses another path, set the repository variable `VOILY_SPARKLE_PRIVATE_KEY_FILE` to that absolute path. Do not commit the private key, API tokens, or keychain exports to the repository.
 
 ## Versioning
 
@@ -206,6 +221,7 @@ unzip -q Vendor/Sparkle/Sparkle-for-Swift-Package-Manager.zip -d /tmp/voily-spar
 RELEASE_TAG="v0.1.2"
 /tmp/voily-sparkle/bin/generate_appcast \
   --download-url-prefix "https://github.com/BubblePtr/Voily/releases/download/${RELEASE_TAG}/" \
+  --ed-key-file "$HOME/.voily-release/sparkle-ed25519-private-key.txt" \
   build/release/artifacts
 ```
 

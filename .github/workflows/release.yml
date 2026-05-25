@@ -32,6 +32,7 @@ jobs:
       VOILY_NOTARY_PROFILE: ${{ vars.VOILY_NOTARY_PROFILE }}
       VOILY_RELEASE_KEYCHAIN: /Users/openclaw/Library/Keychains/voily-release.keychain-db
       VOILY_RELEASE_KEYCHAIN_PASSWORD: ${{ secrets.VOILY_RELEASE_KEYCHAIN_PASSWORD }}
+      VOILY_SPARKLE_PRIVATE_KEY_FILE: ${{ vars.VOILY_SPARKLE_PRIVATE_KEY_FILE }}
       RELEASE_TAG: ${{ github.event.inputs.tag || github.ref_name }}
 
     steps:
@@ -69,7 +70,14 @@ jobs:
           shasum -a 256 Vendor/Sparkle/Sparkle-for-Swift-Package-Manager.zip | grep -q '^b83e37436774556ed055e0244b297ef2c790e0737393bf65bf495fcbba6eed65 '
           rm -rf /tmp/voily-sparkle
           unzip -q Vendor/Sparkle/Sparkle-for-Swift-Package-Manager.zip -d /tmp/voily-sparkle
-          /tmp/voily-sparkle/bin/generate_keys -p
+
+          sparkle_private_key_file="${VOILY_SPARKLE_PRIVATE_KEY_FILE:-$HOME/.voily-release/sparkle-ed25519-private-key.txt}"
+          if [[ ! -r "$sparkle_private_key_file" ]]; then
+            printf 'Sparkle private key file is not readable: %s\n' "$sparkle_private_key_file" >&2
+            printf 'Export the key on the release machine with generate_keys -x, keep it outside the repository, and set VOILY_SPARKLE_PRIVATE_KEY_FILE if using a custom path.\n' >&2
+            exit 1
+          fi
+          printf 'VOILY_SPARKLE_PRIVATE_KEY_FILE=%s\n' "$sparkle_private_key_file" >> "$GITHUB_ENV"
 
       - name: Build signed release app
         run: |
@@ -139,6 +147,7 @@ jobs:
           download_url_prefix="https://github.com/${GITHUB_REPOSITORY}/releases/download/${RELEASE_TAG}/"
           /tmp/voily-sparkle/bin/generate_appcast \
             --download-url-prefix "$download_url_prefix" \
+            --ed-key-file "$VOILY_SPARKLE_PRIVATE_KEY_FILE" \
             build/release/artifacts
 
           test -f build/release/artifacts/appcast.xml
