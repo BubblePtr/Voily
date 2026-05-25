@@ -146,6 +146,12 @@ jobs:
         run: |
           set -euo pipefail
 
+          public_ed_key="$(/usr/libexec/PlistBuddy -c 'Print :SUPublicEDKey' build/release/Voily.app/Contents/Info.plist 2>/dev/null || true)"
+          if [[ -z "$public_ed_key" || "$public_ed_key" =~ \$\( ]]; then
+            printf 'SUPublicEDKey is missing or unresolved in release app Info.plist.\n' >&2
+            exit 1
+          fi
+
           download_url_prefix="https://github.com/${GITHUB_REPOSITORY}/releases/download/${RELEASE_TAG}/"
           security find-generic-password \
             -a "$VOILY_SPARKLE_KEYCHAIN_ACCOUNT" \
