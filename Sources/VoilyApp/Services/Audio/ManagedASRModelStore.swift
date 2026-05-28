@@ -205,7 +205,7 @@ final class ManagedASRModelStore {
                     )
                 ],
                 defaultArguments: "",
-                estimatedDownload: "约 950 MB"
+                estimatedDownload: AppLocalization.localized("约 950 MB")
             )
         case .doubaoStreaming, .funASR, .qwenASR, .stepfunASR:
             return nil
@@ -226,7 +226,9 @@ final class ManagedASRModelStore {
         do {
             try process.run()
         } catch {
-            throw ManagedASRModelError.commandFailed("解压运行时失败：\(error.localizedDescription)")
+            throw ManagedASRModelError.commandFailed(
+                String(format: AppLocalization.localized("解压运行时失败：%@"), error.localizedDescription)
+            )
         }
 
         return try await withCheckedThrowingContinuation { continuation in
@@ -239,7 +241,10 @@ final class ManagedASRModelStore {
                 } else {
                     let message = [stderr, stdout]
                         .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-                        .first { !$0.isEmpty } ?? "解压运行时失败，退出码 \(process.terminationStatus)"
+                        .first { !$0.isEmpty } ?? String(
+                            format: AppLocalization.localized("解压运行时失败，退出码 %@"),
+                            "\(process.terminationStatus)"
+                        )
                     continuation.resume(throwing: ManagedASRModelError.commandFailed(message))
                 }
             }
@@ -253,7 +258,7 @@ final class ManagedASRModelStore {
 
         let (temporaryURL, response) = try await URLSession.shared.download(from: url)
         guard let httpResponse = response as? HTTPURLResponse, (200 ..< 300).contains(httpResponse.statusCode) else {
-            throw ManagedASRModelError.commandFailed("模型下载失败。")
+            throw ManagedASRModelError.commandFailed(AppLocalization.localized("模型下载失败。"))
         }
 
         try? FileManager.default.removeItem(at: destination)

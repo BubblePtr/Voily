@@ -72,13 +72,15 @@ make install-debug
    - Microphone
    - Accessibility
 
-If macOS still warns about permissions, open `System Settings` -> `Privacy & Security` and enable the requested access manually.
+If macOS still warns about permissions, open Voily Settings -> Input. The permission card can request microphone access, open the relevant Privacy & Security pane, and refresh status after you grant access.
 
 Voily now requests only:
 - **Microphone** — required for audio capture
 - **Accessibility** — required for paste-based text injection
 
 The older Apple `Speech.framework` fallback was removed, so you should no longer see or need a separate Speech Recognition permission prompt.
+
+For a full local permission-flow regression, use `make test-permission-flow`; it resets Voily's microphone and Accessibility grants before installing the test build.
 
 ### Build a GitHub Release artifact
 

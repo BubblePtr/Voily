@@ -19,6 +19,8 @@ private enum DashboardFormatters {
 
 struct DashboardHomePage: View {
     let usageStore: UsageStore
+    let permissionActions: SettingsPermissionActions
+    let onOpenInputSettings: () -> Void
 
     @State private var showCopyToast = false
     @State private var copyToastTask: Task<Void, Never>?
@@ -28,9 +30,24 @@ struct DashboardHomePage: View {
         GridItem(.flexible(minimum: 360), spacing: 20, alignment: .top),
     ]
 
+    init(
+        usageStore: UsageStore,
+        permissionActions: SettingsPermissionActions = .preview(),
+        onOpenInputSettings: @escaping () -> Void = {}
+    ) {
+        self.usageStore = usageStore
+        self.permissionActions = permissionActions
+        self.onOpenInputSettings = onOpenInputSettings
+    }
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 24) {
+                DashboardPermissionStatusHeader(
+                    actions: permissionActions,
+                    onOpenInputSettings: onOpenInputSettings
+                )
+
                 TodayMetricsSection(
                     summary: usageStore.todaySummary,
                     asrSummary: usageStore.todayASRSummary
@@ -104,6 +121,115 @@ struct DashboardHomePage: View {
 
     private func formatCharacters(_ value: Int) -> String {
         String(format: AppLocalization.localized("%@ 字"), "\(value)")
+    }
+}
+
+private struct DashboardPermissionStatusHeader: View {
+    let actions: SettingsPermissionActions
+    let onOpenInputSettings: () -> Void
+
+    @Environment(\.scenePhase) private var scenePhase
+    @State private var snapshot = SettingsPermissionSnapshot.unknown
+
+    var body: some View {
+        VStack(alignment: .trailing, spacing: snapshot.hasKnownMissingRequiredPermissions ? 12 : 0) {
+            HStack {
+                Spacer(minLength: 0)
+                CompactSettingsPermissionStatusCapsules(snapshot: snapshot)
+            }
+
+            if snapshot.hasKnownMissingRequiredPermissions {
+                DashboardPermissionReminderBanner(
+                    snapshot: snapshot,
+                    onOpenInputSettings: onOpenInputSettings
+                )
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .trailing)
+        .onAppear(perform: refresh)
+        .onChange(of: scenePhase) { _, phase in
+            guard phase == .active else { return }
+            refresh()
+        }
+        .task(id: scenePhase) {
+            guard scenePhase == .active else { return }
+            await refreshWhileVisible()
+        }
+    }
+
+    @MainActor
+    private func refresh() {
+        snapshot = actions.loadSnapshot()
+    }
+
+    @MainActor
+    private func refreshWhileVisible() async {
+        while !Task.isCancelled {
+            refresh()
+
+            do {
+                try await Task.sleep(for: .seconds(2))
+            } catch {
+                return
+            }
+        }
+    }
+}
+
+private struct DashboardPermissionReminderBanner: View {
+    let snapshot: SettingsPermissionSnapshot
+    let onOpenInputSettings: () -> Void
+
+    var body: some View {
+        HStack(alignment: .center, spacing: 14) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .font(.system(size: 17, weight: .semibold))
+                .foregroundStyle(.orange)
+                .frame(width: 34, height: 34)
+                .background(
+                    Circle()
+                        .fill(Color.orange.opacity(0.12))
+                )
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(AppLocalization.localized("需要完成系统权限授权"))
+                    .font(.system(size: 14, weight: .semibold))
+
+                Text(bannerDetail)
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            Spacer(minLength: 16)
+
+            Button(AppLocalization.localized("去输入设置"), action: onOpenInputSettings)
+                .controlSize(.small)
+        }
+        .padding(.horizontal, 18)
+        .padding(.vertical, 14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .fill(Color.orange.opacity(0.08))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .stroke(Color.orange.opacity(0.24), lineWidth: 1)
+        )
+    }
+
+    private var bannerDetail: String {
+        switch (snapshot.microphone.isGranted, snapshot.accessibility.isGranted) {
+        case (false, false):
+            return AppLocalization.localized("麦克风和辅助功能权限未就绪，请到输入设置页处理。")
+        case (false, true):
+            return AppLocalization.localized("麦克风权限未就绪，请到输入设置页处理。")
+        case (true, false):
+            return AppLocalization.localized("辅助功能权限未就绪，请到输入设置页处理。")
+        case (true, true):
+            return ""
+        }
     }
 }
 

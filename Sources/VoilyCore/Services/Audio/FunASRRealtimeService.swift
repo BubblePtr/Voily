@@ -20,26 +20,26 @@ enum FunASRRealtimeServiceError: LocalizedError, Sendable {
     var errorDescription: String? {
         switch self {
         case .missingBaseURL:
-            return "未配置 Fun-ASR 实时识别地址。"
+            return AppLocalization.localized("未配置 Fun-ASR 实时识别地址。")
         case .missingAPIKey:
-            return "未配置 Fun-ASR API Key。"
+            return AppLocalization.localized("未配置 Fun-ASR API Key。")
         case .missingModel:
-            return "未配置 Fun-ASR 实时识别模型。"
+            return AppLocalization.localized("未配置 Fun-ASR 实时识别模型。")
         case let .invalidBaseURL(value):
-            return "Fun-ASR 实时识别地址无效：\(value)"
+            return String(format: AppLocalization.localized("Fun-ASR 实时识别地址无效：%@"), value)
         case .sessionNotStarted:
-            return "Fun-ASR 实时识别会话尚未建立。"
+            return AppLocalization.localized("Fun-ASR 实时识别会话尚未建立。")
         case let .connectionFailed(message):
-            return "Fun-ASR 实时识别连接失败：\(message)"
+            return String(format: AppLocalization.localized("Fun-ASR 实时识别连接失败：%@"), message)
         case let .serverError(code, message):
             if let code, !code.isEmpty {
-                return "Fun-ASR 实时识别返回错误：\(code) \(message)"
+                return String(format: AppLocalization.localized("Fun-ASR 实时识别返回错误：%@ %@"), code, message)
             }
-            return "Fun-ASR 实时识别返回错误：\(message)"
+            return String(format: AppLocalization.localized("Fun-ASR 实时识别返回错误：%@"), message)
         case let .unexpectedClose(code, reason):
-            return "Fun-ASR 实时识别连接已关闭：\(code.rawValue) \(reason)"
+            return String(format: AppLocalization.localized("Fun-ASR 实时识别连接已关闭：%@ %@"), "\(code.rawValue)", reason)
         case .emptyTranscript:
-            return "Fun-ASR 实时识别未返回可用文本。"
+            return AppLocalization.localized("Fun-ASR 实时识别未返回可用文本。")
         }
     }
 }
@@ -130,7 +130,7 @@ public actor FunASRRealtimeService {
             startTimeoutTask = Task {
                 try? await Task.sleep(for: .seconds(10))
                 guard !Task.isCancelled else { return }
-                await self.failAll(with: FunASRRealtimeServiceError.connectionFailed("建立会话超时"))
+                await self.failAll(with: FunASRRealtimeServiceError.connectionFailed(AppLocalization.localized("建立会话超时")))
             }
             Task {
                 do {
@@ -174,7 +174,7 @@ public actor FunASRRealtimeService {
             finishTimeoutTask = Task {
                 try? await Task.sleep(for: .seconds(10))
                 guard !Task.isCancelled else { return }
-                await self.failAll(with: FunASRRealtimeServiceError.connectionFailed("等待识别结果超时"))
+                await self.failAll(with: FunASRRealtimeServiceError.connectionFailed(AppLocalization.localized("等待识别结果超时")))
             }
             Task {
                 do {
@@ -193,9 +193,9 @@ public actor FunASRRealtimeService {
         finishTimeoutTask?.cancel()
         finishTimeoutTask = nil
 
-        createdContinuation?.resume(throwing: FunASRRealtimeServiceError.connectionFailed("会话已取消"))
+        createdContinuation?.resume(throwing: FunASRRealtimeServiceError.connectionFailed(AppLocalization.localized("会话已取消")))
         createdContinuation = nil
-        finishContinuation?.resume(throwing: FunASRRealtimeServiceError.connectionFailed("会话已取消"))
+        finishContinuation?.resume(throwing: FunASRRealtimeServiceError.connectionFailed(AppLocalization.localized("会话已取消")))
         finishContinuation = nil
 
         webSocketTask?.cancel(with: .goingAway, reason: nil)
@@ -210,7 +210,7 @@ public actor FunASRRealtimeService {
 
     private func sendControlMessage(_ data: Data, over task: URLSessionWebSocketTask) async throws {
         guard let text = String(data: data, encoding: .utf8) else {
-            throw FunASRRealtimeServiceError.connectionFailed("请求序列化失败")
+            throw FunASRRealtimeServiceError.connectionFailed(AppLocalization.localized("请求序列化失败"))
         }
         try await task.send(.string(text))
     }
@@ -293,13 +293,13 @@ public actor FunASRRealtimeService {
             let failure = Self.taskFailure(from: payload)
             await failAll(with: FunASRRealtimeServiceError.serverError(
                 code: failure?.code,
-                message: failure?.message ?? "任务失败"
+                message: failure?.message ?? AppLocalization.localized("任务失败")
             ))
         case "error":
             let failure = Self.taskFailure(from: payload)
             await failAll(with: FunASRRealtimeServiceError.serverError(
                 code: failure?.code,
-                message: failure?.message ?? "任务失败"
+                message: failure?.message ?? AppLocalization.localized("任务失败")
             ))
         default:
             break

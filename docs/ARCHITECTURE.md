@@ -80,6 +80,11 @@ DeepSeek 的默认 Base URL 是 `https://api.deepseek.com`，默认模型是 `de
 
 ## 5. 权限与系统集成
 
-- **麦克风**：录音前必须取得，由 `PermissionCoordinator` 统一引导
-- **辅助功能（Accessibility）**：粘贴注入需要，缺失时 `TextInjectionService` 会降级提示
-- **菜单栏 / Dock**：菜单栏常驻，Dock 图标可选；关闭设置窗口不退出 app（见 `AppController`）
+- **麦克风**：录音前必须取得，由 `PermissionCoordinator` 负责状态读取和首次系统弹窗请求；设置页失败修复入口由 `MicrophonePermissionGuide` 通过 PermissionFlow 打开系统设置。
+- **辅助功能（Accessibility）**：全局触发键监听和粘贴注入需要。`AccessibilityPermissionGuide` 通过 PermissionFlow 打开辅助功能设置，并把当前 App 作为建议授权对象传给引导面板。
+- **权限状态 UI**：`SettingsPermissionSnapshot` 表示麦克风 / 辅助功能状态，`SettingsPermissionCard` 在输入设置页提供完整修复入口；首页只显示状态胶囊和缺失权限 banner，把交互引导回输入设置页。
+- **刷新策略**：权限状态只在相关页面 active 时轻量轮询，用户从系统设置授权后会自动刷新；手动「重新检查」仍保留。
+- **本地流程测试**：`make test-permission-flow` 会先重置相关权限，再安装测试构建，便于回归首次安装和授权流程。
+- **菜单栏 / Dock**：菜单栏常驻，Dock 图标可选；关闭设置窗口不退出 app（见 `AppController`）。
+
+权限引导决策见 [0006-permissionflow-permission-guidance.md](decisions/0006-permissionflow-permission-guidance.md)。

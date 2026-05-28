@@ -12,15 +12,15 @@ enum SenseVoiceResidentServiceError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .pythonNotFound:
-            return "未找到可用的 SenseVoice MLX 运行时。"
+            return AppLocalization.localized("未找到可用的 SenseVoice MLX 运行时。")
         case let .startupFailed(message):
-            return "SenseVoice 常驻服务启动失败：\(message)"
+            return String(format: AppLocalization.localized("SenseVoice 常驻服务启动失败：%@"), message)
         case .serverUnavailable:
-            return "SenseVoice 常驻服务未就绪。"
+            return AppLocalization.localized("SenseVoice 常驻服务未就绪。")
         case .invalidResponse:
-            return "SenseVoice 常驻服务返回了无效响应。"
+            return AppLocalization.localized("SenseVoice 常驻服务返回了无效响应。")
         case .emptyTranscript:
-            return "SenseVoice 常驻服务未返回可用文本。"
+            return AppLocalization.localized("SenseVoice 常驻服务未返回可用文本。")
         }
     }
 }
@@ -217,7 +217,7 @@ actor SenseVoiceResidentService {
             if let process, !process.isRunning {
                 let stderr = launchResult.stderrPipe.readSummary()
                 self.process = nil
-                throw SenseVoiceResidentServiceError.startupFailed(stderr.isEmpty ? "进程提前退出" : stderr)
+                throw SenseVoiceResidentServiceError.startupFailed(stderr.isEmpty ? AppLocalization.localized("进程提前退出") : stderr)
             }
         }
 
@@ -289,13 +289,15 @@ actor SenseVoiceResidentService {
         do {
             try process.run()
         } catch {
-            throw SenseVoiceResidentServiceError.startupFailed("无法清理旧服务：\(error.localizedDescription)")
+            throw SenseVoiceResidentServiceError.startupFailed(
+                String(format: AppLocalization.localized("无法清理旧服务：%@"), error.localizedDescription)
+            )
         }
 
         process.waitUntilExit()
         guard process.terminationStatus == 0 || process.terminationStatus == 1 else {
             let stderr = stderrPipe.readSummary()
-            throw SenseVoiceResidentServiceError.startupFailed(stderr.isEmpty ? "无法识别旧服务进程" : stderr)
+            throw SenseVoiceResidentServiceError.startupFailed(stderr.isEmpty ? AppLocalization.localized("无法识别旧服务进程") : stderr)
         }
 
         let output = String(decoding: stdoutPipe.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)

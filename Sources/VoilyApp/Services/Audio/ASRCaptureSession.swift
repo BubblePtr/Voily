@@ -14,7 +14,7 @@ enum ASRCaptureSessionError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .noAudioCaptured:
-            return "没有采集到可用于识别的音频。"
+            return AppLocalization.localized("没有采集到可用于识别的音频。")
         }
     }
 }

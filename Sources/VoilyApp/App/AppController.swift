@@ -117,6 +117,8 @@ final class AppController: NSObject {
     private let settings = AppSettings()
     private let usageStore = UsageStore()
     private let permissionCoordinator = PermissionCoordinator()
+    private let accessibilityPermissionGuide = AccessibilityPermissionGuide()
+    private let microphonePermissionGuide = MicrophonePermissionGuide()
     private let triggerKeyMonitor = TriggerKeyMonitor()
     private let audioCaptureService = AudioCaptureService()
     private let senseVoiceResidentService = SenseVoiceResidentService()
@@ -250,11 +252,7 @@ final class AppController: NSObject {
         debugLog("configureAccessibilityFeatures trusted=\(permissionCoordinator.isAccessibilityTrusted)")
         guard permissionCoordinator.isAccessibilityTrusted else {
             debugLog("Accessibility not trusted yet, prompting and waiting")
-            permissionCoordinator.promptForAccessibilityIfNeeded()
-            permissionCoordinator.waitForAccessibilityGrant { [weak self] in
-                debugLog("Accessibility granted, starting trigger key monitoring")
-                self?.configureTriggerKeyMonitoring()
-            }
+            openAccessibilityPermissionGuideAndWaitForGrant()
             return
         }
 
@@ -345,10 +343,42 @@ final class AppController: NSObject {
             ),
             managedASRModels: managedASRModels,
             appUpdater: appUpdater,
+            permissionActions: makeSettingsPermissionActions(),
             registerWindow: registerSettingsWindow(_:),
             onInitialAppearance: handleSettingsWindowInitialAppearance,
             onWindowHide: handleSettingsWindowDidHide
         )
+    }
+
+    private func makeSettingsPermissionActions() -> SettingsPermissionActions {
+        SettingsPermissionActions(
+            loadSnapshot: { [permissionCoordinator] in
+                SettingsPermissionSnapshot(
+                    microphone: .microphone(permissionCoordinator.microphoneAuthorizationStatus),
+                    accessibility: .accessibility(isTrusted: permissionCoordinator.isAccessibilityTrusted)
+                )
+            },
+            requestMicrophone: { [weak self] in
+                guard let self else { return false }
+                return await self.requestSystemPermissionWhileTriggerKeyMonitoringPaused { [permissionCoordinator] in
+                    await permissionCoordinator.requestMicrophoneIfNeeded()
+                }
+            },
+            openMicrophoneSettings: { [microphonePermissionGuide] in
+                microphonePermissionGuide.openSettings()
+            },
+            openAccessibilitySettings: { [weak self] in
+                self?.openAccessibilityPermissionGuideAndWaitForGrant()
+            }
+        )
+    }
+
+    private func openAccessibilityPermissionGuideAndWaitForGrant() {
+        accessibilityPermissionGuide.open()
+        permissionCoordinator.waitForAccessibilityGrant { [weak self] in
+            debugLog("Accessibility granted, starting trigger key monitoring")
+            self?.configureTriggerKeyMonitoring()
+        }
     }
 
     private func handleSettingsWindowInitialAppearance() {
@@ -805,7 +835,7 @@ final class AppController: NSObject {
         if injectionResult != .success {
             NSLog("Text injection finished with result: \(String(describing: injectionResult))")
             if injectionResult == .accessibilityDenied {
-                permissionCoordinator.promptForAccessibilityIfNeeded(force: true)
+                openAccessibilityPermissionGuideAndWaitForGrant()
             }
         }
 
@@ -1122,7 +1152,7 @@ private struct MenuDashboardMenuItemView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             VStack(alignment: .leading, spacing: 6) {
-                Text("今日概览")
+                Text(AppLocalization.localized("今日概览"))
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(.secondary)
 
@@ -1145,7 +1175,9 @@ private struct MenuDashboardMenuItemView: View {
     }
 
     private var summaryLine: String {
-        "\(formattedDuration(summary.totalDurationMs)) · \(summary.sessionCount) 次 · \(summary.totalCharacters) 字"
+        let sessions = String(format: AppLocalization.localized("%@ 次"), "\(summary.sessionCount)")
+        let characters = String(format: AppLocalization.localized("%@ 字"), "\(summary.totalCharacters)")
+        return "\(formattedDuration(summary.totalDurationMs)) · \(sessions) · \(characters)"
     }
 
     private func formattedDuration(_ durationMs: Int) -> String {
@@ -1154,10 +1186,14 @@ private struct MenuDashboardMenuItemView: View {
         let seconds = totalSeconds % 60
 
         if minutes > 0 {
-            return "\(minutes) 分 \(seconds) 秒"
+            return String(
+                format: AppLocalization.localized("%@ 分 %@ 秒"),
+                "\(minutes)",
+                "\(seconds)"
+            )
         }
 
-        return "\(seconds) 秒"
+        return String(format: AppLocalization.localized("%@ 秒"), "\(seconds)")
     }
 }
 

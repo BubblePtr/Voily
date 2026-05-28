@@ -26,33 +26,33 @@ enum DoubaoStreamingASRServiceError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .missingBaseURL:
-            return "未配置豆包实时 ASR 地址。"
+            return AppLocalization.localized("未配置豆包实时 ASR 地址。")
         case .missingAPIKey:
-            return "未配置豆包 Token。"
+            return AppLocalization.localized("未配置豆包 Token。")
         case .missingResourceID:
-            return "未配置豆包 Resource ID。"
+            return AppLocalization.localized("未配置豆包 Resource ID。")
         case let .invalidResourceIDFormat(value):
-            return "豆包 Resource ID 格式不正确：\(value)。示例：volc.seedasr.sauc.duration"
+            return String(format: AppLocalization.localized("豆包 Resource ID 格式不正确：%@。示例：volc.seedasr.sauc.duration"), value)
         case let .unsupportedLanguage(value):
-            return "豆包双向流式识别暂仅支持中文或英文输入：\(value)"
+            return String(format: AppLocalization.localized("豆包双向流式识别暂仅支持中文或英文输入：%@"), value)
         case .missingAppID:
-            return "未配置豆包 App ID。"
+            return AppLocalization.localized("未配置豆包 App ID。")
         case let .invalidBaseURL(value):
-            return "豆包实时 ASR 地址无效：\(value)"
+            return String(format: AppLocalization.localized("豆包实时 ASR 地址无效：%@"), value)
         case .sessionNotStarted:
-            return "豆包实时 ASR 会话尚未建立。"
+            return AppLocalization.localized("豆包实时 ASR 会话尚未建立。")
         case .invalidPacket:
-            return "豆包实时 ASR 返回了无法解析的协议包。"
+            return AppLocalization.localized("豆包实时 ASR 返回了无法解析的协议包。")
         case .invalidResponse:
-            return "豆包实时 ASR 返回了无效响应。"
+            return AppLocalization.localized("豆包实时 ASR 返回了无效响应。")
         case let .serverError(code, message):
-            return "豆包实时 ASR 返回错误：[\(code)] \(message)"
+            return String(format: AppLocalization.localized("豆包实时 ASR 返回错误：[%@] %@"), "\(code)", message)
         case let .connectionFailed(message):
-            return "豆包实时 ASR 连接失败：\(message)"
+            return String(format: AppLocalization.localized("豆包实时 ASR 连接失败：%@"), message)
         case let .unexpectedClose(code, reason):
-            return "豆包实时 ASR 连接已关闭：\(code.rawValue) \(reason)"
+            return String(format: AppLocalization.localized("豆包实时 ASR 连接已关闭：%@ %@"), "\(code.rawValue)", reason)
         case .emptyTranscript:
-            return "豆包实时 ASR 未返回可用文本。"
+            return AppLocalization.localized("豆包实时 ASR 未返回可用文本。")
         }
     }
 }
@@ -496,9 +496,9 @@ actor DoubaoStreamingASRService {
     }
 
     func cancelSession() async throws {
-        createdContinuation?.resume(throwing: DoubaoStreamingASRServiceError.connectionFailed("会话已取消"))
+        createdContinuation?.resume(throwing: DoubaoStreamingASRServiceError.connectionFailed(AppLocalization.localized("会话已取消")))
         createdContinuation = nil
-        finishContinuation?.resume(throwing: DoubaoStreamingASRServiceError.connectionFailed("会话已取消"))
+        finishContinuation?.resume(throwing: DoubaoStreamingASRServiceError.connectionFailed(AppLocalization.localized("会话已取消")))
         finishContinuation = nil
 
         webSocketTask?.cancel(with: .goingAway, reason: nil)

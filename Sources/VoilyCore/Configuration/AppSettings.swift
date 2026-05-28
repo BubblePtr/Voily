@@ -50,15 +50,15 @@ public enum TextRefinementProvider: String, CaseIterable, Codable, Identifiable,
         case .deepSeek:
             return "DeepSeek"
         case .dashScope:
-            return "阿里云百炼"
+            return AppLocalization.localized("阿里云百炼")
         case .volcengine:
-            return "火山引擎"
+            return AppLocalization.localized("火山引擎")
         case .minimax:
             return "MiniMax"
         case .kimi:
             return "Kimi"
         case .zhipu:
-            return "智谱"
+            return AppLocalization.localized("智谱")
         }
     }
 }
@@ -143,7 +143,7 @@ public enum TriggerKey: String, CaseIterable, Codable, Identifiable, Sendable {
         case .fn:
             return "Fn"
         case .rightCommand:
-            return "右 Command"
+            return AppLocalization.localized("右 Command")
         }
     }
 

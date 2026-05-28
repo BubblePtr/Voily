@@ -21,23 +21,23 @@ enum QwenRealtimeASRServiceError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .missingBaseURL:
-            return "未配置阿里云实时 ASR 地址。"
+            return AppLocalization.localized("未配置阿里云实时 ASR 地址。")
         case .missingAPIKey:
-            return "未配置阿里云 API Key。"
+            return AppLocalization.localized("未配置阿里云 API Key。")
         case .missingModel:
-            return "未配置阿里云实时 ASR 模型。"
+            return AppLocalization.localized("未配置阿里云实时 ASR 模型。")
         case let .invalidBaseURL(value):
-            return "阿里云实时 ASR 地址无效：\(value)"
+            return String(format: AppLocalization.localized("阿里云实时 ASR 地址无效：%@"), value)
         case .sessionNotStarted:
-            return "阿里云实时 ASR 会话尚未建立。"
+            return AppLocalization.localized("阿里云实时 ASR 会话尚未建立。")
         case let .connectionFailed(message):
-            return "阿里云实时 ASR 连接失败：\(message)"
+            return String(format: AppLocalization.localized("阿里云实时 ASR 连接失败：%@"), message)
         case let .serverError(message):
-            return "阿里云实时 ASR 返回错误：\(message)"
+            return String(format: AppLocalization.localized("阿里云实时 ASR 返回错误：%@"), message)
         case let .unexpectedClose(code, reason):
-            return "阿里云实时 ASR 连接已关闭：\(code.rawValue) \(reason)"
+            return String(format: AppLocalization.localized("阿里云实时 ASR 连接已关闭：%@ %@"), "\(code.rawValue)", reason)
         case .emptyTranscript:
-            return "阿里云实时 ASR 未返回可用文本。"
+            return AppLocalization.localized("阿里云实时 ASR 未返回可用文本。")
         }
     }
 }
@@ -154,9 +154,9 @@ actor QwenRealtimeASRService {
     }
 
     func cancelSession() async throws {
-        createdContinuation?.resume(throwing: QwenRealtimeASRServiceError.connectionFailed("会话已取消"))
+        createdContinuation?.resume(throwing: QwenRealtimeASRServiceError.connectionFailed(AppLocalization.localized("会话已取消")))
         createdContinuation = nil
-        finishContinuation?.resume(throwing: QwenRealtimeASRServiceError.connectionFailed("会话已取消"))
+        finishContinuation?.resume(throwing: QwenRealtimeASRServiceError.connectionFailed(AppLocalization.localized("会话已取消")))
         finishContinuation = nil
 
         webSocketTask?.cancel(with: .goingAway, reason: nil)
@@ -196,7 +196,7 @@ actor QwenRealtimeASRService {
     private func sendJSON(_ payload: [String: Any], over task: URLSessionWebSocketTask) async throws {
         let data = try JSONSerialization.data(withJSONObject: payload)
         guard let text = String(data: data, encoding: .utf8) else {
-            throw QwenRealtimeASRServiceError.connectionFailed("请求序列化失败")
+            throw QwenRealtimeASRServiceError.connectionFailed(AppLocalization.localized("请求序列化失败"))
         }
         try await task.send(.string(text))
     }
