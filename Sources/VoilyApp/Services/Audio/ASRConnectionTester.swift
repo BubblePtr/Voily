@@ -7,7 +7,7 @@ enum ASRConnectionTesterError: LocalizedError, Equatable {
     var errorDescription: String? {
         switch self {
         case .unsupportedProvider:
-            return "当前 provider 不支持测试连接。"
+            return AppLocalization.localized("当前 provider 不支持测试连接。")
         }
     }
 }

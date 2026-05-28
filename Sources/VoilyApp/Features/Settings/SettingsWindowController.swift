@@ -13,6 +13,7 @@ struct SettingsWindowSceneView: View {
     let asrConnectionTester: ASRConnectionTester
     let managedASRModels: ManagedASRModelStore
     let appUpdater: AppUpdater
+    let permissionActions: SettingsPermissionActions
     let registerWindow: (NSWindow) -> Void
     let onInitialAppearance: () -> Void
     let onWindowHide: () -> Void
@@ -24,7 +25,8 @@ struct SettingsWindowSceneView: View {
             llmService: llmService,
             asrConnectionTester: asrConnectionTester,
             managedASRModels: managedASRModels,
-            appUpdater: appUpdater
+            appUpdater: appUpdater,
+            permissionActions: permissionActions
         )
         .environment(\.locale, Locale(identifier: settings.appInterfaceLanguage.rawValue))
         .frame(minHeight: 760)
@@ -143,13 +145,12 @@ private enum SettingsPage: String, CaseIterable, Identifiable, Hashable {
     case glossary
     case general
     case input
-    case appearance
     case about
 
     var id: String { rawValue }
 
     static let overviewPages: [SettingsPage] = [.home]
-    static let configurationPages: [SettingsPage] = [.model, .glossary, .general, .input, .appearance]
+    static let configurationPages: [SettingsPage] = [.model, .glossary, .general, .input]
     static let appPages: [SettingsPage] = [.about]
 
     func title(languageCode: String) -> String {
@@ -164,8 +165,6 @@ private enum SettingsPage: String, CaseIterable, Identifiable, Hashable {
             return AppLocalization.localized("通用", languageCode: languageCode)
         case .input:
             return AppLocalization.localized("输入", languageCode: languageCode)
-        case .appearance:
-            return AppLocalization.localized("外观", languageCode: languageCode)
         case .about:
             return AppLocalization.localized("关于", languageCode: languageCode)
         }
@@ -180,11 +179,9 @@ private enum SettingsPage: String, CaseIterable, Identifiable, Hashable {
         case .glossary:
             return AppLocalization.localized("选择默认术语包，并维护自定义词条。该词库会参与 LLM 文本润色。", languageCode: languageCode)
         case .general:
-            return AppLocalization.localized("管理界面语言和设置窗口的通用说明。", languageCode: languageCode)
+            return AppLocalization.localized("管理界面语言、Dock 展示和设置窗口说明。", languageCode: languageCode)
         case .input:
             return AppLocalization.localized("管理默认输入语言、麦克风、触发键和录音期间系统输出。", languageCode: languageCode)
-        case .appearance:
-            return AppLocalization.localized("控制 Dock、menu bar 和应用图标展示。", languageCode: languageCode)
         case .about:
             return AppLocalization.localized("查看版本信息，并手动检查软件更新。", languageCode: languageCode)
         }
@@ -202,8 +199,6 @@ private enum SettingsPage: String, CaseIterable, Identifiable, Hashable {
             return Ph.gear.regular
         case .input:
             return Image(systemName: "keyboard")
-        case .appearance:
-            return Image(systemName: "paintbrush")
         case .about:
             return Image(systemName: "info.circle")
         }
@@ -218,6 +213,7 @@ private struct SettingsRootView: View {
     let asrConnectionTester: ASRConnectionTester
     let managedASRModels: ManagedASRModelStore
     let appUpdater: AppUpdater
+    let permissionActions: SettingsPermissionActions
 
     @State private var selection: SettingsPage? = .home
 
@@ -261,7 +257,13 @@ private struct SettingsRootView: View {
             Group {
                 switch currentPage {
                 case .home:
-                    DashboardHomePage(usageStore: usageStore)
+                    DashboardHomePage(
+                        usageStore: usageStore,
+                        permissionActions: permissionActions,
+                        onOpenInputSettings: {
+                            selection = .input
+                        }
+                    )
                 case .model:
                     ModelSettingsPage(
                         settings: settings,
@@ -274,9 +276,10 @@ private struct SettingsRootView: View {
                 case .general:
                     GeneralSettingsPage(settings: settings)
                 case .input:
-                    InputSettingsPage(settings: settings)
-                case .appearance:
-                    AppearanceSettingsPage(settings: settings)
+                    InputSettingsPage(
+                        settings: settings,
+                        permissionActions: permissionActions
+                    )
                 case .about:
                     AboutSettingsPage(appUpdater: appUpdater)
                 }
@@ -490,7 +493,7 @@ private struct AppIconOptionCard: View {
                         .foregroundStyle(isSelected ? Color.accentColor : Color.secondary.opacity(0.7))
                 }
 
-                Text(isSelected ? "当前使用中" : "点击切换")
+                Text(AppLocalization.localized(isSelected ? "当前使用中" : "点击切换"))
                     .font(.system(size: 12))
                     .foregroundStyle(.secondary)
             }
@@ -786,9 +789,11 @@ private struct DictationSkillsCard: View {
                 }
 
                 Text(
-                    isTextRefinementEnabled
-                        ? "当前配置会在普通听写时生效。\"整理成有序列表\" 只会在内容存在 2 个及以上清晰事项时触发。"
-                        : "当前未启用普通听写纠错。技能配置会保留，待开启后在普通听写中生效。"
+                    AppLocalization.localized(
+                        isTextRefinementEnabled
+                            ? "当前配置会在普通听写时生效。\"整理成有序列表\" 只会在内容存在 2 个及以上清晰事项时触发。"
+                            : "当前未启用普通听写纠错。技能配置会保留，待开启后在普通听写中生效。"
+                    )
                 )
                 .font(.system(size: 12))
                 .foregroundStyle(.secondary)
@@ -929,7 +934,7 @@ extension ASRProvider: ProviderPresentable {
         case .senseVoice:
             return "SenseVoice Small"
         case .doubaoStreaming:
-            return "豆包语音识别 2.0"
+            return AppLocalization.localized("豆包语音识别 2.0")
         case .funASR:
             return "Fun-ASR Realtime"
         case .qwenASR:
@@ -1263,7 +1268,11 @@ private struct TextRefinementProviderConfigSheet: View {
             }
 
             SheetFooter(
-                statusText: isEnabled ? "当前已启用普通听写纠错，保存后会影响后续默认 provider。" : "当前未启用普通听写纠错，保存配置后不会立即参与链路。",
+                statusText: AppLocalization.localized(
+                    isEnabled
+                        ? "当前已启用普通听写纠错，保存后会影响后续默认 provider。"
+                        : "当前未启用普通听写纠错，保存配置后不会立即参与链路。"
+                ),
                 onCancel: { dismiss() },
                 onSave: {
                     onSave(draftConfig)
@@ -1464,7 +1473,7 @@ private struct CloudProviderFields: View {
 
             if provider == .doubaoStreaming {
                 SettingsFormField(title: "App ID") {
-                    TextField("填写火山控制台中的 App ID", text: $config.appID)
+                    TextField(AppLocalization.localized("填写火山控制台中的 App ID"), text: $config.appID)
                         .textFieldStyle(.roundedBorder)
                 }
             }
@@ -1479,22 +1488,22 @@ private struct CloudProviderFields: View {
             }
 
             if provider == .qwenASR {
-                Text("北京区：wss://dashscope.aliyuncs.com/api-ws/v1/realtime\n国际区：wss://dashscope-intl.aliyuncs.com/api-ws/v1/realtime")
+                Text(AppLocalization.localized("北京区：wss://dashscope.aliyuncs.com/api-ws/v1/realtime\n国际区：wss://dashscope-intl.aliyuncs.com/api-ws/v1/realtime"))
                     .font(.system(size: 12))
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             } else if provider == .funASR {
-                Text("推荐地址：wss://dashscope.aliyuncs.com/api-ws/v1/inference\n模型示例：fun-asr-realtime\n音频要求：16k PCM 单声道流式输入。")
+                Text(AppLocalization.localized("推荐地址：wss://dashscope.aliyuncs.com/api-ws/v1/inference\n模型示例：fun-asr-realtime\n音频要求：16k PCM 单声道流式输入。"))
                     .font(.system(size: 12))
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             } else if provider == .stepfunASR {
-                Text("推荐地址：wss://api.stepfun.com/v1/realtime/asr/stream\n模型示例：step-asr-1.1-stream\n当前只支持中文或英文。")
+                Text(AppLocalization.localized("推荐地址：wss://api.stepfun.com/v1/realtime/asr/stream\n模型示例：step-asr-1.1-stream\n当前只支持中文或英文。"))
                     .font(.system(size: 12))
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             } else if provider == .doubaoStreaming {
-                Text("推荐地址：wss://openspeech.bytedance.com/api/v3/sauc/bigmodel_async\nResource ID 示例：volc.seedasr.sauc.duration（小时版）\nResource ID 示例：volc.seedasr.sauc.concurrent（并发版）")
+                Text(AppLocalization.localized("推荐地址：wss://openspeech.bytedance.com/api/v3/sauc/bigmodel_async\nResource ID 示例：volc.seedasr.sauc.duration（小时版）\nResource ID 示例：volc.seedasr.sauc.concurrent（并发版）"))
                     .font(.system(size: 12))
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -1589,7 +1598,7 @@ private struct APIKeyField: View {
                     .font(.system(size: 14, weight: .medium))
             }
             .buttonStyle(.borderless)
-            .help(isRevealed ? "隐藏 API Key" : "显示 API Key")
+            .help(AppLocalization.localized(isRevealed ? "隐藏 API Key" : "显示 API Key"))
         }
         .onChange(of: isRevealed) { _, newValue in
             focusedField = newValue ? .revealed : .concealed
@@ -1808,7 +1817,9 @@ private struct GeneralSettingsPage: View {
                     }
                 }
 
-                SettingsCard(title: "通用说明", subtitle: "配置已经按职责拆分，通用页只保留不会频繁改动的基础说明") {
+                AppAppearanceSettingsCard(settings: settings)
+
+                SettingsCard(title: "通用说明", subtitle: "设置窗口的基础使用说明") {
                     VStack(alignment: .leading, spacing: 12) {
                         GeneralSettingNoteRow(
                             title: "打开方式",
@@ -1818,11 +1829,6 @@ private struct GeneralSettingsPage: View {
                         GeneralSettingNoteRow(
                             title: "快捷操作",
                             detail: settings.triggerKey.summary
-                        )
-
-                        GeneralSettingNoteRow(
-                            title: "配置归位",
-                            detail: "界面语言在“通用”页管理；默认输入、麦克风、触发键和系统输出在“输入”页管理；Dock 与图标在“外观”页管理。"
                         )
                     }
                 }
@@ -1834,8 +1840,36 @@ private struct GeneralSettingsPage: View {
     }
 }
 
+private struct AppAppearanceSettingsCard: View {
+    @Bindable var settings: AppSettings
+
+    var body: some View {
+        SettingsCard(title: "App 外观", subtitle: "控制 Dock 与 menu bar 的展示方式") {
+            VStack(alignment: .leading, spacing: 14) {
+                Toggle("显示 Dock 图标", isOn: $settings.dockIconVisible)
+                    .toggleStyle(.switch)
+
+                if settings.isEasterEggUnlocked {
+                    SettingsFormField(title: "App 图标") {
+                        AppIconSelector(selection: $settings.selectedAppIconVariant)
+                    }
+
+                    Text("图标切换会立即作用到当前运行中的 App。")
+                        .font(.system(size: 12))
+                        .foregroundStyle(.secondary)
+                }
+
+                Text("关闭后会隐藏 Dock 图标，仅保留 menu bar 入口；切换会立即生效。")
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+}
+
 private struct InputSettingsPage: View {
     @Bindable var settings: AppSettings
+    let permissionActions: SettingsPermissionActions
     let loadInputDevices: () -> [AudioInputDevice]
 
     @State private var availableInputDevices: [AudioInputDevice] = []
@@ -1843,15 +1877,19 @@ private struct InputSettingsPage: View {
 
     init(
         settings: AppSettings,
+        permissionActions: SettingsPermissionActions = .preview(),
         loadInputDevices: @escaping () -> [AudioInputDevice] = { AudioInputDeviceCatalog().availableInputDevices() }
     ) {
         self.settings = settings
+        self.permissionActions = permissionActions
         self.loadInputDevices = loadInputDevices
     }
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 24) {
+                SettingsPermissionCard(actions: permissionActions)
+
                 SettingsCard(title: "输入语言", subtitle: "普通听写默认使用这里选择的语言") {
                     VStack(alignment: .leading, spacing: 14) {
                         Picker("输入语言", selection: $settings.selectedLanguage) {
@@ -1922,40 +1960,6 @@ private struct InputSettingsPage: View {
 
     private func reloadInputDevices() {
         availableInputDevices = loadInputDevices()
-    }
-}
-
-private struct AppearanceSettingsPage: View {
-    @Bindable var settings: AppSettings
-
-    var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 24) {
-                SettingsCard(title: "App 外观", subtitle: "控制 Dock 与 menu bar 的展示方式") {
-                    VStack(alignment: .leading, spacing: 14) {
-                        Toggle("显示 Dock 图标", isOn: $settings.dockIconVisible)
-                            .toggleStyle(.switch)
-
-                        if settings.isEasterEggUnlocked {
-                            SettingsFormField(title: "App 图标") {
-                                AppIconSelector(selection: $settings.selectedAppIconVariant)
-                            }
-
-                            Text("图标切换会立即作用到当前运行中的 App。")
-                                .font(.system(size: 12))
-                                .foregroundStyle(.secondary)
-                        }
-
-                        Text("关闭后会隐藏 Dock 图标，仅保留 menu bar 入口；切换会立即生效。")
-                            .font(.system(size: 12))
-                            .foregroundStyle(.secondary)
-                    }
-                }
-            }
-            .padding(28)
-            .frame(maxWidth: .infinity, alignment: .leading)
-        }
-        .scrollIndicators(.hidden)
     }
 }
 
@@ -2404,7 +2408,7 @@ enum SettingsPreviewData {
         ),
         AudioInputDevice(
             uid: "airpods-mic",
-            name: "AirPods Pro 麦克风",
+            name: "AirPods Pro Microphone",
             isDefault: false,
             transport: .bluetooth
         ),
@@ -2424,8 +2428,8 @@ enum SettingsPreviewData {
                         startedAt: startedAt,
                         endedAt: endDate,
                         languageCode: SupportedLanguage.simplifiedChinese.rawValue,
-                        recognizedText: "识别文本 \(dayOffset)-\(index)",
-                        finalText: "这是第 \(index + 1) 条预览历史记录，用来展示 dashboard 首页里的完整历史与复制能力。",
+                        recognizedText: "Recognized text \(dayOffset)-\(index)",
+                        finalText: "Preview history item \(index + 1), showing the dashboard history list and copy behavior.",
                         refinementApplied: index % 2 == 0,
                         asrProvider: index % 2 == 0 ? ASRProvider.senseVoice.rawValue : ASRProvider.doubaoStreaming.rawValue,
                         asrSource: index % 2 == 0 ? "local" : "system-speech",
@@ -2481,13 +2485,13 @@ private extension ASRProvider {
         case .senseVoice:
             return "SV"
         case .doubaoStreaming:
-            return "豆"
+            return "DB"
         case .funASR:
             return "FA"
         case .qwenASR:
             return "QW"
         case .stepfunASR:
-            return "跃"
+            return "SF"
         }
     }
 
@@ -2614,15 +2618,15 @@ private extension TextRefinementProvider {
         case .deepSeek:
             return "DS"
         case .dashScope:
-            return "百"
+            return "BL"
         case .volcengine:
-            return "火"
+            return "VC"
         case .minimax:
             return "MM"
         case .kimi:
             return "Ki"
         case .zhipu:
-            return "智"
+            return "ZP"
         }
     }
 
@@ -2687,11 +2691,6 @@ private extension TextRefinementProvider {
         .padding(28)
     }
     .frame(width: 760, height: 760)
-}
-
-#Preview("Settings Appearance") {
-    AppearanceSettingsPage(settings: SettingsPreviewData.configuredSettings())
-        .frame(width: 760, height: 700)
 }
 
 #Preview("Settings About") {

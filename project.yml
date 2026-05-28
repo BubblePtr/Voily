@@ -64,6 +64,9 @@ packages:
     path: .
   Sparkle:
     path: Vendor/Sparkle
+  PermissionFlow:
+    url: https://github.com/jaywcjlove/PermissionFlow.git
+    from: 2.4.0
 
 targets:
   Voily:
@@ -97,6 +100,8 @@ targets:
         product: VoilyCore
       - package: Sparkle
         product: Sparkle
+      - package: PermissionFlow
+        product: PermissionFlow
     settings:
       base:
         PRODUCT_NAME: Voily

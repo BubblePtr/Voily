@@ -23,28 +23,28 @@ enum StepRealtimeASRServiceError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .missingBaseURL:
-            return "未配置跃阶星辰实时 ASR 地址。"
+            return AppLocalization.localized("未配置跃阶星辰实时 ASR 地址。")
         case .missingAPIKey:
-            return "未配置跃阶星辰 API Key。"
+            return AppLocalization.localized("未配置跃阶星辰 API Key。")
         case .missingModel:
-            return "未配置跃阶星辰实时 ASR 模型。"
+            return AppLocalization.localized("未配置跃阶星辰实时 ASR 模型。")
         case let .unsupportedLanguage(value):
-            return "跃阶星辰流式识别当前仅支持中文或英文输入：\(value)"
+            return String(format: AppLocalization.localized("跃阶星辰流式识别当前仅支持中文或英文输入：%@"), value)
         case let .finishTimedOut(timeout):
             let seconds = Double(timeout.components.seconds) + (Double(timeout.components.attoseconds) / 1_000_000_000_000_000_000)
-            return String(format: "跃阶星辰实时 ASR 在 %.2f 秒内未返回最终结果。", seconds)
+            return String(format: AppLocalization.localized("跃阶星辰实时 ASR 在 %.2f 秒内未返回最终结果。"), seconds)
         case let .invalidBaseURL(value):
-            return "跃阶星辰实时 ASR 地址无效：\(value)"
+            return String(format: AppLocalization.localized("跃阶星辰实时 ASR 地址无效：%@"), value)
         case .sessionNotStarted:
-            return "跃阶星辰实时 ASR 会话尚未建立。"
+            return AppLocalization.localized("跃阶星辰实时 ASR 会话尚未建立。")
         case let .connectionFailed(message):
-            return "跃阶星辰实时 ASR 连接失败：\(message)"
+            return String(format: AppLocalization.localized("跃阶星辰实时 ASR 连接失败：%@"), message)
         case let .serverError(message):
-            return "跃阶星辰实时 ASR 返回错误：\(message)"
+            return String(format: AppLocalization.localized("跃阶星辰实时 ASR 返回错误：%@"), message)
         case let .unexpectedClose(code, reason):
-            return "跃阶星辰实时 ASR 连接已关闭：\(code.rawValue) \(reason)"
+            return String(format: AppLocalization.localized("跃阶星辰实时 ASR 连接已关闭：%@ %@"), "\(code.rawValue)", reason)
         case .emptyTranscript:
-            return "跃阶星辰实时 ASR 未返回可用文本。"
+            return AppLocalization.localized("跃阶星辰实时 ASR 未返回可用文本。")
         }
     }
 }
@@ -166,9 +166,9 @@ actor StepRealtimeASRService {
     }
 
     func cancelSession() async throws {
-        createdContinuation?.resume(throwing: StepRealtimeASRServiceError.connectionFailed("会话已取消"))
+        createdContinuation?.resume(throwing: StepRealtimeASRServiceError.connectionFailed(AppLocalization.localized("会话已取消")))
         createdContinuation = nil
-        finishContinuation?.resume(throwing: StepRealtimeASRServiceError.connectionFailed("会话已取消"))
+        finishContinuation?.resume(throwing: StepRealtimeASRServiceError.connectionFailed(AppLocalization.localized("会话已取消")))
         finishContinuation = nil
 
         webSocketTask?.cancel(with: .goingAway, reason: nil)
@@ -187,7 +187,7 @@ actor StepRealtimeASRService {
 
     private func sendJSONData(_ data: Data, over task: URLSessionWebSocketTask) async throws {
         guard let text = String(data: data, encoding: .utf8) else {
-            throw StepRealtimeASRServiceError.connectionFailed("请求序列化失败")
+            throw StepRealtimeASRServiceError.connectionFailed(AppLocalization.localized("请求序列化失败"))
         }
         try await task.send(.string(text))
     }

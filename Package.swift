@@ -13,6 +13,7 @@ let package = Package(
     ],
     dependencies: [
         .package(path: "Vendor/Sparkle"),
+        .package(url: "https://github.com/jaywcjlove/PermissionFlow.git", from: "2.4.0"),
     ],
     targets: [
         .target(
@@ -27,6 +28,7 @@ let package = Package(
             dependencies: [
                 "VoilyCore",
                 .product(name: "Sparkle", package: "Sparkle"),
+                .product(name: "PermissionFlow", package: "PermissionFlow"),
             ],
             path: "Sources/VoilyApp"
         ),

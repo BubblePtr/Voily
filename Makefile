@@ -1,4 +1,5 @@
 APP_NAME := Voily
+APP_BUNDLE_ID := dev.kieranzhang.voily
 PROJECT := Voily.xcodeproj
 SCHEME := Voily
 BUILD_DIR := .xcodebuild
@@ -6,11 +7,12 @@ DEBUG_APP_PATH := $(BUILD_DIR)/Build/Products/Debug/$(APP_NAME).app
 RELEASE_APP_PATH := build/release/$(APP_NAME).app
 INSTALL_PATH := /Applications/$(APP_NAME).app
 RELEASE_SCRIPT := ./scripts/release.sh
+TCCUTIL := /usr/bin/tccutil
 XCODEGEN := xcodegen
 XCODEBUILD := xcodebuild
 SWIFT := swift
 
-.PHONY: generate build test test-core test-logic test-app swift-build run install-dev install-debug clean release archive export-app package-zip package-dmg notarize staple verify-release clean-release
+.PHONY: generate build test test-core test-logic test-app swift-build run install-dev install-debug reset-permissions test-permission-flow clean release archive export-app package-zip package-dmg notarize staple verify-release clean-release
 
 define install_app
 	@set -e; \
@@ -30,6 +32,21 @@ define install_app
 	mv "$$tmp_path" "$(INSTALL_PATH)"; \
 	rm -rf "$$backup_path"; \
 	trap - EXIT
+endef
+
+define reset_tcc_service
+	@output=$$($(TCCUTIL) reset $(1) "$(APP_BUNDLE_ID)" 2>&1); status=$$?; \
+	if [ $$status -ne 0 ]; then \
+		if printf "%s\n" "$$output" | grep -q "No such bundle identifier"; then \
+			echo "No existing $(1) TCC grant found for $(APP_BUNDLE_ID); continuing."; \
+		else \
+			echo "$$output"; \
+			echo "Failed to reset $(1) permission for $(APP_BUNDLE_ID). Run this target from the macOS user account that owns the permission grant."; \
+			exit $$status; \
+		fi; \
+	elif [ -n "$$output" ]; then \
+		echo "$$output"; \
+	fi
 endef
 
 generate:
@@ -62,6 +79,17 @@ install-dev: release
 install-debug: build
 	$(call install_app,$(DEBUG_APP_PATH))
 	@echo "Installed Debug build to $(INSTALL_PATH)"
+
+reset-permissions:
+	@pkill -x "$(APP_NAME)" >/dev/null 2>&1 || true
+	$(call reset_tcc_service,Microphone)
+	$(call reset_tcc_service,Accessibility)
+
+test-permission-flow:
+	$(MAKE) reset-permissions
+	$(MAKE) install-debug
+	open -n "$(INSTALL_PATH)"
+	@echo "Installed Debug build to $(INSTALL_PATH) with Microphone and Accessibility permissions reset for $(APP_BUNDLE_ID)"
 
 release archive export-app: generate
 	$(RELEASE_SCRIPT) archive

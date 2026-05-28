@@ -32,17 +32,17 @@ enum FunASRVocabularyServiceError: LocalizedError, Sendable {
     var errorDescription: String? {
         switch self {
         case .missingBaseURL:
-            return "未配置 Fun-ASR 热词接口地址。"
+            return AppLocalization.localized("未配置 Fun-ASR 热词接口地址。")
         case .missingAPIKey:
-            return "未配置 Fun-ASR 热词 API Key。"
+            return AppLocalization.localized("未配置 Fun-ASR 热词 API Key。")
         case .missingModel:
-            return "未配置 Fun-ASR 热词目标模型。"
+            return AppLocalization.localized("未配置 Fun-ASR 热词目标模型。")
         case let .invalidBaseURL(value):
-            return "Fun-ASR 热词接口地址无效：\(value)"
+            return String(format: AppLocalization.localized("Fun-ASR 热词接口地址无效：%@"), value)
         case .invalidResponse:
-            return "Fun-ASR 热词接口返回了无效响应。"
+            return AppLocalization.localized("Fun-ASR 热词接口返回了无效响应。")
         case .missingVocabularyID:
-            return "Fun-ASR 热词接口未返回 vocabulary_id。"
+            return AppLocalization.localized("Fun-ASR 热词接口未返回 vocabulary_id。")
         }
     }
 }
