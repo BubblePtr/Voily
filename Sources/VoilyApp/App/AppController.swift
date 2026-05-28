@@ -377,7 +377,7 @@ final class AppController: NSObject {
         accessibilityPermissionGuide.open()
         permissionCoordinator.waitForAccessibilityGrant { [weak self] in
             debugLog("Accessibility granted, starting trigger key monitoring")
-            self?.configureTriggerKeyMonitoring()
+            self?.configureTriggerKeyMonitoringIfNeeded()
         }
     }
 

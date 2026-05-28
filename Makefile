@@ -67,13 +67,14 @@ install-debug: build
 
 reset-permissions:
 	@pkill -x "$(APP_NAME)" >/dev/null 2>&1 || true
-	$(TCCUTIL) reset All "$(APP_BUNDLE_ID)"
+	$(TCCUTIL) reset Microphone "$(APP_BUNDLE_ID)"
+	$(TCCUTIL) reset Accessibility "$(APP_BUNDLE_ID)"
 
 test-permission-flow:
 	$(MAKE) reset-permissions
 	$(MAKE) install-debug
 	open -n "$(INSTALL_PATH)"
-	@echo "Installed Debug build to $(INSTALL_PATH) with TCC permissions reset for $(APP_BUNDLE_ID)"
+	@echo "Installed Debug build to $(INSTALL_PATH) with Microphone and Accessibility permissions reset for $(APP_BUNDLE_ID)"
 
 release archive export-app: generate
 	$(RELEASE_SCRIPT) archive
