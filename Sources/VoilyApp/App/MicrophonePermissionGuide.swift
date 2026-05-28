@@ -3,6 +3,7 @@ import PermissionFlow
 
 @MainActor
 final class MicrophonePermissionGuide {
+    // PermissionFlow owns its panel through this controller while guidance is visible.
     private var controller: PermissionFlowController?
 
     func openSettings() {

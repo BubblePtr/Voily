@@ -34,6 +34,21 @@ define install_app
 	trap - EXIT
 endef
 
+define reset_tcc_service
+	@output=$$($(TCCUTIL) reset $(1) "$(APP_BUNDLE_ID)" 2>&1); status=$$?; \
+	if [ $$status -ne 0 ]; then \
+		if printf "%s\n" "$$output" | grep -q "No such bundle identifier"; then \
+			echo "No existing $(1) TCC grant found for $(APP_BUNDLE_ID); continuing."; \
+		else \
+			echo "$$output"; \
+			echo "Failed to reset $(1) permission for $(APP_BUNDLE_ID). Run this target from the macOS user account that owns the permission grant."; \
+			exit $$status; \
+		fi; \
+	elif [ -n "$$output" ]; then \
+		echo "$$output"; \
+	fi
+endef
+
 generate:
 	@command -v $(XCODEGEN) >/dev/null 2>&1 || { echo "Missing required command: $(XCODEGEN). Install XcodeGen before building Voily."; exit 1; }
 	$(XCODEGEN) generate
@@ -67,8 +82,8 @@ install-debug: build
 
 reset-permissions:
 	@pkill -x "$(APP_NAME)" >/dev/null 2>&1 || true
-	$(TCCUTIL) reset Microphone "$(APP_BUNDLE_ID)"
-	$(TCCUTIL) reset Accessibility "$(APP_BUNDLE_ID)"
+	$(call reset_tcc_service,Microphone)
+	$(call reset_tcc_service,Accessibility)
 
 test-permission-flow:
 	$(MAKE) reset-permissions

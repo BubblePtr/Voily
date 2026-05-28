@@ -10,6 +10,7 @@ final class AccessibilityPermissionGuide {
 
     private let appBundleURL: URL
     private let openRequest: @MainActor (Request) -> PermissionFlowController?
+    // PermissionFlow owns its panel through this controller while guidance is visible.
     private var controller: PermissionFlowController?
 
     init(

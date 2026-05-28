@@ -317,9 +317,9 @@ private struct SettingsPermissionStatusCapsule: View {
                 .font(.system(size: 12, weight: .medium))
                 .foregroundStyle(.primary)
 
-            Image(systemName: statusSymbolName)
+            Image(systemName: state.statusSymbolName)
                 .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(statusColor)
+                .foregroundStyle(state.statusColor)
                 .accessibilityHidden(true)
         }
         .padding(.horizontal, 9)
@@ -329,52 +329,11 @@ private struct SettingsPermissionStatusCapsule: View {
                 .stroke(Color.primary.opacity(0.12), lineWidth: 1)
         )
         .help(helpText)
-        .accessibilityLabel("\(title)：\(statusText)")
-    }
-
-    private var statusText: String {
-        switch state {
-        case .granted:
-            return AppLocalization.localized("已授权")
-        case .needsRequest:
-            return AppLocalization.localized("待确认")
-        case .needsSettings:
-            return AppLocalization.localized("需处理")
-        case .restricted:
-            return AppLocalization.localized("受限制")
-        case .unknown:
-            return AppLocalization.localized("检查中")
-        }
-    }
-
-    private var statusSymbolName: String {
-        switch state {
-        case .granted:
-            return "checkmark.circle.fill"
-        case .needsRequest, .needsSettings:
-            return "exclamationmark.circle.fill"
-        case .restricted:
-            return "xmark.octagon.fill"
-        case .unknown:
-            return "questionmark.circle.fill"
-        }
-    }
-
-    private var statusColor: Color {
-        switch state {
-        case .granted:
-            return .green
-        case .needsRequest, .needsSettings:
-            return .orange
-        case .restricted:
-            return .red
-        case .unknown:
-            return .secondary
-        }
+        .accessibilityLabel("\(title)：\(state.statusLabel)")
     }
 
     private var helpText: String {
-        "\(title)：\(statusText)"
+        "\(title)：\(state.statusLabel)"
     }
 }
 
