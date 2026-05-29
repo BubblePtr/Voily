@@ -1,160 +1,155 @@
+<p align="center">
+  <img src="assets/voily-icon.png" alt="Voily" width="96">
+</p>
+
 <h1 align="center">Voily</h1>
 
-<p align="center">语言: <a href="./README.md">EN</a> | 简中</p>
+<p align="center">
+  <b>你只管说，剩下交给我们。</b>
+</p>
+
+<p align="center">
+  <a href="./README.md">EN</a>
+</p>
 
 <p align="center">
   <img src="https://img.shields.io/badge/macOS_14.0+-black?style=flat-square&logo=apple&logoColor=white" alt="macOS 14.0+">
   <img src="https://img.shields.io/badge/Swift-orange?style=flat-square&logo=swift&logoColor=white" alt="Swift">
   <img src="https://img.shields.io/badge/License-Apache_2.0-blue?style=flat-square" alt="Apache 2.0">
-  <img src="https://img.shields.io/badge/Open_Source-green?style=flat-square" alt="开源">
 </p>
 
-**按下触发键，说话，文字出现在光标处。**
+<p align="center">
+  <img src="assets/screenshots/hero.png" alt="Voily" width="720">
+</p>
 
-Voily 是一款开源的 macOS 语音听写应用。按下你配置的触发键即可开始听写，再按一次结束，识别结果会自动粘贴到当前光标位置，适用于任何应用。长按触发键可启动中译英快捷翻译。它支持本地和云端 ASR 引擎、可选的 LLM 文本润色，以及在采集和转写过程中显示状态的浮窗。
+<!-- TODO: swap in a ~5s demo GIF once recorded — trigger key -> speak ->
+     overlay transcribes -> text lands at the cursor. Save it as
+     assets/screenshots/demo.gif and replace the hero <img> above. -->
 
-## ✨ 功能特性
+---
 
-- **可配置触发键** — 可选 `Fn` 或 `右 Command`。单击开始或结束普通听写，长按 0.8 秒启动中译英快捷翻译。
-- **多种 ASR 引擎** — 可选本地 `SenseVoice Small` 或云端 `Doubao ASR`、`Fun-ASR`、`Qwen ASR`、`StepFun ASR`。
-- **可插拔 ASR 运行时** — 所有录音会话都走统一的 `ASRCaptureSession` 抽象，新增引擎不需要再分叉听写主流程。
-- **浮窗实时反馈** — 浮窗会显示录音、转写、翻译和注入状态；流式 provider 会在说话时显示 partial 文字。
-- **LLM 文本润色** — 可选用 LLM（DeepSeek、阿里云百炼、火山引擎、MiniMax、Kimi、智谱）对转写结果进行后处理：去语气词、正式化、整理成列表。
-- **术语表支持** — 自定义术语和内置术语预设，提升专业词汇的识别准确率。
-- **快速翻译** — 长按触发键，用中文口述，输出英文。
-- **菜单栏仪表盘** — 在菜单栏查看今日用量（时长、次数、字数）及近一周趋势图。
-- **原生轻量** — 使用 SwiftUI 和 AppKit 构建，常驻菜单栏，可选显示 Dock 图标。
+Voily 是一款面向 macOS 的开源 AI 语音输入工具。按下触发键，自然说话，文字就出现在光标处——任何应用都行。它不只是转写：可选的 LLM 会顺手清掉语气词、润色措辞，或把中文即时翻译成英文。内置引擎完全在设备端运行，无需 API Key、零成本；想要更高准确率时，云端引擎随时待命。一个键，全部搞定。
 
-## 📋 系统要求
+## 为什么用 Voily
 
-- macOS 14.0 (Sonoma) 或更高版本
-- Xcode 26+
-- 麦克风权限
-- 辅助功能权限（用于通过粘贴注入文字）
-- 不再需要“语音识别”权限。此前的 Apple `Speech.framework` 回退路径已移除。
+- **说比打字快** —— 按下触发键、开口说话，文字立即出现在光标处：邮件、编辑器、聊天、终端，任何文本输入框都行。
+- **本地优先，隐私无忧** —— 内置 SenseVoice 引擎完全在设备端运行，不联网、无需 API Key、零调用成本。
+- **同一个键直接翻译** —— 长按触发键，口述中文，光标处吐出英文。无需切换模式，无需第二个应用。
+- **可选 AI 顺稿** —— 交给 LLM 去除语气词、改写成书面正式语体，或把口述的步骤整理成有序列表。
+- **轻到没存在感** —— 常驻菜单栏，默认不占 Dock，录音时自动静音系统输出、防止回授。
+- **键盘模拟失效的地方也能用** —— 文本通过系统粘贴板注入，因此在沙盒应用、密码框、远程桌面里都能稳定落字。
+- **开源、可插拔** —— Apache 2.0，五款 ASR 引擎共用同一套管线。
 
-## 🚀 快速开始
+## 工作原理
 
-### 构建与运行
+按下触发键开始录音。Voily 采集麦克风音频，流式发送给语音识别引擎，可选交给 LLM 润色，最后把结果粘贴到光标处。浮窗实时展示每一步——录音、转写、润色、注入——全程进度看得见。
 
-```bash
-# 克隆仓库
-git clone https://github.com/BubblePtr/Voily.git
-cd Voily
+## 快速开始
 
-# 构建
-make build
+### 下载
 
-# 运行
-make run
-```
+从 [GitHub Releases](https://github.com/BubblePtr/Voily/releases/latest) 下载最新的 `.dmg`。
 
-`make build` 会先用 XcodeGen 根据 `project.yml` 重新生成 `Voily.xcodeproj`，再调用 Xcode 构建。如果本机缺少 `xcodegen`，请先安装。
+### 安装
 
-### 安装到 /Applications 做本地验收
+打开磁盘镜像，将 **Voily.app** 拖入 `应用程序` 文件夹，然后启动。
 
-```bash
-# Release 配置，Developer ID 签名，安装到 /Applications。
-# 日常提 PR 前验功能用这个。
-make install-dev
+### 授权
 
-# Debug 配置，Apple Development 签名，安装到 /Applications。
-# 只有需要 LLDB 或 Debug 专用行为时才用。
-make install-debug
-```
+首次启动时，Voily 会请求两项权限：
 
-### 从 GitHub Releases 安装
+| 权限 | 用途 |
+|---|---|
+| 麦克风 | 采集你的语音 |
+| 辅助功能 | 将识别文字粘贴到光标位置（不模拟键盘输入） |
 
-1. 从 GitHub Releases 下载最新的已 notarize `.dmg`。
-2. 打开磁盘镜像，把 `Voily.app` 拖到 `Applications`。
-3. 从 `Applications` 启动 `Voily.app`。
-4. 首次启动时，授权：
-   - 麦克风
-   - 辅助功能
+权限弹窗会在首次启动时出现。如果关闭了弹窗，可在 **设置 > 输入** 中重新打开。
 
-如果 macOS 仍提示权限问题，请打开 Voily 的「设置」->「输入」。权限检查卡片可以请求麦克风权限、打开对应的隐私设置页，并在授权完成后刷新状态。
+### 开始听写
 
-Voily 现在只需要两项权限：
-- **麦克风** — 用于录音采集
-- **辅助功能** — 用于基于粘贴的文本注入
-
-此前的 Apple `Speech.framework` 回退已移除，因此不应再看到单独的“语音识别”权限请求。
-
-本地回归完整授权流程时，可以使用 `make test-permission-flow`；它会先重置 Voily 的麦克风和辅助功能授权，再安装测试构建。
-
-### 构建 GitHub 发布产物
-
-```bash
-# 归档 Release 构建，导出到 build/release/Voily.app
-make release
-
-# 打包可分发的 dmg
-make package-dmg
-
-# 检查签名、Hardened Runtime 和 Gatekeeper 状态
-make verify-release
-```
-
-完整的签名、notarization 和 GitHub Releases 发布流程见 [docs/releasing.md](docs/releasing.md)。
-
-### 配置
-
-首次启动时，Voily 会请求**麦克风**和**辅助功能**权限。然后打开设置进行配置：
-
-### 当前支持的 ASR Provider
-
-| Provider | 运行时 | 测试连接 | 说明 |
-|---|---|---|---|
-| SenseVoice Small | 本地 | 不需要 | 由 Voily 本地下载和托管 |
-| Doubao ASR | 云端 | 支持 | 基于 WebSocket 的实时识别 |
-| Fun-ASR | 云端 | 支持 | 实时识别，可选术语表热词同步 |
-| Qwen ASR | 云端 | 支持 | 实时识别 |
-| StepFun ASR | 云端 | 支持 | 实时识别 |
-
-Voily 已不再内置 Apple `Speech.framework` 回退。当前运行时 ASR 仅支持上表 provider，并统一通过 [docs/decisions/0003-pluggable-asr-providers.md](docs/decisions/0003-pluggable-asr-providers.md) 描述的 capture-session 抽象接入。
-
-1. **ASR 提供方** — 选择语音识别引擎：
-   - **SenseVoice Small**（本地）— 应用会自动下载并管理 MLX 模型，无需 API Key。
-   - **Doubao ASR**（云端）— 需配置 WebSocket URL、App ID、Token 和 Resource ID。
-   - **Fun-ASR**（云端）— 需配置 WebSocket URL、API Key 和 Model。默认端点为 `wss://dashscope.aliyuncs.com/api-ws/v1/inference`，默认模型为 `fun-asr-realtime`，并会在会话启动前尝试把术语表同步为热词词表。
-   - **Qwen ASR**（云端）— 需配置 WebSocket URL、API Key 和 Model，已预设默认端点和模型。
-   - **StepFun ASR**（云端）— 需配置 WebSocket URL、API Key 和 Model。
-
-2. **文本润色**（可选）— 开启 LLM 后处理并配置提供方（DeepSeek / 阿里云百炼 / 火山引擎 / MiniMax / Kimi / 智谱）。
-
-   DeepSeek 默认使用 `https://api.deepseek.com` 和 `deepseek-v4-flash`；API Key 默认留空，需要用户自行填写。已有的 `https://api.deepseek.com/v1`、`deepseek-chat`、`deepseek-reasoner` 配置会迁移到新的端点和模型，同时保留已保存的 API Key。
-
-3. **听写技能** — 开关处理技能，如去语气词、更正式、整理成有序列表。
-
-4. **术语表** — 添加自定义术语或启用内置预设，提升专业词汇识别。选择 `Fun-ASR` 时，Voily 会在每次实时识别前把最终生效词库同步到 provider 热词词表。
-
-## 🎯 使用方式
+1. 在设置中选择触发键（`Fn` 或 `右 Command`）。
+2. 选择 ASR 引擎。**SenseVoice Small** 本地运行，开箱即用，无需任何配置。云端引擎（Doubao、Fun-ASR、Qwen、StepFun）需要配置相应的凭证。
+3. 按下触发键 -> 说话 -> 再按一次。浮窗会实时显示状态，完成后文字自动出现在光标处。
 
 | 操作 | 手势 |
 |---|---|
-| 开始听写 | 单击一次所选触发键 |
-| 完成并粘贴 | 再按一次所选触发键 |
-| 快速翻译（中 → 英） | 长按所选触发键 0.8 秒 |
+| 普通听写 | 按触发键 -> 说话 -> 再按一次 |
+| 快捷翻译（中 -> 英） | 长按触发键 0.8 秒 -> 说话 -> 确认 |
 
-浮窗实时显示状态：
-- 🎙️ **录音中** — 波形动画 + 实时部分文字
-- ⏳ **转写中** — 最终识别进行中
-- ✨ **润色中** — LLM 后处理
-- 📋 **注入中** — 粘贴结果到光标
+## 功能特性
 
-## 🏗️ 项目结构
+### 语音识别引擎
 
-```
-Sources/
-├── VoilyCore/              # SwiftPM library：设置、存储、转写文本逻辑、LLM/Fun-ASR 核心逻辑
-└── VoilyApp/               # SwiftUI/AppKit app：生命周期、权限、UI、音频采集、app-hosted services
-Resources/VoilyApp/         # Info.plist、entitlements、资产目录、本地化字符串、品牌图标
-Tests/
-├── VoilyCoreTests/         # SwiftPM 逻辑测试
-└── VoilyTests/             # Xcode app-hosted 测试
-project.yml                 # XcodeGen 源文件，生成本地 Voily.xcodeproj
-```
+Voily 内置五款 ASR 后端，共用统一的录音转写流程。切换引擎不影响使用体验。
 
-## 📄 许可证
+| 引擎 | 运行方式 | 需要 API Key |
+|---|---|---|
+| **SenseVoice Small** | 本地（MLX） | 不需要 |
+| Doubao ASR | 云端（WebSocket） | 需要 |
+| Fun-ASR | 云端（WebSocket） | 需要 |
+| Qwen ASR | 云端（WebSocket） | 需要 |
+| StepFun ASR | 云端（WebSocket） | 需要 |
 
-本项目基于 [Apache License 2.0](LICENSE) 开源。
+本地 SenseVoice 完全在设备端运行，无需网络、无需 API Key、无调用成本。模型会自动下载并托管在 `~/Library/Application Support/Voily/LocalModels/` 目录下。
+
+云端引擎通过 WebSocket 实时传输音频，支持流式部分结果：说话过程中浮窗就会显示实时文字，随时确认识别是否准确。
+
+<p align="center">
+  <img src="assets/screenshots/setting-asr.png" alt="ASR 设置" width="640">
+</p>
+
+### LLM 文本润色
+
+转写完成后，可让 LLM 对文字做进一步处理。可选的处理方式包括：
+
+- **去除语气词** — 去掉「那个」「就是说」等口头填充词
+- **改写得更正式** — 将口语化表达转为书面正式语体
+- **整理成有序列表** — 如果口述了多个步骤，自动编号排版
+
+润色功能默认关闭，在设置中开启并选择后端即可。
+
+支持的 LLM 后端：**DeepSeek**、**阿里云百炼**、**火山引擎**、**MiniMax**、**Kimi**、**智谱**。
+
+<p align="center">
+  <img src="assets/screenshots/setting-text.png" alt="文本润色设置" width="640">
+</p>
+
+### 术语表
+
+添加自定义术语或启用内置预设，让 ASR 引擎准确识别专业领域词汇。使用 Fun-ASR 时，术语表会在每次会话前自动同步为热词词表。
+
+### 快捷翻译
+
+长按触发键进入翻译模式。口述中文，英文结果注入光标处。浮窗会在粘贴前展示翻译结果，可取消重录。
+
+### 菜单栏仪表盘
+
+点击菜单栏图标即可查看今日听写用量——总时长、会话次数、字符数，以及近一周趋势图。无需打开额外窗口。
+
+<p align="center">
+  <img src="assets/screenshots/menu-bar.png" alt="菜单栏仪表盘" width="400">
+</p>
+
+### 用心的细节
+
+- 触发键（`Fn` 或 `右 Command`）不会误触。`右 Command` 作为修饰键参与组合键时（如 `右 Command + C`）不会触发听写。
+- 录音期间系统音频自动静音，防止回授啸叫。
+- 应用默认常驻菜单栏，Dock 图标可选手动开启。
+
+## 系统要求
+
+- macOS 14.0 (Sonoma) 或更高版本
+- Apple Silicon Mac
+- 麦克风权限
+- 辅助功能权限
+
+## 开发者
+
+构建指南、工程结构、测试和发布流程见 [CONTRIBUTING.md](CONTRIBUTING.md)。
+
+- 架构总览：[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
+- 设计决策：[docs/decisions/](docs/decisions/)
+
+## 许可证
+
+[Apache License 2.0](LICENSE)

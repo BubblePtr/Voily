@@ -1,160 +1,155 @@
+<p align="center">
+  <img src="assets/voily-icon.png" alt="Voily" width="96">
+</p>
+
 <h1 align="center">Voily</h1>
 
-<p align="center">Language: EN | <a href="./README_CN.md">简中</a></p>
+<p align="center">
+  <b>Just speak — we'll do the rest.</b>
+</p>
+
+<p align="center">
+  <a href="./README_CN.md">简中</a>
+</p>
 
 <p align="center">
   <img src="https://img.shields.io/badge/macOS_14.0+-black?style=flat-square&logo=apple&logoColor=white" alt="macOS 14.0+">
   <img src="https://img.shields.io/badge/Swift-orange?style=flat-square&logo=swift&logoColor=white" alt="Swift">
   <img src="https://img.shields.io/badge/License-Apache_2.0-blue?style=flat-square" alt="Apache 2.0">
-  <img src="https://img.shields.io/badge/Open_Source-green?style=flat-square" alt="Open Source">
 </p>
 
-**Press your trigger key, speak, and text appears at your cursor.**
+<p align="center">
+  <img src="assets/screenshots/hero.png" alt="Voily" width="720">
+</p>
 
-Voily is an open-source macOS dictation app. Press your configured trigger key to start dictation, press it again to finish, and the recognized text is automatically pasted at the current cursor position — in any app. Long-press the trigger key to start quick Chinese-to-English translation. It supports both local and cloud-based ASR engines, optional LLM-powered text refinement, and a floating overlay that shows progress during capture and transcription.
+<!-- TODO: swap in a ~5s demo GIF once recorded — trigger key -> speak ->
+     overlay transcribes -> text lands at the cursor. Save it as
+     assets/screenshots/demo.gif and replace the hero <img> above. -->
 
-## ✨ Features
+---
 
-- **Configurable trigger key** — Use either `Fn` or `Right Command`. Single press starts or finishes dictation, and long-pressing for 0.8s starts quick Chinese-to-English translation.
-- **Multiple ASR engines** — Choose between local `SenseVoice Small` or cloud `Doubao ASR`, `Fun-ASR`, `Qwen ASR`, and `StepFun ASR`.
-- **Pluggable ASR runtime** — All capture providers run through the shared `ASRCaptureSession` abstraction, so adding a new engine does not fork the dictation flow.
-- **Live overlay feedback** — The floating overlay shows recording, transcription, translation, and injection state. Streaming providers can surface partial text while you speak.
-- **LLM text refinement** — Optionally post-process transcriptions with LLM providers (DeepSeek, Alibaba Cloud, Volcengine, MiniMax, Kimi, Zhipu) to remove filler words, formalize tone, or organize into lists.
-- **Glossary support** — Define custom terms and enable built-in glossary presets to improve recognition accuracy for domain-specific vocabulary.
-- **Quick translation** — Long-press the trigger key to dictate in Chinese and get English output.
-- **Menu bar dashboard** — View today's usage stats (duration, session count, character count) and a weekly sparkline chart from the menu bar.
-- **Minimal and native** — Built with SwiftUI and AppKit; lives in your menu bar with an optional Dock icon.
+Voily is an open-source, AI-powered voice input tool for macOS. Press a key, speak naturally, and your words land at the cursor — in any app. It does more than transcribe: an optional LLM cleans up filler, polishes your phrasing, or translates Chinese to English on the fly. The built-in engine runs fully on-device with no API key and no cost; cloud engines are there when you want higher accuracy. One key does it all.
 
-## 📋 Requirements
+## Why Voily
 
-- macOS 14.0 (Sonoma) or later
-- Xcode 26+
-- Microphone permission
-- Accessibility permission (for text injection via paste)
-- No Speech Recognition permission is required. The previous Apple `Speech.framework` fallback has been removed.
+- **Speak faster than you type** — press the trigger key, talk, and text appears right at your cursor: email, editor, chat, terminal, any text field.
+- **Local-first and private** — the built-in SenseVoice engine runs entirely on-device, with no network calls, no API key, and no per-request cost.
+- **Translate on the same key** — long-press, speak Chinese, get English at the cursor. No mode switch, no second app.
+- **Optional AI polish** — let an LLM strip filler words, rewrite into a formal register, or turn dictated steps into a numbered list.
+- **Stays out of your way** — lives in the menu bar, no Dock icon by default, and mutes system audio while recording to prevent feedback.
+- **Works where keystrokes fail** — text is injected through the system pasteboard, so it lands reliably in sandboxed apps, password fields, and remote desktops.
+- **Open source and pluggable** — Apache 2.0, with five ASR engines behind one shared pipeline.
 
-## 🚀 Getting Started
+## How It Works
 
-### Build & Run
+Press the trigger key to start recording. Voily captures the microphone, streams audio to a speech recognition engine, optionally refines the result with an LLM, and pastes the final text at your cursor. A floating overlay shows every step — recording, transcribing, refining, injecting — so you always know what's happening.
 
-```bash
-# Clone the repository
-git clone https://github.com/BubblePtr/Voily.git
-cd Voily
+## Quick Start
 
-# Build
-make build
+### Download
 
-# Run
-make run
-```
+Get the latest `.dmg` from [GitHub Releases](https://github.com/BubblePtr/Voily/releases/latest).
 
-`make build` regenerates `Voily.xcodeproj` from `project.yml` with XcodeGen before invoking Xcode. Install XcodeGen locally if the command is missing.
+### Install
 
-### Install to /Applications for local validation
+Open the disk image, drag **Voily.app** into `Applications`, then launch it.
 
-```bash
-# Release configuration, Developer ID signing, installed to /Applications.
-# Use this for PR and feature validation on a development machine.
-make install-dev
+### Grant Permissions
 
-# Debug configuration, Apple Development signing, installed to /Applications.
-# Use this only when you need LLDB/debug-only behavior.
-make install-debug
-```
+On first launch, the app will request two permissions:
 
-### Install from GitHub Releases
+| Permission | Purpose |
+|---|---|
+| Microphone | Capture your voice during dictation |
+| Accessibility | Paste recognized text at the cursor (no keyboard simulation) |
 
-1. Download the latest notarized `.dmg` from GitHub Releases.
-2. Open the disk image and drag `Voily.app` into `Applications`.
-3. Launch `Voily.app` from `Applications`.
-4. On first launch, grant:
-   - Microphone
-   - Accessibility
+Permission prompts appear on first run. If you dismiss them, reopen them from **Settings > Input**.
 
-If macOS still warns about permissions, open Voily Settings -> Input. The permission card can request microphone access, open the relevant Privacy & Security pane, and refresh status after you grant access.
+### Start Dictating
 
-Voily now requests only:
-- **Microphone** — required for audio capture
-- **Accessibility** — required for paste-based text injection
-
-The older Apple `Speech.framework` fallback was removed, so you should no longer see or need a separate Speech Recognition permission prompt.
-
-For a full local permission-flow regression, use `make test-permission-flow`; it resets Voily's microphone and Accessibility grants before installing the test build.
-
-### Build a GitHub Release artifact
-
-```bash
-# Archive a Release build to build/release/Voily.app
-make release
-
-# Package a distributable dmg
-make package-dmg
-
-# Inspect signing, hardened runtime, and Gatekeeper status
-make verify-release
-```
-
-For the full signing, notarization, and GitHub release flow, see [docs/releasing.md](docs/releasing.md).
-
-### Configuration
-
-On first launch, Voily will ask for **Microphone** and **Accessibility** permissions. Then open Settings to configure:
-
-### Supported ASR Providers
-
-| Provider | Runtime | Connection Test | Notes |
-|---|---|---|---|
-| SenseVoice Small | Local | Not needed | Managed locally by Voily |
-| Doubao ASR | Cloud | Supported | WebSocket-based realtime ASR |
-| Fun-ASR | Cloud | Supported | Realtime ASR with optional glossary hotword sync |
-| Qwen ASR | Cloud | Supported | Realtime ASR |
-| StepFun ASR | Cloud | Supported | Realtime ASR |
-
-Voily no longer ships an Apple `Speech.framework` fallback. The runtime ASR path is now limited to the providers above and is constructed through the shared capture-session layer described in [docs/decisions/0003-pluggable-asr-providers.md](docs/decisions/0003-pluggable-asr-providers.md).
-
-1. **ASR Provider** — Select a speech recognition engine:
-   - **SenseVoice Small** (local) — Downloads and manages the MLX model locally. No API key needed.
-   - **Doubao ASR** (cloud) — Requires WebSocket URL, App ID, Token, and Resource ID.
-   - **Fun-ASR** (cloud) — Requires WebSocket URL, API Key, and Model. Defaults to `wss://dashscope.aliyuncs.com/api-ws/v1/inference` and `fun-asr-realtime`, and can sync your glossary as hotword vocabulary.
-   - **Qwen ASR** (cloud) — Requires WebSocket URL, API Key, and Model. The default endpoint and model are prefilled.
-   - **StepFun ASR** (cloud) — Requires WebSocket URL, API Key, and Model.
-
-2. **Text Refinement** (optional) — Enable LLM post-processing and configure a provider (DeepSeek / Alibaba Cloud DashScope / Volcengine / MiniMax / Kimi / Zhipu).
-
-   DeepSeek defaults to `https://api.deepseek.com` and `deepseek-v4-flash`; the API key field is intentionally empty and must be filled by the user. Existing `https://api.deepseek.com/v1`, `deepseek-chat`, and `deepseek-reasoner` settings are normalized to the new endpoint and model while preserving the saved API key.
-
-3. **Dictation Skills** — Toggle processing skills like filler-word removal, formalization, or ordered-list formatting.
-
-4. **Glossary** — Add custom terms or enable built-in presets to improve recognition of specialized vocabulary. When `Fun-ASR` is selected, Voily syncs the effective glossary into the provider hotword vocabulary before each realtime session.
-
-## 🎯 Usage
+1. Pick your trigger key in Settings (`Fn` or `Right Command`).
+2. Choose an ASR provider. **SenseVoice Small** runs locally out of the box with no API key. Cloud providers (Doubao, Fun-ASR, Qwen, StepFun) need credentials.
+3. Press the trigger key, speak, press again. The overlay shows live status, then your text appears at the cursor.
 
 | Action | Gesture |
 |---|---|
-| Start dictation | Press the selected trigger key once |
-| Finish & paste | Press the selected trigger key again |
-| Quick translate (ZH → EN) | Long-press the selected trigger key for 0.8s |
+| Dictate | Press trigger key -> speak -> press again |
+| Translate (ZH -> EN) | Long-press trigger key (0.8s) -> speak -> confirm |
 
-The floating overlay shows real-time status:
-- 🎙️ **Recording** — Waveform animation with live partial text
-- ⏳ **Transcribing** — Final recognition in progress
-- ✨ **Refining** — LLM post-processing
-- 📋 **Injecting** — Pasting result to cursor
+## Features
 
-## 🏗️ Project Structure
+### Speech Recognition Engines
 
-```
-Sources/
-├── VoilyCore/              # SwiftPM library: settings, storage, transcript logic, LLM/Fun-ASR core logic
-└── VoilyApp/               # SwiftUI/AppKit app: lifecycle, permissions, UI, audio capture, app-hosted services
-Resources/VoilyApp/         # Info.plist, entitlements, asset catalogs, localized strings, brand icons
-Tests/
-├── VoilyCoreTests/         # SwiftPM logic tests
-└── VoilyTests/             # Xcode app-hosted tests
-project.yml                 # XcodeGen source of truth for Voily.xcodeproj
-```
+Voily ships with five ASR backends behind a shared capture pipeline. Switching engines does not change how dictation works.
 
-## 📄 License
+| Provider | Mode | Needs API Key |
+|---|---|---|
+| **SenseVoice Small** | Local (MLX) | No |
+| Doubao ASR | Cloud (WebSocket) | Yes |
+| Fun-ASR | Cloud (WebSocket) | Yes |
+| Qwen ASR | Cloud (WebSocket) | Yes |
+| StepFun ASR | Cloud (WebSocket) | Yes |
 
-This project is licensed under the [Apache License 2.0](LICENSE).
+Local SenseVoice runs on-device with no network calls, no API key, and no per-request cost. It downloads and manages the MLX model automatically under `~/Library/Application Support/Voily/LocalModels/`.
+
+Cloud engines stream audio over WebSocket and support partial results: the overlay shows live text while you are still speaking, so you can see whether the engine is tracking.
+
+<p align="center">
+  <img src="assets/screenshots/setting-asr.png" alt="ASR Settings" width="640">
+</p>
+
+### LLM Text Refinement
+
+After transcription, an optional LLM pass can process the text. You control what happens:
+
+- **Remove filler words** — strip "um", "you know", and verbal padding
+- **Make it formal** — rephrase casual speech into a polished register
+- **Structure as ordered list** — if you dictated steps, they come out numbered
+
+The refinement step is off by default. Enable it and pick a provider in Settings.
+
+Supported LLM backends: **DeepSeek**, **Alibaba DashScope**, **Volcengine**, **MiniMax**, **Kimi**, **Zhipu**.
+
+<p align="center">
+  <img src="assets/screenshots/setting-text.png" alt="Text Refinement Settings" width="640">
+</p>
+
+### Custom Glossary
+
+Define domain terms so the ASR engine recognizes them correctly. Add individual terms, or enable built-in presets. When connected to Fun-ASR, your glossary syncs automatically as hotword vocabulary before each session.
+
+### Quick Translation
+
+Long-press the trigger key to enter translation mode. Speak in Chinese, and English text is injected at the cursor. The overlay confirms the result before pasting, so you can cancel and retry if needed.
+
+### Menu Bar Dashboard
+
+Click the menu bar icon to see today's dictation activity: total duration, session count, and character count. A weekly sparkline gives you a trend at a glance. No separate window required.
+
+<p align="center">
+  <img src="assets/screenshots/menu-bar.png" alt="Menu Bar Dashboard" width="400">
+</p>
+
+### Thoughtful Defaults
+
+- The trigger key (`Fn` or `Right Command`) stays out of your way. `Right Command` used as a modifier (e.g. `Right Command + C`) does not fire dictation.
+- System audio is automatically muted during recording to prevent feedback.
+- The app lives in the menu bar. A Dock icon is available as an option but off by default.
+
+## Requirements
+
+- macOS 14.0 (Sonoma) or later
+- Apple Silicon Mac
+- Microphone permission
+- Accessibility permission
+
+## For Developers
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for build instructions, project layout, testing, and release workflow.
+
+- Architecture overview: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
+- Design decisions: [docs/decisions/](docs/decisions/)
+
+## License
+
+[Apache License 2.0](LICENSE)

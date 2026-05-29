@@ -24,6 +24,7 @@
 ## 知识地图
 
 - 架构全貌 → [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
+- 开发流程（构建、测试、发布） → [CONTRIBUTING.md](CONTRIBUTING.md)
 - 决策背后的原因 → [docs/decisions/](docs/decisions/)
 - 历史设计稿（specs 跟踪入库；plans 已 gitignore） → [docs/superpowers/specs/](docs/superpowers/specs/)
 - 用户文档（中英） → [README.md](README.md) / [README_CN.md](README_CN.md)
