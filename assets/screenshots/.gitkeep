@@ -1,0 +1,14 @@
+# Screenshots
+
+## Current (added)
+
+- **hero.png** — Main product shot: Voily in action with floating overlay visible
+- **setting-asr.png** — Settings: ASR provider selection panel
+- **setting-text.png** — Settings: Text refinement (LLM) configuration panel
+- **menu-bar.png** — Menu bar dashboard: usage stats and weekly sparkline
+
+## Planned
+
+- **demo.gif** — Animated demo of a full dictation cycle:
+  recording (waveform + partial text) -> transcribing -> refining -> injecting.
+  A static screenshot does not convey the real-time feedback well.
