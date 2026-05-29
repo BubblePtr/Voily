@@ -106,8 +106,8 @@ targets:
       base:
         PRODUCT_NAME: Voily
         PRODUCT_BUNDLE_IDENTIFIER: dev.kieranzhang.voily
-        MARKETING_VERSION: "0.1.3"
-        CURRENT_PROJECT_VERSION: "3"
+        MARKETING_VERSION: "0.1.4"
+        CURRENT_PROJECT_VERSION: "4"
         VOILY_SPARKLE_PUBLIC_ED_KEY: "t+3T7R1L+52pqpiHjRjtd1QksVS6cjKlh5YK+pDhuPA="
         DEVELOPMENT_TEAM: 9KZ32XLVQW
         CODE_SIGN_STYLE: Automatic
@@ -144,8 +144,8 @@ targets:
       base:
         PRODUCT_NAME: VoilyTests
         PRODUCT_BUNDLE_IDENTIFIER: dev.kieranzhang.voilyTests
-        MARKETING_VERSION: "0.1.3"
-        CURRENT_PROJECT_VERSION: "3"
+        MARKETING_VERSION: "0.1.4"
+        CURRENT_PROJECT_VERSION: "4"
         GENERATE_INFOPLIST_FILE: YES
         CODE_SIGNING_ALLOWED: YES
         CODE_SIGNING_REQUIRED: YES
