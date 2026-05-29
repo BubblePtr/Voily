@@ -123,11 +123,11 @@ Voily release versions use semantic versioning in the `MAJOR.MINOR.PATCH` form.
 - The automated release workflow also rejects tags that do not match `CFBundleShortVersionString`.
 - Each public release must include `docs/releases/vMAJOR.MINOR.PATCH.md`. The workflow uses that file for both the GitHub Release body and the Sparkle update notes embedded into `appcast.xml`.
 
-The current release version is `0.1.3`, so the matching tag is:
+The current release version is `0.1.4`, so the matching tag is:
 
 ```bash
-git tag v0.1.3
-git push origin v0.1.3
+git tag v0.1.4
+git push origin v0.1.4
 ```
 
 Pre-release identifiers such as `v0.1.0-rc.1` are not accepted by the public release workflow yet, because the macOS app version stored in `CFBundleShortVersionString` is kept to the stable `MAJOR.MINOR.PATCH` form.
@@ -199,9 +199,9 @@ If Gatekeeper rejects the app at this stage, that usually means the build is sti
 The recommended artifact to notarize is the dmg:
 
 ```bash
-ARTIFACT=build/release/artifacts/Voily-0.1.3.dmg make notarize
-ARTIFACT=build/release/artifacts/Voily-0.1.3.dmg make staple
-ARTIFACT=build/release/artifacts/Voily-0.1.3.dmg make verify-release
+ARTIFACT=build/release/artifacts/Voily-0.1.4.dmg make notarize
+ARTIFACT=build/release/artifacts/Voily-0.1.4.dmg make staple
+ARTIFACT=build/release/artifacts/Voily-0.1.4.dmg make verify-release
 ```
 
 Notes:
@@ -222,8 +222,8 @@ The preferred publishing path is the GitHub Actions release workflow. It runs on
 After the workflow is present on `main`, publish a release by creating and pushing the matching semantic version tag:
 
 ```bash
-git tag v0.1.3
-git push origin v0.1.3
+git tag v0.1.4
+git push origin v0.1.4
 ```
 
 The workflow will:
@@ -262,7 +262,7 @@ When enabling appcast publishing on the release machine, generate the appcast fr
 
 ```bash
 unzip -q Vendor/Sparkle/Sparkle-for-Swift-Package-Manager.zip -d /tmp/voily-sparkle
-RELEASE_TAG="v0.1.3"
+RELEASE_TAG="v0.1.4"
 security find-generic-password \
   -a ed25519 \
   -s dev.voily.sparkle.ed25519-private-key \
