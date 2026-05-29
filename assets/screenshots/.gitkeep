@@ -9,6 +9,6 @@
 
 ## Planned
 
-- **overlay.gif** — Animated GIF of the floating overlay during a full dictation cycle:
+- **demo.gif** — Animated demo of a full dictation cycle:
   recording (waveform + partial text) -> transcribing -> refining -> injecting.
   A static screenshot does not convey the real-time feedback well.

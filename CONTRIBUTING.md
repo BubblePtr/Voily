@@ -60,7 +60,7 @@ See [docs/testing.md](docs/testing.md) for test coverage details and conventions
 
 ## Project Structure
 
-```
+```text
 Sources/
 ├── VoilyCore/              # SwiftPM library: settings, storage, transcript logic, LLM/Fun-ASR core
 └── VoilyApp/               # SwiftUI/AppKit app: lifecycle, permissions, UI, audio capture, services
