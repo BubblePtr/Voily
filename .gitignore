@@ -17,6 +17,10 @@ dist/local-asr/
 *.sqlite-wal
 *.log
 
+website/node_modules/
+website/dist/
+website/.wrangler/
+
 Voily.xcodeproj/project.xcworkspace/xcuserdata/
 Voily.xcodeproj/xcuserdata/
 
