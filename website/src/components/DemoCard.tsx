@@ -3,6 +3,8 @@ import { useEffect, useMemo, useState } from 'react'
 import { demoExamples } from './content'
 
 const LOOP_MS = 7500
+const REDUCED_MOTION_TIME = 5000
+const REDUCED_MOTION_QUERY = '(prefers-reduced-motion: reduce)'
 
 function getStage(elapsed: number) {
   if (elapsed < 2000) return 'said'
@@ -13,19 +15,36 @@ function getStage(elapsed: number) {
 }
 
 export function DemoCard() {
+  const [prefersReducedMotion, setPrefersReducedMotion] = useState(() =>
+    typeof window !== 'undefined' &&
+      window.matchMedia(REDUCED_MOTION_QUERY).matches
+  )
   const [time, setTime] = useState(0)
 
   useEffect(() => {
+    const media = window.matchMedia(REDUCED_MOTION_QUERY)
+    const updatePreference = () => setPrefersReducedMotion(media.matches)
+
+    updatePreference()
+    media.addEventListener('change', updatePreference)
+
+    return () => media.removeEventListener('change', updatePreference)
+  }, [])
+
+  useEffect(() => {
+    if (prefersReducedMotion) return
+
     const started = performance.now()
     const interval = window.setInterval(() => {
       setTime(performance.now() - started)
     }, 80)
 
     return () => window.clearInterval(interval)
-  }, [])
+  }, [prefersReducedMotion])
 
-  const exampleIndex = Math.floor(time / LOOP_MS) % demoExamples.length
-  const elapsed = time % LOOP_MS
+  const playbackTime = prefersReducedMotion ? REDUCED_MOTION_TIME : time
+  const exampleIndex = Math.floor(playbackTime / LOOP_MS) % demoExamples.length
+  const elapsed = playbackTime % LOOP_MS
   const stage = getStage(elapsed)
   const example = demoExamples[exampleIndex]
 

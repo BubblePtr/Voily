@@ -30,7 +30,7 @@ export function DotFieldBackground() {
       y: 0
     }
 
-    let animationFrame = 0
+    let animationFrame: number | null = null
     let height = 0
     let width = 0
 
@@ -133,7 +133,7 @@ export function DotFieldBackground() {
         : 0
 
       if (interactionStrength <= 0) {
-        animationFrame = window.requestAnimationFrame(draw)
+        animationFrame = null
         return
       }
 
@@ -146,6 +146,19 @@ export function DotFieldBackground() {
       animationFrame = window.requestAnimationFrame(draw)
     }
 
+    const startAnimation = () => {
+      if (animationFrame !== null) return
+
+      animationFrame = window.requestAnimationFrame(draw)
+    }
+
+    const stopAnimation = () => {
+      if (animationFrame === null) return
+
+      window.cancelAnimationFrame(animationFrame)
+      animationFrame = null
+    }
+
     const handlePointerMove = (event: PointerEvent) => {
       const rect = canvas.getBoundingClientRect()
       pointer.x = event.clientX - rect.left
@@ -156,6 +169,10 @@ export function DotFieldBackground() {
         pointer.y >= 0 &&
         pointer.y <= rect.height
       pointer.lastMove = performance.now()
+
+      if (pointer.active) {
+        startAnimation()
+      }
     }
 
     const handlePointerLeave = () => {
@@ -163,14 +180,13 @@ export function DotFieldBackground() {
     }
 
     resize()
-    animationFrame = window.requestAnimationFrame(draw)
 
     window.addEventListener('resize', resize)
     hero?.addEventListener('pointermove', handlePointerMove, { passive: true })
     hero?.addEventListener('pointerleave', handlePointerLeave, { passive: true })
 
     return () => {
-      window.cancelAnimationFrame(animationFrame)
+      stopAnimation()
       window.removeEventListener('resize', resize)
       hero?.removeEventListener('pointermove', handlePointerMove)
       hero?.removeEventListener('pointerleave', handlePointerLeave)
