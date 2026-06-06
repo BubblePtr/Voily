@@ -1,0 +1,25 @@
+{
+  "name": "voily-website",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "build": "vite build",
+    "preview": "vite preview --host 127.0.0.1",
+    "pages:deploy:direct": "bun run build && bunx wrangler pages deploy dist --project-name voily",
+    "pages:dev": "bun run build && bunx wrangler pages dev dist"
+  },
+  "dependencies": {
+    "@tanstack/react-router": "^1.170.11",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7"
+  },
+  "devDependencies": {
+    "@tanstack/router-plugin": "^1.168.14",
+    "@types/react": "^19.2.16",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^6.0.2",
+    "typescript": "^6.0.3",
+    "vite": "^8.0.16"
+  }
+}
