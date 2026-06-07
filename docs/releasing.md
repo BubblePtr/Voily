@@ -20,6 +20,7 @@ Before running the release flow, make sure the current Mac has:
 - A configured `notarytool` keychain profile
 - A Sparkle EdDSA key pair for in-app updates, generated on the release machine
 - A Sparkle private key stored as a generic password in the self-hosted release runner's release keychain
+- Xcode Metal Toolchain installed through `xcodebuild -downloadComponent MetalToolchain`
 
 Install `dmgbuild` once on the release machine:
 
