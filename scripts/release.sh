@@ -17,6 +17,7 @@ DEFAULT_NOTARY_PROFILE="${VOILY_NOTARY_PROFILE:-${NOTARY_PROFILE:-}}"
 DEFAULT_NOTARY_KEYCHAIN="${VOILY_NOTARY_KEYCHAIN:-${VOILY_RELEASE_KEYCHAIN:-}}"
 EXPORT_OPTIONS_PLIST="${VOILY_EXPORT_OPTIONS_PLIST:-$RELEASE_ROOT/ExportOptions.plist}"
 DMG_BACKGROUND_PATH="${VOILY_DMG_BACKGROUND_PATH:-$ROOT_DIR/Resources/Release/dmg-background.png}"
+LEGACY_SENSEVOICE_RUNTIME_RELATIVE_DIR="Contents/Library/SenseVoiceRuntime"
 
 log() {
   printf "==> %s\n" "$*"
@@ -179,6 +180,7 @@ archive_app() {
   log "Archiving $APP_NAME (Release)"
   "${cmd[@]}"
 
+  remove_legacy_sensevoice_runtime "$ARCHIVE_PATH/Products/Applications/$APP_NAME.app"
   generate_export_options_plist
   export_archive
 
@@ -186,6 +188,7 @@ archive_app() {
   [[ -d "$exported_app" ]] || die "Export completed but app bundle was not found at $exported_app"
 
   ditto "$exported_app" "$APP_PATH"
+  remove_legacy_sensevoice_runtime "$APP_PATH"
   log "Exported app bundle to $APP_PATH"
 }
 
@@ -249,6 +252,12 @@ export_archive() {
 
   local archived_app="$ARCHIVE_PATH/Products/Applications/$APP_NAME.app"
   [[ -d "$archived_app" ]] || die "Archive completed but app bundle was not found at $archived_app"
+}
+
+remove_legacy_sensevoice_runtime() {
+  local app_path="$1"
+
+  rm -rf "$app_path/$LEGACY_SENSEVOICE_RUNTIME_RELATIVE_DIR"
 }
 
 package_zip() {

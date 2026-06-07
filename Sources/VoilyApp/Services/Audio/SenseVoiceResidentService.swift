@@ -202,9 +202,9 @@ actor SenseVoiceResidentService {
             throw SenseVoiceResidentServiceError.serverUnavailable
         }
 
-        let pythonPath = try resolvePythonPath()
+        let pythonURL = try resolvePythonURL()
         let scriptURL = try ensureServerScript()
-        let launchResult = try startProcess(pythonPath: pythonPath, scriptURL: scriptURL)
+        let launchResult = try startProcess(pythonURL: pythonURL, scriptURL: scriptURL)
         debugLog("SenseVoice resident launching command=\(launchResult.summary)")
 
         for _ in 0 ..< 40 {
@@ -311,28 +311,18 @@ actor SenseVoiceResidentService {
         }
     }
 
-    private func resolvePythonPath() throws -> String {
-        let fileManager = FileManager.default
-        let environment = ProcessInfo.processInfo.environment
-        let appSupportRuntime = applicationSupportRoot()
-            .appendingPathComponent("LocalModels", isDirectory: true)
-            .appendingPathComponent(ASRProvider.senseVoice.rawValue, isDirectory: true)
-            .appendingPathComponent("runtime/python/bin/python3", isDirectory: false)
-        let candidates: [String?] = [
-            environment["VOILY_SENSEVOICE_PYTHON"],
-            appSupportRuntime.path,
-        ]
-
-        for candidate in candidates.compactMap({ $0?.trimmingCharacters(in: .whitespacesAndNewlines) }) where !candidate.isEmpty {
-            if fileManager.isExecutableFile(atPath: candidate) {
-                return candidate
-            }
+    private func resolvePythonURL() throws -> URL {
+        guard let pythonURL = SenseVoiceRuntimeResolver().resolvePythonURL() else {
+            throw SenseVoiceResidentServiceError.pythonNotFound
         }
-
-        throw SenseVoiceResidentServiceError.pythonNotFound
+        return pythonURL
     }
 
     private func ensureServerScript() throws -> URL {
+        if let bundledScriptURL = SenseVoiceRuntimeResolver().bundledServerScriptURL() {
+            return bundledScriptURL
+        }
+
         let directory = applicationSupportRoot()
             .appendingPathComponent("Runtime", isDirectory: true)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
@@ -341,11 +331,11 @@ actor SenseVoiceResidentService {
         return scriptURL
     }
 
-    private func startProcess(pythonPath: String, scriptURL: URL) throws -> (summary: String, stderrPipe: Pipe) {
+    private func startProcess(pythonURL: URL, scriptURL: URL) throws -> (summary: String, stderrPipe: Pipe) {
         let process = Process()
-        process.executableURL = URL(fileURLWithPath: pythonPath)
+        process.executableURL = pythonURL
         process.arguments = [scriptURL.path, "--port", String(port)]
-        process.environment = mergedEnvironment()
+        process.environment = mergedEnvironment(pythonURL: pythonURL)
         process.currentDirectoryURL = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
 
         let stdoutPipe = Pipe()
@@ -360,17 +350,18 @@ actor SenseVoiceResidentService {
         }
 
         self.process = process
-        let summary = ([pythonPath] + (process.arguments ?? [])).joined(separator: " ")
+        let summary = ([pythonURL.path] + (process.arguments ?? [])).joined(separator: " ")
         return (summary, stderrPipe)
     }
 
-    private func mergedEnvironment() -> [String: String] {
+    private func mergedEnvironment(pythonURL: URL) -> [String: String] {
         var environment = ProcessInfo.processInfo.environment
         let installedModelDirectory = applicationSupportRoot()
             .appendingPathComponent("LocalModels", isDirectory: true)
             .appendingPathComponent(ASRProvider.senseVoice.rawValue, isDirectory: true)
             .appendingPathComponent("model", isDirectory: true)
         environment["SENSEVOICE_MODEL_DIR"] = environment["SENSEVOICE_MODEL_DIR"] ?? installedModelDirectory.path
+        environment.merge(SenseVoiceRuntimeResolver().environmentOverrides(for: pythonURL)) { _, newValue in newValue }
         return environment
     }
 

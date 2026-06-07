@@ -35,12 +35,12 @@ make install-dev
 make install-debug
 ```
 
-### Reset Permissions for Testing
+### Prepare Debug Build
 
 ```bash
-# Resets Voily's microphone and Accessibility grants, then installs the test build.
-# Useful for regression-testing the first-launch permission flow.
-make test-permission-flow
+# Clears the installed app identity and permissions, then installs and launches the debug build.
+# Useful when switching from a release/Developer ID build to a local debug build.
+make prepare-debug
 ```
 
 ### Running Tests

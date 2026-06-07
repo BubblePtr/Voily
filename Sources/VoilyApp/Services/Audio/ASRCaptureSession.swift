@@ -47,11 +47,30 @@ protocol ASRCaptureSessionBuilding {
 @MainActor
 struct LiveASRCaptureSessionFactory: ASRCaptureSessionBuilding {
     let senseVoiceResidentService: SenseVoiceResidentService
+    let senseVoiceNativeService: SenseVoiceNativeService
     let funASRRealtimeService: FunASRRealtimeService
     let funASRVocabularyService: FunASRVocabularyService
     let qwenRealtimeASRService: QwenRealtimeASRService
     let stepRealtimeASRService: StepRealtimeASRService
     let doubaoStreamingASRService: DoubaoStreamingASRService
+
+    init(
+        senseVoiceResidentService: SenseVoiceResidentService,
+        senseVoiceNativeService: SenseVoiceNativeService = SenseVoiceNativeService(),
+        funASRRealtimeService: FunASRRealtimeService,
+        funASRVocabularyService: FunASRVocabularyService,
+        qwenRealtimeASRService: QwenRealtimeASRService,
+        stepRealtimeASRService: StepRealtimeASRService,
+        doubaoStreamingASRService: DoubaoStreamingASRService
+    ) {
+        self.senseVoiceResidentService = senseVoiceResidentService
+        self.senseVoiceNativeService = senseVoiceNativeService
+        self.funASRRealtimeService = funASRRealtimeService
+        self.funASRVocabularyService = funASRVocabularyService
+        self.qwenRealtimeASRService = qwenRealtimeASRService
+        self.stepRealtimeASRService = stepRealtimeASRService
+        self.doubaoStreamingASRService = doubaoStreamingASRService
+    }
 
     func makeSession(
         provider: ASRProvider,
@@ -64,8 +83,8 @@ struct LiveASRCaptureSessionFactory: ASRCaptureSessionBuilding {
 
         switch provider {
         case .senseVoice:
-            session = SenseVoiceCaptureSession(
-                service: senseVoiceResidentService,
+            session = SenseVoiceNativeCaptureSession(
+                service: senseVoiceNativeService,
                 languageCode: languageCode
             )
         case .funASR:

@@ -67,6 +67,9 @@ packages:
   PermissionFlow:
     url: https://github.com/jaywcjlove/PermissionFlow.git
     from: 2.4.0
+  mlx-swift:
+    url: https://github.com/ml-explore/mlx-swift.git
+    from: 0.31.4
 
 targets:
   Voily:
@@ -102,6 +105,10 @@ targets:
         product: Sparkle
       - package: PermissionFlow
         product: PermissionFlow
+      - package: mlx-swift
+        product: MLX
+      - package: mlx-swift
+        product: MLXNN
     settings:
       base:
         PRODUCT_NAME: Voily

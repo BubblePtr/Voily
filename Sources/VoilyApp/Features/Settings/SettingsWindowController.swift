@@ -644,9 +644,18 @@ private struct ModelSettingsPage: View {
                     languageCode: settings.selectedLanguageCode,
                     connectionTester: asrConnectionTester,
                     managedState: managedASRModels.state(for: provider),
+                    modelSources: managedASRModels.modelSources(for: provider),
                     estimatedDownload: managedASRModels.estimatedDownload(for: provider),
-                    onInstall: { managedASRModels.install(provider: provider) },
-                    onUninstall: { managedASRModels.uninstall(provider: provider) },
+                    hasModelCache: managedASRModels.hasModelCache(for: provider),
+                    modelCacheSize: managedASRModels.modelCacheSizeDescription(for: provider),
+                    onDownloadModel: { source in
+                        managedASRModels.downloadModel(provider: provider, from: source)
+                    },
+                    onImportModel: { sourceDirectory in
+                        managedASRModels.importModel(provider: provider, from: sourceDirectory)
+                    },
+                    onClearModelCache: { managedASRModels.clearModelCache(provider: provider) },
+                    onRefreshModel: { managedASRModels.refresh(provider: provider) },
                     onSave: { config in
                         asrDrafts[provider] = config
                         settings.setASRConfig(config, for: provider)
@@ -1063,14 +1072,18 @@ private struct ASRProviderConfigSheet: View {
     let languageCode: String
     let connectionTester: ASRConnectionTester
     let managedState: ManagedASRInstallState
+    let modelSources: [ManagedASRModelSource]
     let estimatedDownload: String
-    let onInstall: () -> Void
-    let onUninstall: () -> Void
+    let hasModelCache: Bool
+    let modelCacheSize: String
+    let onDownloadModel: (ManagedASRModelSource) -> Void
+    let onImportModel: (URL) -> Void
+    let onClearModelCache: () -> Void
+    let onRefreshModel: () -> Void
     let onSave: (ASRProviderConfig) -> Void
 
     @Environment(\.dismiss) private var dismiss
 
-    @State private var showingInstallConfirmation = false
     @State private var draftConfig = ASRProviderConfig.empty
     @State private var statusMessage = ""
     @State private var isTesting = false
@@ -1088,9 +1101,14 @@ private struct ASRProviderConfigSheet: View {
                 ManagedLocalProviderFields(
                     provider: provider,
                     managedState: managedState,
+                    modelSources: modelSources,
                     estimatedDownload: estimatedDownload,
-                    onInstall: { showingInstallConfirmation = true },
-                    onUninstall: onUninstall
+                    hasModelCache: hasModelCache,
+                    modelCacheSize: modelCacheSize,
+                    onDownloadModel: onDownloadModel,
+                    onImportModel: onImportModel,
+                    onClearModelCache: onClearModelCache,
+                    onRefreshModel: onRefreshModel
                 )
             } else {
                 CloudProviderFields(
@@ -1117,7 +1135,7 @@ private struct ASRProviderConfigSheet: View {
             }
 
             SheetFooter(
-                statusText: provider.category == .local ? AppLocalization.localized("本地模型由应用托管下载和卸载。") : provider.cloudStatusText,
+                statusText: provider.category == .local ? AppLocalization.localized("运行时随应用提供；这里仅管理大模型缓存。") : provider.cloudStatusText,
                 onCancel: { dismiss() },
                 onSave: {
                     onSave(normalizedConfig(draftConfig))
@@ -1159,14 +1177,6 @@ private struct ASRProviderConfigSheet: View {
                 }
             }
         }
-        .alert(installConfirmationTitle, isPresented: $showingInstallConfirmation) {
-            Button("取消", role: .cancel) {}
-            Button("确认下载") {
-                onInstall()
-            }
-        } message: {
-            Text("会在首次安装时下载 SenseVoice Small 的 MLX 模型文件。安装完成后只走本地常驻识别。")
-        }
     }
 
     private var defaultTestingHint: String {
@@ -1195,10 +1205,6 @@ private struct ASRProviderConfigSheet: View {
                 )
             }
         }
-    }
-
-    private var installConfirmationTitle: String {
-        String(format: AppLocalization.localized("下载 %@"), provider.displayName)
     }
 
     private func normalizedConfig(_ config: ASRProviderConfig) -> ASRProviderConfig {
@@ -1411,51 +1417,241 @@ private enum BrandIconLoader {
 private struct ManagedLocalProviderFields: View {
     let provider: ASRProvider
     let managedState: ManagedASRInstallState
+    let modelSources: [ManagedASRModelSource]
     let estimatedDownload: String
-    let onInstall: () -> Void
-    let onUninstall: () -> Void
+    let hasModelCache: Bool
+    let modelCacheSize: String
+    let onDownloadModel: (ManagedASRModelSource) -> Void
+    let onImportModel: (URL) -> Void
+    let onClearModelCache: () -> Void
+    let onRefreshModel: () -> Void
+
+    @State private var showingClearConfirmation = false
+    @State private var selectedSourceID: String?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            SettingsFormField(title: "安装状态") {
-                Text(managedState.statusText)
-                    .font(.system(size: 14))
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 10)
-                    .background(
-                        RoundedRectangle(cornerRadius: 10, style: .continuous)
-                            .fill(Color(nsColor: .textBackgroundColor))
-                    )
+            SettingsFormField(title: "模型状态") {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(managedState.statusText)
+                        .font(.system(size: 14))
+
+                    if let modelStatusDetail {
+                        Text(modelStatusDetail)
+                            .font(.system(size: 12))
+                            .foregroundStyle(.secondary)
+                    }
+
+                    if let progress = managedState.downloadProgress {
+                        ModelDownloadProgressView(progress: progress)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 10)
+                .background(
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .fill(Color(nsColor: .textBackgroundColor))
+                )
             }
 
-            SettingsFormField(title: "下载内容") {
-                Text(downloadDescription)
-                    .font(.system(size: 13))
-                    .foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+            SettingsFormField(title: "模型源") {
+                VStack(alignment: .leading, spacing: 10) {
+                    HStack(spacing: 10) {
+                        ForEach(modelSources) { source in
+                            Button {
+                                selectedSourceID = source.id
+                            } label: {
+                                ModelSourceButtonContent(
+                                    source: source,
+                                    isSelected: selectedSource?.id == source.id
+                                )
+                            }
+                            .buttonStyle(.plain)
+                            .disabled(managedState.isBusy)
+                        }
+                    }
+
+                    Text(modelSourceHint)
+                        .font(.system(size: 12))
+                        .foregroundStyle(.secondary)
+                }
             }
 
             HStack(spacing: 12) {
-                Button("下载模型", action: onInstall)
-                    .disabled({
-                        if case .installing = managedState {
-                            return true
-                        }
-                        return managedState.isInstalled
-                    }())
+                Button("下载模型") {
+                    if let selectedSource {
+                        onDownloadModel(selectedSource)
+                    }
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(!canDownloadSelectedSource)
 
-                Button("卸载模型", action: onUninstall)
-                    .disabled(!managedState.isInstalled)
+                Button("手动导入...", action: selectModelDirectory)
+                    .disabled(managedState.isBusy)
+
+                Button("重新校验", action: onRefreshModel)
+                    .disabled(managedState.isBusy)
+
+                Button(clearCacheTitle) {
+                    showingClearConfirmation = true
+                }
+                .disabled(!hasModelCache || managedState.isBusy)
 
                 Spacer()
 
-                if case .installing = managedState {
+                if managedState.isBusy {
                     ProgressView()
                         .controlSize(.small)
                 }
             }
         }
+        .onAppear {
+            if selectedSourceID == nil {
+                selectedSourceID = preferredSource?.id
+            }
+        }
+        .alert("清除本地模型缓存", isPresented: $showingClearConfirmation) {
+            Button("取消", role: .cancel) {}
+            Button("清除缓存", role: .destructive, action: onClearModelCache)
+        } message: {
+            Text("这只会删除已导入的大模型权重，不会删除设置或云端 provider 凭证。")
+        }
+    }
+
+    private var selectedSource: ManagedASRModelSource? {
+        if let selectedSourceID, let source = modelSources.first(where: { $0.id == selectedSourceID }) {
+            return source
+        }
+        return preferredSource
+    }
+
+    private var preferredSource: ManagedASRModelSource? {
+        modelSources.first(where: { $0.isRecommended && $0.isDownloadAvailable }) ??
+            modelSources.first(where: \.isDownloadAvailable) ??
+            modelSources.first
+    }
+
+    private var canDownloadSelectedSource: Bool {
+        guard !managedState.isBusy else { return false }
+        return selectedSource?.isDownloadAvailable == true
+    }
+
+    private var modelStatusDetail: String? {
+        if case .runtimeUnavailable = managedState {
+            if hasModelCache {
+                return String(
+                    format: AppLocalization.localized("模型缓存已存在（%@），但当前本地运行时不可用。"),
+                    modelCacheSize
+                )
+            }
+            return AppLocalization.localized("这是应用运行时问题，不需要用户手动安装依赖。")
+        }
+        return nil
+    }
+
+    private var modelSourceHint: String {
+        guard let selectedSource else {
+            return AppLocalization.localized("请选择模型源后下载。")
+        }
+        guard selectedSource.isDownloadAvailable else {
+            return String(
+                format: AppLocalization.localized("%@ 暂无可用的一键下载地址。"),
+                selectedSource.displayName
+            )
+        }
+        return String(
+            format: AppLocalization.localized("将从 %@ 下载 Voily 支持的 MLX 模型文件。模型约 %@，推理由应用内 MLX Swift 引擎执行。"),
+            selectedSource.displayName,
+            estimatedDownload
+        )
+    }
+
+    private var clearCacheTitle: String {
+        String(
+            format: AppLocalization.localized("清除缓存（%@）"),
+            modelCacheSize
+        )
+    }
+
+    private func selectModelDirectory() {
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = false
+        panel.canChooseDirectories = true
+        panel.allowsMultipleSelection = false
+        panel.canCreateDirectories = false
+        panel.title = AppLocalization.localized("选择已下载的模型文件夹")
+        panel.message = AppLocalization.localized("请选择包含 Voily 支持的 SenseVoice MLX 模型文件的文件夹。")
+        panel.prompt = AppLocalization.localized("选择")
+
+        guard panel.runModal() == .OK, let selectedURL = panel.url else {
+            return
+        }
+        onImportModel(selectedURL)
+    }
+}
+
+private struct ModelDownloadProgressView: View {
+    let progress: ManagedASRDownloadProgress
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            ProgressView(value: progress.fractionCompleted)
+                .progressViewStyle(.linear)
+
+            HStack(spacing: 8) {
+                if let byteCountText = progress.byteCountText {
+                    Text(byteCountText)
+                }
+
+                Spacer()
+
+                if let fractionCompleted = progress.fractionCompleted {
+                    Text(fractionCompleted, format: .percent.precision(.fractionLength(0)))
+                }
+            }
+            .font(.system(size: 11))
+            .foregroundStyle(.secondary)
+        }
+    }
+}
+
+private struct ModelSourceButtonContent: View {
+    let source: ManagedASRModelSource
+    let isSelected: Bool
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 8) {
+                Text(source.displayName)
+                    .font(.system(size: 13, weight: .semibold))
+
+                if source.isRecommended {
+                    TagBadge(text: AppLocalization.localized("推荐"))
+                }
+
+                if !source.isDownloadAvailable {
+                    TagBadge(text: AppLocalization.localized("待配置"))
+                }
+            }
+
+            Text(source.subtitle)
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
+                .lineLimit(2)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: .infinity, minHeight: 58, alignment: .leading)
+        .padding(12)
+        .background(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .fill(isSelected ? Color.accentColor.opacity(0.12) : Color.primary.opacity(0.06))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .stroke(isSelected ? Color.accentColor.opacity(0.28) : Color.primary.opacity(0.08), lineWidth: 1)
+        )
+        .opacity(source.isDownloadAvailable ? 1 : 0.72)
     }
 }
 
@@ -2144,16 +2340,6 @@ private struct MicrophoneInputSettingsCard: View {
     }
 }
 
-private extension ManagedLocalProviderFields {
-    var downloadDescription: String {
-        String(
-            format: AppLocalization.localized("%@ 的 MLX 模型文件，%@"),
-            provider.displayName,
-            estimatedDownload
-        )
-    }
-}
-
 private struct GlossaryPresetToggleCard: View {
     let preset: GlossaryPresetDefinition
     let isEnabled: Bool
@@ -2562,7 +2748,7 @@ private extension ASRProvider {
         case .stepfunASR:
             return AppLocalization.localized("云端流式 provider 会直接建立跃阶星辰实时 ASR WebSocket 会话。")
         case .senseVoice:
-            return AppLocalization.localized("本地模型由应用托管下载和卸载。")
+            return AppLocalization.localized("运行时随应用提供；这里仅管理大模型缓存。")
         }
     }
 

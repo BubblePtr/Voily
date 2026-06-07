@@ -43,11 +43,13 @@ project.yml          # XcodeGen 源文件，本地生成 Voily.xcodeproj
 
 统一会话抽象在 `Sources/VoilyApp/Services/Audio/ASRCaptureSession.swift`，provider 选择集中在 `LiveASRCaptureSessionFactory`。当前实现：
 
-- `SenseVoiceResidentService`（本地，MLX 常驻服务）
+- `SenseVoiceNativeService`（本地，MLX Swift 进程内推理）
 - `DoubaoStreamingASRService`（云端，WebSocket）
 - `FunASRRealtimeService` + `FunASRVocabularyService`（云端，WebSocket + 热词词表同步）
 - `QwenRealtimeASRService`（云端，HTTP/WS）
 - `StepRealtimeASRService`（云端）
+
+本地 SenseVoice 使用 MLX Swift 在 app 进程内推理，不再随安装包分发 Python runtime。模型权重仍由设置页下载到用户目录，见 [0008-native-mlx-swift-sensevoice-runtime.md](decisions/0008-native-mlx-swift-sensevoice-runtime.md)。
 
 Settings 里的「测试连接」不属于 `ASRCaptureSession`；这一职责由独立的 `ASRConnectionTester` 承担。
 
@@ -71,6 +73,7 @@ DeepSeek 的默认 Base URL 是 `https://api.deepseek.com`，默认模型是 `de
 ## 4. 构建与发布
 
 - `make build` — debug 构建
+- `make prepare-sensevoice-runtime` — 兼容旧流程的 no-op；当前本地 SenseVoice 使用 MLX Swift runtime
 - `make run` — 构建并运行
 - `make install-dev` — 构建 Release/Developer ID 本地验收版并安装到 `/Applications`
 - `make install-debug` — 构建 Debug/Apple Development 版并安装到 `/Applications`
@@ -84,7 +87,7 @@ DeepSeek 的默认 Base URL 是 `https://api.deepseek.com`，默认模型是 `de
 - **辅助功能（Accessibility）**：全局触发键监听和粘贴注入需要。`AccessibilityPermissionGuide` 通过 PermissionFlow 打开辅助功能设置，并把当前 App 作为建议授权对象传给引导面板。
 - **权限状态 UI**：`SettingsPermissionSnapshot` 表示麦克风 / 辅助功能状态，`SettingsPermissionCard` 在输入设置页提供完整修复入口；首页只显示状态胶囊和缺失权限 banner，把交互引导回输入设置页。
 - **刷新策略**：权限状态只在相关页面 active 时轻量轮询，用户从系统设置授权后会自动刷新；手动「重新检查」仍保留。
-- **本地流程测试**：`make test-permission-flow` 会先重置相关权限，再安装测试构建，便于回归首次安装和授权流程。
+- **本地调试准备**：`make prepare-debug` 会先重置相关权限，并注销、移除已安装副本，再安装并启动调试构建，便于从 release / Developer ID 版本切换到本地 debug 版本。
 - **菜单栏 / Dock**：菜单栏常驻，Dock 图标可选；关闭设置窗口不退出 app（见 `AppController`）。
 
 权限引导决策见 [0006-permissionflow-permission-guidance.md](decisions/0006-permissionflow-permission-guidance.md)。

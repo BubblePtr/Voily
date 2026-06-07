@@ -12,6 +12,7 @@ Voily.xcodeproj/
 *.xcscmblueprint
 
 dist/local-asr/
+.voily-cache/
 *.sqlite
 *.sqlite-shm
 *.sqlite-wal

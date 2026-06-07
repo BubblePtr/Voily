@@ -16,6 +16,9 @@ private actor SessionRecorder {
     private(set) var persistedConfigs: [ASRProviderConfig] = []
     private(set) var qwenAppendByteCounts: [Int] = []
     private(set) var qwenCancelCount = 0
+    private(set) var nativeTranscribeByteCounts: [Int] = []
+    private(set) var nativePrepareCount = 0
+    private(set) var nativePartials: [String] = []
 
     func recordStart(sampleRate: Double, languageCode: String) {
         startCalls.append((sampleRate, languageCode))
@@ -44,6 +47,19 @@ private actor SessionRecorder {
 
     func recordQwenCancel() {
         qwenCancelCount += 1
+    }
+
+    func recordNativeTranscribe(byteCount: Int) {
+        nativeTranscribeByteCounts.append(byteCount)
+    }
+
+    func recordNativePrepare() {
+        nativePrepareCount += 1
+    }
+
+    func recordNativePartial(_ text: String) -> Int {
+        nativePartials.append(text)
+        return nativePartials.count
     }
 }
 
@@ -272,6 +288,135 @@ final class ASRCaptureSessionTests: XCTestCase {
         } catch {
             XCTAssertEqual(error as? TestCaptureSessionError, .expected)
         }
+    }
+
+    func testSenseVoiceNativeSessionFinalizesAccumulatedAudio() async throws {
+        let session = SenseVoiceNativeCaptureSession(
+            languageCode: "en-US",
+            transcribe: { pcm16MonoData, sampleRate, languageCode in
+                XCTAssertFalse(pcm16MonoData.isEmpty)
+                XCTAssertEqual(sampleRate, 16_000)
+                XCTAssertEqual(languageCode, "en-US")
+                return LocalASRTranscriptionResult(
+                    text: "native result",
+                    duration: 0.01,
+                    commandSummary: "sensevoice-native-test"
+                )
+            }
+        )
+
+        try await session.start(onPartial: { _ in })
+        try await session.append(makeBuffer(sampleRate: 48_000, samples: [0.1, -0.1, 0.2, -0.2]))
+
+        let result = try await session.finish()
+
+        XCTAssertEqual(result.text, "native result")
+        XCTAssertEqual(result.source, "local")
+        XCTAssertEqual(result.commandSummary, "sensevoice-native-test")
+    }
+
+    func testSenseVoiceNativeServiceReturnsCancellationBeforeModelLoad() async {
+        let service = SenseVoiceNativeService()
+        let task = Task {
+            while !Task.isCancelled {
+                await Task.yield()
+            }
+            return try await service.transcribe(
+                pcm16MonoData: Data(repeating: 0, count: 2),
+                sampleRate: 16_000,
+                languageCode: "zh-Hans"
+            )
+        }
+
+        task.cancel()
+
+        do {
+            _ = try await task.value
+            XCTFail("Expected transcribe to throw CancellationError")
+        } catch is CancellationError {
+            // Expected.
+        } catch {
+            XCTFail("Expected CancellationError, got \(error)")
+        }
+    }
+
+    func testSenseVoiceNativeSessionEmitsProgressivePartialPreview() async throws {
+        let partialExpectation = expectation(description: "native partial preview")
+        let recorder = SessionRecorder()
+        let session = SenseVoiceNativeCaptureSession(
+            languageCode: "zh-Hans",
+            partialPreviewWindowSeconds: 0,
+            partialPreviewMinimumInterval: 0,
+            transcribe: { pcm16MonoData, _, _ in
+                await recorder.recordNativeTranscribe(byteCount: pcm16MonoData.count)
+                return LocalASRTranscriptionResult(
+                    text: "渐进结果",
+                    duration: 0.01,
+                    commandSummary: "sensevoice-native-partial-test"
+                )
+            }
+        )
+
+        try await session.start(onPartial: { partialText in
+            XCTAssertEqual(partialText, "渐进结果")
+            partialExpectation.fulfill()
+        })
+        try await session.append(makeBuffer(sampleRate: 16_000, samples: [0.1, -0.1, 0.2, -0.2]))
+
+        await fulfillment(of: [partialExpectation], timeout: 1)
+        let transcribeByteCounts = await recorder.nativeTranscribeByteCounts
+        XCTAssertFalse(transcribeByteCounts.isEmpty)
+
+        await session.cancel()
+    }
+
+    func testSenseVoiceNativeSessionUsesIncrementalPartialWindows() async throws {
+        let firstPartialExpectation = expectation(description: "first native partial preview")
+        let secondPartialExpectation = expectation(description: "second native partial preview")
+        let recorder = SessionRecorder()
+        let session = SenseVoiceNativeCaptureSession(
+            languageCode: "zh-Hans",
+            partialPreviewWindowSeconds: 0.000125,
+            partialPreviewOverlapSeconds: 0,
+            partialPreviewMinimumInterval: 0,
+            prepare: {
+                await recorder.recordNativePrepare()
+            },
+            transcribe: { pcm16MonoData, _, _ in
+                await recorder.recordNativeTranscribe(byteCount: pcm16MonoData.count)
+                let callCount = await recorder.nativeTranscribeByteCounts.count
+                return LocalASRTranscriptionResult(
+                    text: callCount == 1 ? "第一段" : "第二段",
+                    duration: 0.01,
+                    commandSummary: "sensevoice-native-window-test"
+                )
+            }
+        )
+
+        try await session.start(onPartial: { partialText in
+            Task {
+                let partialCount = await recorder.recordNativePartial(partialText)
+                if partialCount == 1 {
+                    firstPartialExpectation.fulfill()
+                } else if partialCount == 2 {
+                    secondPartialExpectation.fulfill()
+                }
+            }
+        })
+
+        try await session.append(makeBuffer(sampleRate: 16_000, samples: [0.1, -0.1]))
+        await fulfillment(of: [firstPartialExpectation], timeout: 1)
+        try await session.append(makeBuffer(sampleRate: 16_000, samples: [0.2, -0.2]))
+        await fulfillment(of: [secondPartialExpectation], timeout: 1)
+
+        let transcribeByteCounts = await recorder.nativeTranscribeByteCounts
+        let prepareCount = await recorder.nativePrepareCount
+        let partials = await recorder.nativePartials
+        XCTAssertEqual(prepareCount, 1)
+        XCTAssertEqual(transcribeByteCounts, [4, 4])
+        XCTAssertEqual(partials, ["第一段", "第一段第二段"])
+
+        await session.cancel()
     }
 
     func testLiveFactoryReturnsProviderBoundSession() async {

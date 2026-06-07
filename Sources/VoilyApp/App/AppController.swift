@@ -122,12 +122,12 @@ final class AppController: NSObject {
     private let triggerKeyMonitor = TriggerKeyMonitor()
     private let audioCaptureService = AudioCaptureService()
     private let senseVoiceResidentService = SenseVoiceResidentService()
+    private let senseVoiceNativeService = SenseVoiceNativeService()
     private let funASRRealtimeService = FunASRRealtimeService()
     private let funASRVocabularyService = FunASRVocabularyService()
     private let qwenRealtimeASRService = QwenRealtimeASRService()
     private let stepRealtimeASRService = StepRealtimeASRService()
     private let doubaoStreamingASRService = DoubaoStreamingASRService()
-    private let managedASRModels = ManagedASRModelStore()
     private let overlayController = OverlayPanelController()
     private let textInjectionService = TextInjectionService()
     private let llmRefinementService = LLMRefinementService()
@@ -158,8 +158,11 @@ final class AppController: NSObject {
     private var openSettingsWindowAction: (@MainActor () -> Void)?
     private let realtimeAppendCounter = PendingRealtimeAppendCounter()
 
+    private lazy var managedASRModels = makeManagedASRModelStore()
+
     private lazy var defaultASRCaptureSessionFactory: any ASRCaptureSessionBuilding = LiveASRCaptureSessionFactory(
         senseVoiceResidentService: senseVoiceResidentService,
+        senseVoiceNativeService: senseVoiceNativeService,
         funASRRealtimeService: funASRRealtimeService,
         funASRVocabularyService: funASRVocabularyService,
         qwenRealtimeASRService: qwenRealtimeASRService,
@@ -179,6 +182,20 @@ final class AppController: NSObject {
         self.windowActions = windowActions
         self.appUpdater = appUpdater
         self.injectedASRCaptureSessionFactory = asrCaptureSessionFactory
+    }
+
+    private func makeManagedASRModelStore() -> ManagedASRModelStore {
+        ManagedASRModelStore(
+            applicationSupportRoot: nil,
+            runtimeAvailability: {
+                true
+            },
+            beforeClearingModelCache: { [senseVoiceResidentService, senseVoiceNativeService] in
+                await senseVoiceResidentService.stop()
+                await senseVoiceNativeService.resetLoadedModel()
+            },
+            modelSpecs: nil
+        )
     }
 
     func start() {
