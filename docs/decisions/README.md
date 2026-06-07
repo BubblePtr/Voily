@@ -31,3 +31,6 @@
 - [0003 ASR provider 通过统一协议接入](0003-pluggable-asr-providers.md)
 - [0004 本地 ASR 模型走用户目录托管，按 provider 独立校验](0004-local-model-storage.md)
 - [0005 触发键固定单击/双击语义，不开放快捷键自定义](0005-trigger-key-interaction.md)
+- [0006 权限引导交给 PermissionFlow，业务层只保留权限状态协调](0006-permissionflow-permission-guidance.md)
+- [0007 本地 ASR 拆分模型缓存与应用内运行时](0007-split-local-model-cache-and-runtime-bundle.md)
+- [0008 本地 SenseVoice 改用原生 MLX Swift 推理](0008-native-mlx-swift-sensevoice-runtime.md)
