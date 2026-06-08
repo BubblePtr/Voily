@@ -28,7 +28,7 @@ struct SettingsWindowSceneView: View {
             appUpdater: appUpdater,
             permissionActions: permissionActions
         )
-        .environment(\.locale, Locale(identifier: settings.appInterfaceLanguage.rawValue))
+        .environment(\.locale, Locale(identifier: settings.appInterfaceLanguageCode))
         .frame(minHeight: 760)
         .background(SettingsWindowLifecycleObserver(registerWindow: registerWindow, onHide: onWindowHide))
         .onAppear {
@@ -187,20 +187,20 @@ private enum SettingsPage: String, CaseIterable, Identifiable, Hashable {
         }
     }
 
-    var sidebarIcon: Image {
+    var sidebarSymbolName: String {
         switch self {
         case .home:
-            return Ph.house.regular
+            return "house"
         case .model:
-            return Ph.cpu.regular
+            return "cpu"
         case .glossary:
-            return Ph.books.regular
+            return "book.closed"
         case .general:
-            return Ph.gear.regular
+            return "gearshape"
         case .input:
-            return Image(systemName: "keyboard")
+            return "keyboard"
         case .about:
-            return Image(systemName: "info.circle")
+            return "info.circle"
         }
     }
 
@@ -287,14 +287,15 @@ private struct SettingsRootView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .navigationTitle(currentPage.title(languageCode: interfaceLanguageCode))
             .navigationSubtitle(currentPage.subtitle(languageCode: interfaceLanguageCode))
+            .id("\(currentPage.id)-\(interfaceLanguageCode)")
         }
+        .environment(\.locale, Locale(identifier: interfaceLanguageCode))
     }
 
     private func sidebarRow(for page: SettingsPage, languageCode: String) -> some View {
         HStack(spacing: 12) {
-            page.sidebarIcon
-                .renderingMode(.template)
-                .scaledToFit()
+            Image(systemName: page.sidebarSymbolName)
+                .font(.system(size: 14, weight: .regular))
                 .frame(width: 18, height: 18)
 
             Text(page.title(languageCode: languageCode))
@@ -303,23 +304,6 @@ private struct SettingsRootView: View {
         .id("\(page.id)-\(languageCode)")
         .tag(page)
     }
-}
-
-private enum Ph {
-    struct Icon {
-        let assetName: String
-
-        var regular: Image {
-            Image(assetName)
-                .renderingMode(.template)
-                .resizable()
-        }
-    }
-
-    static let house = Icon(assetName: "SidebarPhHouseIcon")
-    static let books = Icon(assetName: "SidebarPhBooksIcon")
-    static let cpu = Icon(assetName: "SidebarPhCPUIcon")
-    static let gear = Icon(assetName: "SidebarPhGearIcon")
 }
 
 private struct SidebarHeader: View {
@@ -337,7 +321,7 @@ private struct SidebarHeader: View {
                     .foregroundStyle(.primary)
 
                 if isUnlockMessageVisible {
-                    Text("彩蛋已解锁")
+                    Text(AppLocalization.localized("彩蛋已解锁"))
                         .font(.system(size: 11, weight: .medium))
                         .foregroundStyle(.secondary)
                 }
@@ -597,10 +581,10 @@ private struct ModelSettingsPage: View {
                                 subtitle: provider.providerSummary,
                                 logoName: provider.logoAssetName,
                                 logoFallbackText: provider.logoFallbackText,
-                                tag: AppLocalization.localized("云端"),
+                                category: .cloud,
                                 isSelected: draftSelectedTextProvider == provider,
-                                isConfigured: isConfigured,
-                                statusText: isConfigured ? AppLocalization.localized("已配置") : AppLocalization.localized("未配置"),
+                                isAvailable: isConfigured,
+                                availabilityLabel: isConfigured ? AppLocalization.localized("已配置") : AppLocalization.localized("未配置"),
                                 onOpen: { presentedSheet = .text(provider) }
                             )
                         }
@@ -701,10 +685,10 @@ private struct ModelSettingsPage: View {
             subtitle: provider.providerSummary,
             logoName: provider.logoAssetName,
             logoFallbackText: provider.logoFallbackText,
-            tag: provider.category.displayName,
+            category: provider.category,
             isSelected: draftSelectedASRProvider == provider,
-            isConfigured: status.isConfigured,
-            statusText: status.text,
+            isAvailable: status.isConfigured,
+            availabilityLabel: status.text,
             onOpen: { presentedSheet = .asr(provider) }
         )
     }
@@ -736,25 +720,25 @@ private struct DefaultModelsOverviewCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 26) {
             HStack {
-                Label("默认模型", systemImage: "cpu")
+                Label(AppLocalization.localized("默认模型"), systemImage: "cpu")
                     .font(.system(size: 24, weight: .semibold))
 
                 Spacer()
 
-                Toggle("启用普通听写纠错", isOn: $textRefinementEnabled)
+                Toggle(AppLocalization.localized("启用普通听写纠错"), isOn: $textRefinementEnabled)
                     .toggleStyle(.switch)
             }
 
             HStack(alignment: .top, spacing: 18) {
                 DefaultModelSelectorColumn(
-                    title: "语音识别模型",
+                    title: AppLocalization.localized("语音识别模型"),
                     description: selectedASRProvider.providerSummary,
                     modelDisplayName: selectedASRProvider.modelSummary(using: asrConfig),
                     selection: $selectedASRProvider
                 )
 
                 DefaultModelSelectorColumn(
-                    title: "文本处理模型",
+                    title: AppLocalization.localized("文本处理模型"),
                     description: selectedTextProvider.providerSummary,
                     modelDisplayName: selectedTextProvider.modelSummary(using: textConfig),
                     selection: $selectedTextProvider
@@ -779,8 +763,8 @@ private struct DictationSkillsCard: View {
 
     var body: some View {
         SettingsCard(
-            title: "文本处理技能",
-            subtitle: "仅作用于普通听写。基础纠错始终启用，下面这些技能可按需叠加。"
+            title: AppLocalization.localized("文本处理技能"),
+            subtitle: AppLocalization.localized("仅作用于普通听写。基础纠错始终启用，下面这些技能可按需叠加。")
         ) {
             VStack(alignment: .leading, spacing: 14) {
                 ForEach(DictationProcessingSkill.allCases) { skill in
@@ -834,14 +818,16 @@ private struct DefaultModelSelectorColumn<SelectionValue: Hashable & CaseIterabl
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text(LocalizedStringKey(title))
+            Text(title)
                 .font(.system(size: 16, weight: .semibold))
 
             Menu {
                 ForEach(menuSections) { section in
                     if let title = section.title {
-                        Section(LocalizedStringKey(title)) {
+                        Section {
                             sectionButtons(for: section.options)
+                        } header: {
+                            Text(title)
                         }
                     } else {
                         sectionButtons(for: section.options)
@@ -880,7 +866,7 @@ private struct DefaultModelSelectorColumn<SelectionValue: Hashable & CaseIterabl
                     .foregroundStyle(.primary)
             }
 
-            Text(LocalizedStringKey(description))
+            Text(description)
                 .font(.system(size: 13))
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -977,10 +963,10 @@ private struct ProviderServiceCard: View {
     let subtitle: String
     let logoName: String
     let logoFallbackText: String?
-    let tag: String
+    let category: ProviderCategory
     let isSelected: Bool
-    let isConfigured: Bool
-    let statusText: String?
+    let isAvailable: Bool
+    let availabilityLabel: String
     let onOpen: () -> Void
 
     var body: some View {
@@ -990,35 +976,26 @@ private struct ProviderServiceCard: View {
                     ProviderLogoIcon(name: logoName, fallbackText: logoFallbackText)
 
                     VStack(alignment: .leading, spacing: 6) {
-                        HStack(spacing: 10) {
-                            Text(title)
-                                .font(.system(size: 17, weight: .semibold))
+                        Text(title)
+                            .font(.system(size: 17, weight: .semibold))
+                            .lineLimit(1)
+                            .truncationMode(.tail)
+                            .layoutPriority(1)
 
-                            TagBadge(text: tag)
-
-                            if isSelected {
-                                TagBadge(text: AppLocalization.localized("默认"))
-                            }
-                        }
-
-                        Text(LocalizedStringKey(subtitle))
+                        Text(subtitle)
                             .font(.system(size: 13))
                             .foregroundStyle(.secondary)
                             .lineLimit(1)
                             .truncationMode(.tail)
-
-                        if let statusText {
-                            Text(LocalizedStringKey(statusText))
-                                .font(.system(size: 12, weight: .medium))
-                                .foregroundStyle(.secondary)
-                        }
                     }
 
                     Spacer(minLength: 12)
 
-                    Circle()
-                        .fill(isConfigured ? Color.green : Color.secondary.opacity(0.25))
-                        .frame(width: 12, height: 12)
+                    ProviderSemanticStatusIcon(
+                        category: category,
+                        isAvailable: isAvailable,
+                        availabilityLabel: availabilityLabel
+                    )
                 }
                 .padding(22)
 
@@ -1026,7 +1003,7 @@ private struct ProviderServiceCard: View {
                     .overlay(Color.primary.opacity(0.04))
 
                 HStack {
-                    Text("点击配置")
+                    Text(AppLocalization.localized("点击配置"))
                         .font(.system(size: 15, weight: .medium))
                     Spacer()
                     Image(systemName: "chevron.right")
@@ -1050,12 +1027,46 @@ private struct ProviderServiceCard: View {
     }
 }
 
+private struct ProviderSemanticStatusIcon: View {
+    let category: ProviderCategory
+    let isAvailable: Bool
+    let availabilityLabel: String
+
+    var body: some View {
+        Group {
+            switch category {
+            case .cloud:
+                Image(systemName: isAvailable ? "checkmark.icloud" : "icloud.slash")
+                    .symbolRenderingMode(.hierarchical)
+                    .font(.system(size: 28, weight: .medium))
+            case .local:
+                Image(systemName: isAvailable ? "externaldrive.badge.checkmark" : "externaldrive.badge.exclamationmark")
+                    .symbolRenderingMode(.hierarchical)
+                    .font(.system(size: 29, weight: .medium))
+            }
+        }
+        .foregroundStyle(iconColor)
+        .frame(width: 34, height: 34)
+        .help(helpText)
+        .accessibilityLabel(Text(helpText))
+    }
+
+    private var iconColor: Color {
+        isAvailable ? .green : Color.secondary.opacity(0.45)
+    }
+
+    private var helpText: String {
+        "\(category.displayName)：\(availabilityLabel)"
+    }
+}
+
 private struct TagBadge: View {
     let text: String
 
     var body: some View {
         Text(text)
             .font(.system(size: 12, weight: .medium))
+            .lineLimit(1)
             .padding(.horizontal, 10)
             .padding(.vertical, 4)
             .background(
@@ -1118,7 +1129,7 @@ private struct ASRProviderConfigSheet: View {
                 )
 
                 HStack(spacing: 12) {
-                    Button("测试连接") {
+                    Button(AppLocalization.localized("测试连接")) {
                         testConnection()
                     }
                     .disabled(isTesting || !draftConfig.isConfigured(for: provider))
@@ -1258,7 +1269,7 @@ private struct TextRefinementProviderConfigSheet: View {
             TextRefinementProviderFields(provider: provider, config: $draftConfig)
 
             HStack(spacing: 12) {
-                Button("测试连接") {
+                Button(AppLocalization.localized("测试连接")) {
                     testConnection()
                 }
                 .disabled(isTesting || !draftConfig.isConfigured)
@@ -1360,8 +1371,8 @@ private struct SheetFooter: View {
             HStack {
                 Spacer()
 
-                Button("取消", action: onCancel)
-                Button("保存", action: onSave)
+                Button(AppLocalization.localized("取消"), action: onCancel)
+                Button(AppLocalization.localized("保存"), action: onSave)
                     .keyboardShortcut(.defaultAction)
             }
         }
@@ -1431,31 +1442,31 @@ private struct ManagedLocalProviderFields: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            SettingsFormField(title: "模型状态") {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text(managedState.statusText)
-                        .font(.system(size: 14))
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(spacing: 10) {
+                    Text(AppLocalization.localized("模型状态"))
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(.secondary)
 
-                    if let modelStatusDetail {
-                        Text(modelStatusDetail)
-                            .font(.system(size: 12))
-                            .foregroundStyle(.secondary)
-                    }
-
-                    if let progress = managedState.downloadProgress {
-                        ModelDownloadProgressView(progress: progress)
-                    }
+                    ModelStatusBadge(
+                        text: modelStatusBadgeText,
+                        state: managedState
+                    )
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 10)
-                .background(
-                    RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .fill(Color(nsColor: .textBackgroundColor))
-                )
-            }
 
-            SettingsFormField(title: "模型源") {
+                if let modelStatusDetail {
+                    Text(modelStatusDetail)
+                        .font(.system(size: 12))
+                        .foregroundStyle(.secondary)
+                }
+
+                if let progress = managedState.downloadProgress {
+                    ModelDownloadProgressView(progress: progress)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            SettingsFormField(title: AppLocalization.localized("模型源")) {
                 VStack(alignment: .leading, spacing: 10) {
                     HStack(spacing: 10) {
                         ForEach(modelSources) { source in
@@ -1479,7 +1490,7 @@ private struct ManagedLocalProviderFields: View {
             }
 
             HStack(spacing: 12) {
-                Button("下载模型") {
+                Button(AppLocalization.localized("下载模型")) {
                     if let selectedSource {
                         onDownloadModel(selectedSource)
                     }
@@ -1487,16 +1498,23 @@ private struct ManagedLocalProviderFields: View {
                 .buttonStyle(.borderedProminent)
                 .disabled(!canDownloadSelectedSource)
 
-                Button("手动导入...", action: selectModelDirectory)
-                    .disabled(managedState.isBusy)
-
-                Button("重新校验", action: onRefreshModel)
-                    .disabled(managedState.isBusy)
-
-                Button(clearCacheTitle) {
+                Button(role: .destructive) {
                     showingClearConfirmation = true
+                } label: {
+                    Text(clearCacheTitle)
                 }
+                .buttonStyle(.bordered)
+                .tint(.red)
                 .disabled(!hasModelCache || managedState.isBusy)
+
+                Menu {
+                    Button(AppLocalization.localized("手动导入..."), action: selectModelDirectory)
+                    Button(AppLocalization.localized("重新校验"), action: onRefreshModel)
+                } label: {
+                    Label(AppLocalization.localized("更多操作"), systemImage: "ellipsis.circle")
+                }
+                .menuStyle(.borderlessButton)
+                .disabled(managedState.isBusy)
 
                 Spacer()
 
@@ -1511,11 +1529,11 @@ private struct ManagedLocalProviderFields: View {
                 selectedSourceID = preferredSource?.id
             }
         }
-        .alert("清除本地模型缓存", isPresented: $showingClearConfirmation) {
-            Button("取消", role: .cancel) {}
-            Button("清除缓存", role: .destructive, action: onClearModelCache)
+        .alert(AppLocalization.localized("清除本地模型缓存"), isPresented: $showingClearConfirmation) {
+            Button(AppLocalization.localized("取消"), role: .cancel) {}
+            Button(AppLocalization.localized("清除缓存"), role: .destructive, action: onClearModelCache)
         } message: {
-            Text("这只会删除已导入的大模型权重，不会删除设置或云端 provider 凭证。")
+            Text(AppLocalization.localized("这只会删除已导入的大模型权重，不会删除设置或云端 provider 凭证。"))
         }
     }
 
@@ -1537,8 +1555,28 @@ private struct ManagedLocalProviderFields: View {
         return selectedSource?.isDownloadAvailable == true
     }
 
+    private var modelStatusBadgeText: String {
+        switch managedState {
+        case .runtimeUnavailable:
+            return AppLocalization.localized("运行时不可用")
+        case .notInstalled:
+            return managedState.statusText
+        case .downloading:
+            return AppLocalization.localized("下载中")
+        case .validating:
+            return AppLocalization.localized("校验中")
+        case .installed:
+            return managedState.statusText
+        case .incomplete:
+            return AppLocalization.localized("不完整")
+        case .failed:
+            return AppLocalization.localized("失败")
+        }
+    }
+
     private var modelStatusDetail: String? {
-        if case .runtimeUnavailable = managedState {
+        switch managedState {
+        case .runtimeUnavailable:
             if hasModelCache {
                 return String(
                     format: AppLocalization.localized("模型缓存已存在（%@），但当前本地运行时不可用。"),
@@ -1546,8 +1584,13 @@ private struct ManagedLocalProviderFields: View {
                 )
             }
             return AppLocalization.localized("这是应用运行时问题，不需要用户手动安装依赖。")
+        case let .downloading(progress):
+            return progress.message
+        case let .validating(message), let .incomplete(message), let .failed(message):
+            return message
+        case .notInstalled, .installed:
+            return nil
         }
-        return nil
     }
 
     private var modelSourceHint: String {
@@ -1588,6 +1631,37 @@ private struct ManagedLocalProviderFields: View {
             return
         }
         onImportModel(selectedURL)
+    }
+}
+
+private struct ModelStatusBadge: View {
+    let text: String
+    let state: ManagedASRInstallState
+
+    var body: some View {
+        Text(text)
+            .font(.system(size: 12, weight: .semibold))
+            .lineLimit(1)
+            .foregroundStyle(color)
+            .padding(.horizontal, 9)
+            .padding(.vertical, 4)
+            .background(
+                Capsule(style: .continuous)
+                    .fill(color.opacity(0.12))
+            )
+    }
+
+    private var color: Color {
+        switch state {
+        case .installed:
+            return .green
+        case .downloading, .validating:
+            return .blue
+        case .runtimeUnavailable, .incomplete, .failed:
+            return .red
+        case .notInstalled:
+            return .secondary
+        }
     }
 }
 
@@ -1819,7 +1893,7 @@ private struct GlossarySettingsPage: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 24) {
-                SettingsCard(title: "默认术语包", subtitle: "按行业和场景启用内置词库，点击即可切换") {
+                SettingsCard(title: AppLocalization.localized("默认术语包"), subtitle: AppLocalization.localized("按行业和场景启用内置词库，点击即可切换")) {
                     VStack(alignment: .leading, spacing: 18) {
                         ForEach(GlossaryPresetDefinition.categories) { category in
                             VStack(alignment: .leading, spacing: 12) {
@@ -1839,20 +1913,20 @@ private struct GlossarySettingsPage: View {
                     }
                 }
 
-                SettingsCard(title: "自定义词条", subtitle: "输入一个标准写法，回车或点击按钮即可添加") {
+                SettingsCard(title: AppLocalization.localized("自定义词条"), subtitle: AppLocalization.localized("输入一个标准写法，回车或点击按钮即可添加")) {
                     VStack(alignment: .leading, spacing: 14) {
                         HStack(spacing: 12) {
-                            TextField("例如：Whisper、DeepSeek、SwiftUI", text: $draftCustomTerm)
+                            TextField(AppLocalization.localized("例如：Whisper、DeepSeek、SwiftUI"), text: $draftCustomTerm)
                                 .textFieldStyle(.roundedBorder)
                                 .onSubmit(addCustomTerm)
 
-                            Button("添加", action: addCustomTerm)
+                            Button(AppLocalization.localized("添加"), action: addCustomTerm)
                                 .keyboardShortcut(.defaultAction)
                                 .disabled(draftCustomTerm.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                         }
 
                         if settings.customGlossaryTerms.isEmpty {
-                            Text("还没有自定义词条。可以补充产品名、缩写、人名或团队内部固定术语。")
+                            Text(AppLocalization.localized("还没有自定义词条。可以补充产品名、缩写、人名或团队内部固定术语。"))
                                 .font(.system(size: 13))
                                 .foregroundStyle(.secondary)
                         } else {
@@ -1870,7 +1944,7 @@ private struct GlossarySettingsPage: View {
                         }
 
                         HStack(spacing: 12) {
-                            Button("清空自定义词条") {
+                            Button(AppLocalization.localized("清空自定义词条")) {
                                 settings.clearCustomGlossaryTerms()
                                 statusMessage = AppLocalization.localized("自定义词条已清空。")
                             }
@@ -1883,9 +1957,9 @@ private struct GlossarySettingsPage: View {
                     }
                 }
 
-                SettingsCard(title: "最终生效词库", subtitle: "Fun-ASR 会优先将这里同步为热词词表；开启文本润色后，LLM 也会继续参考这些标准写法") {
+                SettingsCard(title: AppLocalization.localized("最终生效词库"), subtitle: AppLocalization.localized("Fun-ASR 会优先将这里同步为热词词表；开启文本润色后，LLM 也会继续参考这些标准写法")) {
                     if settings.effectiveGlossarySections.isEmpty {
-                        Text("还没有启用任何术语包或自定义词条。")
+                        Text(AppLocalization.localized("还没有启用任何术语包或自定义词条。"))
                             .foregroundStyle(.secondary)
                     } else {
                         VStack(alignment: .leading, spacing: 16) {
@@ -1997,9 +2071,9 @@ private struct GeneralSettingsPage: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 24) {
-                SettingsCard(title: "界面语言", subtitle: "选择 Voily 的界面显示语言") {
+                SettingsCard(title: AppLocalization.localized("界面语言"), subtitle: AppLocalization.localized("选择 Voily 的界面显示语言")) {
                     VStack(alignment: .leading, spacing: 14) {
-                        Picker("界面语言", selection: $settings.appInterfaceLanguage) {
+                        Picker(AppLocalization.localized("界面语言"), selection: $settings.appInterfaceLanguage) {
                             ForEach(AppInterfaceLanguage.allCases) { language in
                                 Text(language.displayName).tag(language)
                             }
@@ -2007,7 +2081,7 @@ private struct GeneralSettingsPage: View {
                         .pickerStyle(.menu)
                         .labelsHidden()
 
-                        Text("界面会立即按所选语言更新。")
+                        Text(AppLocalization.localized("界面会立即按所选语言更新。"))
                             .font(.system(size: 12))
                             .foregroundStyle(.secondary)
                     }
@@ -2015,15 +2089,15 @@ private struct GeneralSettingsPage: View {
 
                 AppAppearanceSettingsCard(settings: settings)
 
-                SettingsCard(title: "通用说明", subtitle: "设置窗口的基础使用说明") {
+                SettingsCard(title: AppLocalization.localized("通用说明"), subtitle: AppLocalization.localized("设置窗口的基础使用说明")) {
                     VStack(alignment: .leading, spacing: 12) {
                         GeneralSettingNoteRow(
-                            title: "打开方式",
-                            detail: "点击 menu bar 中的 Voily 可以随时回到当前设置窗口。"
+                            title: AppLocalization.localized("打开方式"),
+                            detail: AppLocalization.localized("点击 menu bar 中的 Voily 可以随时回到当前设置窗口。")
                         )
 
                         GeneralSettingNoteRow(
-                            title: "快捷操作",
+                            title: AppLocalization.localized("快捷操作"),
                             detail: settings.triggerKey.summary
                         )
                     }
@@ -2040,22 +2114,22 @@ private struct AppAppearanceSettingsCard: View {
     @Bindable var settings: AppSettings
 
     var body: some View {
-        SettingsCard(title: "App 外观", subtitle: "控制 Dock 与 menu bar 的展示方式") {
+        SettingsCard(title: AppLocalization.localized("App 外观"), subtitle: AppLocalization.localized("控制 Dock 与 menu bar 的展示方式")) {
             VStack(alignment: .leading, spacing: 14) {
-                Toggle("显示 Dock 图标", isOn: $settings.dockIconVisible)
+                Toggle(AppLocalization.localized("显示 Dock 图标"), isOn: $settings.dockIconVisible)
                     .toggleStyle(.switch)
 
                 if settings.isEasterEggUnlocked {
-                    SettingsFormField(title: "App 图标") {
+                    SettingsFormField(title: AppLocalization.localized("App 图标")) {
                         AppIconSelector(selection: $settings.selectedAppIconVariant)
                     }
 
-                    Text("图标切换会立即作用到当前运行中的 App。")
+                    Text(AppLocalization.localized("图标切换会立即作用到当前运行中的 App。"))
                         .font(.system(size: 12))
                         .foregroundStyle(.secondary)
                 }
 
-                Text("关闭后会隐藏 Dock 图标，仅保留 menu bar 入口；切换会立即生效。")
+                Text(AppLocalization.localized("关闭后会隐藏 Dock 图标，仅保留 menu bar 入口；切换会立即生效。"))
                     .font(.system(size: 12))
                     .foregroundStyle(.secondary)
             }
@@ -2086,9 +2160,9 @@ private struct InputSettingsPage: View {
             VStack(alignment: .leading, spacing: 24) {
                 SettingsPermissionCard(actions: permissionActions)
 
-                SettingsCard(title: "输入语言", subtitle: "普通听写默认使用这里选择的语言") {
+                SettingsCard(title: AppLocalization.localized("输入语言"), subtitle: AppLocalization.localized("普通听写默认使用这里选择的语言")) {
                     VStack(alignment: .leading, spacing: 14) {
-                        Picker("输入语言", selection: $settings.selectedLanguage) {
+                        Picker(AppLocalization.localized("输入语言"), selection: $settings.selectedLanguage) {
                             ForEach(SupportedLanguage.allCases) { language in
                                 Text(language.displayName).tag(language)
                             }
@@ -2096,7 +2170,7 @@ private struct InputSettingsPage: View {
                         .pickerStyle(.menu)
                         .labelsHidden()
 
-                        Text("快捷翻译仍固定使用简体中文作为输入语言。")
+                        Text(AppLocalization.localized("快捷翻译仍固定使用简体中文作为输入语言。"))
                             .font(.system(size: 12))
                             .foregroundStyle(.secondary)
                     }
@@ -2108,10 +2182,10 @@ private struct InputSettingsPage: View {
                     onRefresh: reloadInputDevices
                 )
 
-                SettingsCard(title: "触发键", subtitle: "选择用于语音输入的触发键，交互固定为单击听写、长按翻译") {
+                SettingsCard(title: AppLocalization.localized("触发键"), subtitle: AppLocalization.localized("选择用于语音输入的触发键，交互固定为单击听写、长按翻译")) {
                     VStack(alignment: .leading, spacing: 14) {
-                        SettingsFormField(title: "用于触发语音输入的按键") {
-                            Picker("触发键", selection: $settings.triggerKey) {
+                        SettingsFormField(title: AppLocalization.localized("用于触发语音输入的按键")) {
+                            Picker(AppLocalization.localized("触发键"), selection: $settings.triggerKey) {
                                 ForEach(TriggerKey.allCases) { triggerKey in
                                     Text(triggerKey.displayName).tag(triggerKey)
                                 }
@@ -2124,18 +2198,18 @@ private struct InputSettingsPage: View {
                             .font(.system(size: 12))
                             .foregroundStyle(.secondary)
 
-                        Text("快捷翻译开始后可松手，结束方式保持现在的确认/取消交互。选择右 Command 时，仅单独点击或长按会生效，不会覆盖系统组合键。")
+                        Text(AppLocalization.localized("快捷翻译开始后可松手，结束方式保持现在的确认/取消交互。选择右 Command 时，仅单独点击或长按会生效，不会覆盖系统组合键。"))
                             .font(.system(size: 12))
                             .foregroundStyle(.secondary)
                     }
                 }
 
-                SettingsCard(title: "系统输出", subtitle: "控制语音任务期间对系统输出声音的处理") {
+                SettingsCard(title: AppLocalization.localized("系统输出"), subtitle: AppLocalization.localized("控制语音任务期间对系统输出声音的处理")) {
                     VStack(alignment: .leading, spacing: 14) {
-                        Toggle("语音输入时自动静音系统输出，结束后恢复", isOn: $settings.interruptSystemMediaPlayback)
+                        Toggle(AppLocalization.localized("语音输入时自动静音系统输出，结束后恢复"), isOn: $settings.interruptSystemMediaPlayback)
                             .toggleStyle(.switch)
 
-                        Text("统一作用于普通听写和快捷翻译。Voily 会在任务开始时临时静音当前默认输出设备，并在会话结束时恢复；如果你中途切换了输出设备，则不会改动新的设备。")
+                        Text(AppLocalization.localized("统一作用于普通听写和快捷翻译。Voily 会在任务开始时临时静音当前默认输出设备，并在会话结束时恢复；如果你中途切换了输出设备，则不会改动新的设备。"))
                             .font(.system(size: 12))
                             .foregroundStyle(.secondary)
                     }
@@ -2167,7 +2241,7 @@ private struct AboutSettingsPage: View {
 
         ScrollView {
             VStack(alignment: .leading, spacing: 24) {
-                SettingsCard(title: versionInfo.displayName, subtitle: "开源 macOS 听写应用") {
+                SettingsCard(title: versionInfo.displayName, subtitle: AppLocalization.localized("开源 macOS 听写应用")) {
                     HStack(alignment: .center, spacing: 18) {
                         AppAboutIcon()
                             .frame(width: 72, height: 72)
@@ -2176,7 +2250,7 @@ private struct AboutSettingsPage: View {
                             Text(versionInfo.versionSummary)
                                 .font(.system(size: 24, weight: .semibold))
 
-                            Text("按一下触发键开始录音，再按一下停止转写，自动粘贴到光标位置。")
+                            Text(AppLocalization.localized("按一下触发键开始录音，再按一下停止转写，自动粘贴到光标位置。"))
                                 .font(.system(size: 13))
                                 .foregroundStyle(.secondary)
                                 .fixedSize(horizontal: false, vertical: true)
@@ -2186,25 +2260,25 @@ private struct AboutSettingsPage: View {
                     }
                 }
 
-                SettingsCard(title: "版本信息", subtitle: "用于诊断、反馈和发布验证") {
+                SettingsCard(title: AppLocalization.localized("版本信息"), subtitle: AppLocalization.localized("用于诊断、反馈和发布验证")) {
                     VStack(alignment: .leading, spacing: 12) {
-                        SettingsInfoRow(label: "版本", value: versionInfo.shortVersion)
-                        SettingsInfoRow(label: "构建", value: versionInfo.buildNumber.isEmpty ? "-" : versionInfo.buildNumber)
+                        SettingsInfoRow(label: AppLocalization.localized("版本"), value: versionInfo.shortVersion)
+                        SettingsInfoRow(label: AppLocalization.localized("构建"), value: versionInfo.buildNumber.isEmpty ? "-" : versionInfo.buildNumber)
                         SettingsInfoRow(
-                            label: "更新检查",
+                            label: AppLocalization.localized("更新检查"),
                             value: appUpdater.isUpdateCheckConfigured ? AppLocalization.localized("已配置") : AppLocalization.localized("未配置")
                         )
                     }
                 }
 
-                SettingsCard(title: "软件更新", subtitle: "手动检查 Voily 是否有可用新版本") {
+                SettingsCard(title: AppLocalization.localized("软件更新"), subtitle: AppLocalization.localized("手动检查 Voily 是否有可用新版本")) {
                     VStack(alignment: .leading, spacing: 14) {
                         Text(updateStatusDescription)
                             .font(.system(size: 13))
                             .foregroundStyle(.secondary)
                             .fixedSize(horizontal: false, vertical: true)
 
-                        Button("检查更新…") {
+                        Button(AppLocalization.localized("检查更新…")) {
                             appUpdater.checkForUpdates()
                         }
                     }
@@ -2240,10 +2314,10 @@ private struct GeneralSettingNoteRow: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text(LocalizedStringKey(title))
+            Text(title)
                 .font(.system(size: 14, weight: .semibold))
 
-            Text(LocalizedStringKey(detail))
+            Text(detail)
                 .font(.system(size: 13))
                 .foregroundStyle(.secondary)
         }
@@ -2297,10 +2371,10 @@ private struct MicrophoneInputSettingsCard: View {
     }
 
     var body: some View {
-        SettingsCard(title: "麦克风输入", subtitle: "为所有录音场景选择统一的输入设备") {
+        SettingsCard(title: AppLocalization.localized("麦克风输入"), subtitle: AppLocalization.localized("为所有录音场景选择统一的输入设备")) {
             VStack(alignment: .leading, spacing: 14) {
                 HStack(alignment: .center, spacing: 12) {
-                    Picker("麦克风输入", selection: $preferredMicrophoneUID) {
+                    Picker(AppLocalization.localized("麦克风输入"), selection: $preferredMicrophoneUID) {
                         Text(automaticSelectionLabel)
                             .tag(nil as String?)
 
@@ -2312,7 +2386,7 @@ private struct MicrophoneInputSettingsCard: View {
                     .pickerStyle(.menu)
                     .labelsHidden()
 
-                    Button("重新扫描", action: onRefresh)
+                    Button(AppLocalization.localized("重新扫描"), action: onRefresh)
                         .controlSize(.small)
                 }
 
@@ -2321,7 +2395,7 @@ private struct MicrophoneInputSettingsCard: View {
                     .foregroundStyle(.secondary)
 
                 if isPreferredDeviceMissing {
-                    Text("当前设备不可用，录音时将回退到自动选择规则。重新接回设备后会继续命中这个选择。")
+                    Text(AppLocalization.localized("当前设备不可用，录音时将回退到自动选择规则。重新接回设备后会继续命中这个选择。"))
                         .font(.system(size: 12))
                         .foregroundStyle(.orange)
                 }
@@ -2432,10 +2506,10 @@ struct SettingsCard<Content: View>: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
             VStack(alignment: .leading, spacing: 4) {
-                Text(LocalizedStringKey(title))
+                Text(title)
                     .font(.system(size: 17, weight: .semibold))
 
-                Text(LocalizedStringKey(subtitle))
+                Text(subtitle)
                     .font(.system(size: 12))
                     .foregroundStyle(.secondary)
             }
@@ -2461,7 +2535,7 @@ private struct SettingsFormField<Content: View>: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(LocalizedStringKey(title))
+            Text(title)
                 .font(.system(size: 13, weight: .semibold))
                 .foregroundStyle(.secondary)
 
@@ -2476,7 +2550,7 @@ private struct SettingsInfoRow: View {
 
     var body: some View {
         HStack {
-            Text(LocalizedStringKey(label))
+            Text(label)
                 .foregroundStyle(.secondary)
             Spacer()
             Text(value)

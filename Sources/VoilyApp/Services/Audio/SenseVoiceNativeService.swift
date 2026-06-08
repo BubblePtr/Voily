@@ -129,40 +129,61 @@ final class SenseVoiceNativeCaptureSession: ASRCaptureSession {
     private let languageCode: String
     private let prepare: () async throws -> Void
     private let transcribe: (Data, Double, String) async throws -> LocalASRTranscriptionResult
-    private let partialPreviewWindowBytes: Int
-    private let partialPreviewOverlapBytes: Int
+    private let firstPartialPreviewWindowBytes: Int
+    private let revisionPartialPreviewWindowBytes: Int
+    private let preSpeechPaddingBytes: Int
+    private let endpointSilenceBytes: Int
     private let partialPreviewMinimumInterval: TimeInterval
+    private let speechRMSFloor: Float
     private var pcm16MonoData = Data()
     private let targetSampleRate = 16_000.0
     private var onPartialText: (@Sendable (String) -> Void)?
     private var prepareTask: Task<Void, Error>?
     private var partialPreviewTask: Task<Void, Never>?
+    private var partialPreviewDelayTask: Task<Void, Never>?
     private var lastPartialPreviewStartedAt: Date?
     private var nextPartialPreviewStartByte = 0
+    private var activeSpeechStartByte: Int?
+    private var lastSpeechByte: Int?
+    private var hasPendingSegmentBoundary = false
+    private var hasDeliveredPartialForActiveSegment = false
+    private var activeSegmentID = 0
     private var transcriptAccumulator = TranscriptAccumulator()
     private var lastDeliveredPartialText = ""
     private var isClosed = false
 
     init(
         languageCode: String,
-        partialPreviewWindowSeconds: TimeInterval = 1.2,
-        partialPreviewOverlapSeconds: TimeInterval = 0.35,
-        partialPreviewMinimumInterval: TimeInterval = 1.0,
+        firstPartialPreviewWindowSeconds: TimeInterval = 0.55,
+        partialPreviewWindowSeconds: TimeInterval = 0.85,
+        preSpeechPaddingSeconds: TimeInterval = 0.25,
+        endpointSilenceSeconds: TimeInterval = 0.6,
+        partialPreviewMinimumInterval: TimeInterval = 0.45,
+        speechRMSFloor: Float = 0.008,
         prepare: @escaping () async throws -> Void = {},
         transcribe: @escaping (Data, Double, String) async throws -> LocalASRTranscriptionResult
     ) {
         self.languageCode = languageCode
         self.prepare = prepare
         self.transcribe = transcribe
-        partialPreviewWindowBytes = Self.pcm16ByteCount(
+        firstPartialPreviewWindowBytes = Self.pcm16ByteCount(
+            seconds: firstPartialPreviewWindowSeconds,
+            sampleRate: targetSampleRate
+        )
+        revisionPartialPreviewWindowBytes = Self.pcm16ByteCount(
             seconds: partialPreviewWindowSeconds,
             sampleRate: targetSampleRate
         )
-        partialPreviewOverlapBytes = Self.pcm16ByteCount(
-            seconds: partialPreviewOverlapSeconds,
+        preSpeechPaddingBytes = Self.pcm16ByteCount(
+            seconds: preSpeechPaddingSeconds,
+            sampleRate: targetSampleRate
+        )
+        endpointSilenceBytes = Self.pcm16ByteCount(
+            seconds: endpointSilenceSeconds,
             sampleRate: targetSampleRate
         )
         self.partialPreviewMinimumInterval = partialPreviewMinimumInterval
+        self.speechRMSFloor = speechRMSFloor
     }
 
     convenience init(service: SenseVoiceNativeService, languageCode: String) {
@@ -190,7 +211,9 @@ final class SenseVoiceNativeCaptureSession: ASRCaptureSession {
 
     func append(_ buffer: AVAudioPCMBuffer) async throws {
         let chunk = try AudioPCMConverter.pcm16MonoData(from: buffer, targetSampleRate: targetSampleRate)
+        let chunkStartByte = pcm16MonoData.count
         pcm16MonoData.append(chunk)
+        updateSpeechActivity(with: chunk, startByte: chunkStartByte)
         schedulePartialPreviewIfNeeded()
     }
 
@@ -201,6 +224,8 @@ final class SenseVoiceNativeCaptureSession: ASRCaptureSession {
         isClosed = true
         partialPreviewTask?.cancel()
         partialPreviewTask = nil
+        partialPreviewDelayTask?.cancel()
+        partialPreviewDelayTask = nil
         try await prepareTask?.value
 
         let result = try await transcribe(pcm16MonoData, targetSampleRate, languageCode)
@@ -215,37 +240,62 @@ final class SenseVoiceNativeCaptureSession: ASRCaptureSession {
         isClosed = true
         partialPreviewTask?.cancel()
         partialPreviewTask = nil
+        partialPreviewDelayTask?.cancel()
+        partialPreviewDelayTask = nil
         pcm16MonoData.removeAll(keepingCapacity: false)
         transcriptAccumulator.reset()
+        activeSpeechStartByte = nil
+        lastSpeechByte = nil
+        hasPendingSegmentBoundary = false
+        hasDeliveredPartialForActiveSegment = false
     }
 
     private func schedulePartialPreviewIfNeeded() {
         guard !isClosed else { return }
         guard onPartialText != nil else { return }
         guard partialPreviewTask == nil else { return }
-        guard pcm16MonoData.count > nextPartialPreviewStartByte else { return }
-        guard pcm16MonoData.count - nextPartialPreviewStartByte >= partialPreviewWindowBytes else { return }
+        guard let activeSpeechStartByte, let lastSpeechByte else { return }
+        guard lastSpeechByte > activeSpeechStartByte else { return }
+        guard lastSpeechByte > nextPartialPreviewStartByte else { return }
+        let isEndpointPreview = hasPendingSegmentBoundary
+        if !isEndpointPreview {
+            let requiredWindowBytes = hasDeliveredPartialForActiveSegment
+                ? revisionPartialPreviewWindowBytes
+                : firstPartialPreviewWindowBytes
+            guard lastSpeechByte - nextPartialPreviewStartByte >= requiredWindowBytes else { return }
+        }
 
         let now = Date()
         if let lastPartialPreviewStartedAt,
            now.timeIntervalSince(lastPartialPreviewStartedAt) < partialPreviewMinimumInterval {
+            scheduleDelayedPartialPreview(after: partialPreviewMinimumInterval - now.timeIntervalSince(lastPartialPreviewStartedAt))
             return
         }
 
-        let snapshotEnd = pcm16MonoData.count
-        let snapshotStart = max(0, nextPartialPreviewStartByte - partialPreviewOverlapBytes)
+        partialPreviewDelayTask?.cancel()
+        partialPreviewDelayTask = nil
+        let segmentID = activeSegmentID
+        let snapshotEnd = lastSpeechByte
+        let snapshotStart = activeSpeechStartByte
         let snapshot = Data(pcm16MonoData[snapshotStart ..< snapshotEnd])
         lastPartialPreviewStartedAt = now
         nextPartialPreviewStartByte = snapshotEnd
+        let audioDurationMs = Int(Double(snapshot.count) / 2 / targetSampleRate * 1000)
+        let previewKind = isEndpointPreview ? "endpoint" : "rolling"
 
         partialPreviewTask = Task { [weak self] in
             guard let self else { return }
             do {
                 try await prepareTask?.value
                 guard !Task.isCancelled else { return }
+                let startedAt = Date()
                 let result = try await transcribe(snapshot, targetSampleRate, languageCode)
                 guard !Task.isCancelled else { return }
-                deliverPartialPreview(result.text)
+                let decodeMs = Int(Date().timeIntervalSince(startedAt) * 1000)
+                debugLog(
+                    "SenseVoice native partial kind=\(previewKind) segment=\(segmentID) audioMs=\(audioDurationMs) decodeMs=\(decodeMs) textLength=\(result.text.count)"
+                )
+                deliverPartialPreview(result.text, segmentID: segmentID, commitsSegmentAfterDelivery: isEndpointPreview)
             } catch is CancellationError {
                 finishPartialPreview()
             } catch SenseVoiceNativeError.emptyTranscript {
@@ -257,16 +307,56 @@ final class SenseVoiceNativeCaptureSession: ASRCaptureSession {
         }
     }
 
-    private func deliverPartialPreview(_ text: String) {
+    private func scheduleDelayedPartialPreview(after delay: TimeInterval) {
+        guard partialPreviewDelayTask == nil else { return }
+        partialPreviewDelayTask = Task { [weak self] in
+            if delay > 0 {
+                try? await Task.sleep(for: .milliseconds(Int((delay * 1000).rounded(.up))))
+            }
+            await MainActor.run {
+                guard let self else { return }
+                self.partialPreviewDelayTask = nil
+                self.schedulePartialPreviewIfNeeded()
+            }
+        }
+    }
+
+    private func deliverPartialPreview(_ text: String, segmentID: Int, commitsSegmentAfterDelivery: Bool) {
         partialPreviewTask = nil
         guard !isClosed else { return }
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return }
-        let displayText = transcriptAccumulator.commit(trimmed)
+        guard !trimmed.isEmpty else {
+            schedulePartialPreviewIfNeeded()
+            return
+        }
+
+        if segmentID != activeSegmentID {
+            if commitsSegmentAfterDelivery {
+                let displayText = transcriptAccumulator.reviseCommittedSuffix(trimmed)
+                deliverPartialDisplayTextIfNeeded(displayText, marksActiveSegmentDelivered: false)
+            }
+            schedulePartialPreviewIfNeeded()
+            return
+        }
+
+        let displayText = transcriptAccumulator.updatePartial(trimmed)
+        if commitsSegmentAfterDelivery {
+            transcriptAccumulator.commitLiveText()
+        }
+        deliverPartialDisplayTextIfNeeded(displayText, marksActiveSegmentDelivered: true)
+        schedulePartialPreviewIfNeeded()
+    }
+
+    private func deliverPartialDisplayTextIfNeeded(
+        _ displayText: String,
+        marksActiveSegmentDelivered: Bool
+    ) {
+        if marksActiveSegmentDelivered {
+            hasDeliveredPartialForActiveSegment = true
+        }
         guard displayText != lastDeliveredPartialText else { return }
         lastDeliveredPartialText = displayText
         onPartialText?(displayText)
-        schedulePartialPreviewIfNeeded()
     }
 
     private func finishPartialPreview() {
@@ -275,8 +365,54 @@ final class SenseVoiceNativeCaptureSession: ASRCaptureSession {
         schedulePartialPreviewIfNeeded()
     }
 
+    private func updateSpeechActivity(with chunk: Data, startByte: Int) {
+        guard !chunk.isEmpty else { return }
+
+        let chunkEndByte = startByte + chunk.count
+        if Self.rmsLevel(forPCM16MonoData: chunk) >= speechRMSFloor {
+            if activeSpeechStartByte == nil || hasPendingSegmentBoundary {
+                if hasPendingSegmentBoundary {
+                    transcriptAccumulator.commitLiveText()
+                }
+                activeSegmentID += 1
+                activeSpeechStartByte = max(0, startByte - preSpeechPaddingBytes)
+                nextPartialPreviewStartByte = activeSpeechStartByte ?? startByte
+                hasPendingSegmentBoundary = false
+                hasDeliveredPartialForActiveSegment = false
+            }
+            lastSpeechByte = chunkEndByte
+            return
+        }
+
+        guard let lastSpeechByte else { return }
+        if chunkEndByte - lastSpeechByte >= endpointSilenceBytes {
+            hasPendingSegmentBoundary = true
+        }
+    }
+
     private static func pcm16ByteCount(seconds: TimeInterval, sampleRate: Double) -> Int {
         max(0, Int(seconds * sampleRate) * 2)
+    }
+
+    private static func rmsLevel(forPCM16MonoData data: Data) -> Float {
+        guard data.count >= 2 else { return 0 }
+
+        var sumSquares = 0.0
+        var sampleCount = 0
+        data.withUnsafeBytes { rawBuffer in
+            let bytes = rawBuffer.bindMemory(to: UInt8.self)
+            var index = 0
+            while index + 1 < bytes.count {
+                let raw = UInt16(bytes[index]) | (UInt16(bytes[index + 1]) << 8)
+                let sample = Double(Int16(bitPattern: raw)) / 32768.0
+                sumSquares += sample * sample
+                sampleCount += 1
+                index += 2
+            }
+        }
+
+        guard sampleCount > 0 else { return 0 }
+        return Float((sumSquares / Double(sampleCount)).squareRoot())
     }
 }
 
