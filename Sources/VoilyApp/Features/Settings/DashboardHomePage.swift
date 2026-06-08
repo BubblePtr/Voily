@@ -55,8 +55,8 @@ struct DashboardHomePage: View {
 
                 LazyVGrid(columns: historyColumns, spacing: 20) {
                     TrendChartsSection(
-                        title: "近 7 天语音输入时长",
-                        subtitle: "观察最近一周的活跃度变化",
+                        title: AppLocalization.localized("近 7 天语音输入时长"),
+                        subtitle: AppLocalization.localized("观察最近一周的活跃度变化"),
                         summaries: usageStore.weeklySummaries,
                         value: \.totalDurationMs,
                         accentColor: .blue,
@@ -64,8 +64,8 @@ struct DashboardHomePage: View {
                     )
 
                     TrendChartsSection(
-                        title: "近 7 天输出字数",
-                        subtitle: "统计最终结果文本的累计字数",
+                        title: AppLocalization.localized("近 7 天输出字数"),
+                        subtitle: AppLocalization.localized("统计最终结果文本的累计字数"),
                         summaries: usageStore.weeklySummaries,
                         value: \.totalCharacters,
                         accentColor: .green,
@@ -247,7 +247,7 @@ private struct TodayMetricsSection: View {
     var body: some View {
         LazyVGrid(columns: columns, spacing: 16) {
             MetricCard(
-                title: "今日语音输入时长",
+                title: AppLocalization.localized("今日语音输入时长"),
                 value: formattedDuration(summary.totalDurationMs),
                 footnote: summary.sessionCount == 0
                     ? AppLocalization.localized("今天还没有记录")
@@ -259,7 +259,7 @@ private struct TodayMetricsSection: View {
             )
 
             MetricCard(
-                title: "今日输出字数",
+                title: AppLocalization.localized("今日输出字数"),
                 value: "\(summary.totalCharacters)",
                 footnote: summary.totalCharacters == 0
                     ? AppLocalization.localized("当前没有最终文本产出")
@@ -268,7 +268,7 @@ private struct TodayMetricsSection: View {
             )
 
             MetricCard(
-                title: "平均每分钟字数",
+                title: AppLocalization.localized("平均每分钟字数"),
                 value: averageCharactersPerMinute(summary: summary),
                 footnote: summary.totalDurationMs == 0
                     ? AppLocalization.localized("还没有足够的语音输入数据")
@@ -276,7 +276,7 @@ private struct TodayMetricsSection: View {
                 accent: .orange
             )
             MetricCard(
-                title: "今日平均延时",
+                title: AppLocalization.localized("今日平均延时"),
                 value: formattedRecognitionDuration(asrSummary.averageRecognitionMs),
                 footnote: asrSummary.sessionCount == 0
                     ? AppLocalization.localized("还没有识别性能数据")
@@ -333,8 +333,7 @@ private struct MetricCard: View {
                         .frame(width: 10, height: 10)
                 )
 
-            Text(LocalizedStringKey(title))
-                .id("\(title)-\(AppLocalization.currentLanguageCode)")
+            Text(title)
                 .font(.system(size: 14, weight: .medium))
                 .foregroundStyle(.secondary)
 
@@ -376,7 +375,7 @@ private struct TrendChartsSection: View {
 
                 HStack(alignment: .bottom) {
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("最近一天")
+                        Text(AppLocalization.localized("最近一天"))
                             .font(.system(size: 12))
                             .foregroundStyle(.secondary)
                         Text(formatter(summaries.last?[keyPath: value] ?? 0))
@@ -386,7 +385,7 @@ private struct TrendChartsSection: View {
                     Spacer()
 
                     VStack(alignment: .trailing, spacing: 4) {
-                        Text("近 7 天累计")
+                        Text(AppLocalization.localized("近 7 天累计"))
                             .font(.system(size: 12))
                             .foregroundStyle(.secondary)
                         Text(formatter(summaries.reduce(0) { $0 + $1[keyPath: value] }))
@@ -463,9 +462,9 @@ private struct HistoryListSection: View {
     let onCopySuccess: () -> Void
 
     var body: some View {
-        SettingsCard(title: "历史记录", subtitle: "按时间倒序展示，支持复制最终结果文本") {
+        SettingsCard(title: AppLocalization.localized("历史记录"), subtitle: AppLocalization.localized("按时间倒序展示，支持复制最终结果文本")) {
             if sessions.isEmpty {
-                Text("还没有历史记录。完成一次语音输入后，这里会自动出现。")
+                Text(AppLocalization.localized("还没有历史记录。完成一次语音输入后，这里会自动出现。"))
                     .font(.system(size: 13))
                     .foregroundStyle(.secondary)
             } else {
@@ -515,7 +514,7 @@ private struct HistorySessionRowView: View {
 
                 Spacer()
 
-                Button("复制文本") {
+                Button(AppLocalization.localized("复制文本")) {
                     copyText()
                 }
                 .buttonStyle(.bordered)
@@ -598,7 +597,7 @@ private struct CopyToastView: View {
                 .font(.system(size: 16, weight: .semibold))
                 .foregroundStyle(.green)
 
-            Text("复制成功")
+            Text(AppLocalization.localized("复制成功"))
                 .font(.system(size: 13, weight: .semibold))
                 .foregroundStyle(.white)
         }

@@ -30,6 +30,34 @@ final class TranscriptLogicTests: XCTestCase {
         XCTAssertEqual(accumulator.finalText, "你好，世界")
     }
 
+    func testTranscriptAccumulatorRevisesOverlappingPartialSuffix() {
+        var accumulator = TranscriptAccumulator()
+
+        XCTAssertEqual(accumulator.updateOverlappingPartial("我看这个本地六式显示"), "我看这个本地六式显示")
+        XCTAssertEqual(
+            accumulator.updateOverlappingPartial("本地流式显示还是有问题"),
+            "我看这个本地流式显示还是有问题"
+        )
+        XCTAssertEqual(accumulator.finalText, "我看这个本地流式显示还是有问题")
+    }
+
+    func testTranscriptAccumulatorReplacesSimilarOverlappingTail() {
+        var accumulator = TranscriptAccumulator()
+
+        XCTAssertEqual(accumulator.updateOverlappingPartial("这里明显是有重复的，他会不会能显示出来？"), "这里明显是有重复的，他会不会能显示出来？")
+        XCTAssertEqual(
+            accumulator.updateOverlappingPartial("它会不会能显示出来并且修改的。"),
+            "这里明显是有重复的，它会不会能显示出来并且修改的。"
+        )
+    }
+
+    func testTranscriptAccumulatorAppendsOverlappingPartialWithoutReliableRevision() {
+        var accumulator = TranscriptAccumulator()
+
+        XCTAssertEqual(accumulator.updateOverlappingPartial("今天"), "今天")
+        XCTAssertEqual(accumulator.updateOverlappingPartial("天气不错"), "今天天气不错")
+    }
+
     func testPartialTranscriptDisplayThrottleEmitsFirstPartialImmediatelyAndBuffersRapidUpdates() {
         var throttle = PartialTranscriptDisplayThrottle(minimumInterval: 0.25)
 

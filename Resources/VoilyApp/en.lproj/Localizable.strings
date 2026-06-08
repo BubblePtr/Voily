@@ -137,6 +137,11 @@
 "卸载模型" = "Uninstall Model";
 "未导入" = "Not Imported";
 "可用" = "Ready";
+"运行时不可用" = "Runtime Unavailable";
+"下载中" = "Downloading";
+"校验中" = "Validating";
+"不完整" = "Incomplete";
+"失败" = "Failed";
 "正在校验模型文件..." = "Validating model files...";
 "正在准备从 %@ 下载..." = "Preparing download from %@...";
 "正在下载 %@..." = "Downloading %@...";
@@ -156,6 +161,7 @@
 "模型源" = "Model Source";
 "手动导入..." = "Import Manually...";
 "重新校验" = "Revalidate";
+"更多操作" = "More Actions";
 "清除本地模型缓存" = "Clear Local Model Cache";
 "清除缓存" = "Clear Cache";
 "请选择模型源后下载。" = "Choose a model source before downloading.";
