@@ -43,6 +43,15 @@ public struct TranscriptAccumulator: Sendable {
     }
 
     @discardableResult
+    public mutating func reviseCommittedSuffix(_ text: String) -> String {
+        let normalized = Self.normalize(text)
+        if !normalized.isEmpty {
+            committedText = Self.mergeAllowingSuffixRevision(base: committedText, incoming: normalized)
+        }
+        return displayText
+    }
+
+    @discardableResult
     public mutating func appendDelta(_ text: String) -> String {
         let normalized = Self.normalize(text)
         guard !normalized.isEmpty else { return displayText }

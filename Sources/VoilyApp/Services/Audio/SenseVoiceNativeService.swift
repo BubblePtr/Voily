@@ -324,21 +324,39 @@ final class SenseVoiceNativeCaptureSession: ASRCaptureSession {
     private func deliverPartialPreview(_ text: String, segmentID: Int, commitsSegmentAfterDelivery: Bool) {
         partialPreviewTask = nil
         guard !isClosed else { return }
-        guard segmentID == activeSegmentID else { return }
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return }
+        guard !trimmed.isEmpty else {
+            schedulePartialPreviewIfNeeded()
+            return
+        }
+
+        if segmentID != activeSegmentID {
+            if commitsSegmentAfterDelivery {
+                let displayText = transcriptAccumulator.reviseCommittedSuffix(trimmed)
+                deliverPartialDisplayTextIfNeeded(displayText, marksActiveSegmentDelivered: false)
+            }
+            schedulePartialPreviewIfNeeded()
+            return
+        }
+
         let displayText = transcriptAccumulator.updatePartial(trimmed)
         if commitsSegmentAfterDelivery {
             transcriptAccumulator.commitLiveText()
         }
-        guard displayText != lastDeliveredPartialText else {
-            schedulePartialPreviewIfNeeded()
-            return
-        }
-        lastDeliveredPartialText = displayText
-        hasDeliveredPartialForActiveSegment = true
-        onPartialText?(displayText)
+        deliverPartialDisplayTextIfNeeded(displayText, marksActiveSegmentDelivered: true)
         schedulePartialPreviewIfNeeded()
+    }
+
+    private func deliverPartialDisplayTextIfNeeded(
+        _ displayText: String,
+        marksActiveSegmentDelivered: Bool
+    ) {
+        if marksActiveSegmentDelivered {
+            hasDeliveredPartialForActiveSegment = true
+        }
+        guard displayText != lastDeliveredPartialText else { return }
+        lastDeliveredPartialText = displayText
+        onPartialText?(displayText)
     }
 
     private func finishPartialPreview() {

@@ -58,6 +58,16 @@ final class TranscriptLogicTests: XCTestCase {
         XCTAssertEqual(accumulator.updateOverlappingPartial("天气不错"), "今天天气不错")
     }
 
+    func testTranscriptAccumulatorRevisesCommittedSuffixWithoutClearingLiveText() {
+        var accumulator = TranscriptAccumulator()
+
+        XCTAssertEqual(accumulator.updatePartial("第一段"), "第一段")
+        XCTAssertEqual(accumulator.commitLiveText(), "第一段")
+        XCTAssertEqual(accumulator.updatePartial("第二句"), "第一段第二句")
+        XCTAssertEqual(accumulator.reviseCommittedSuffix("第一段尾巴"), "第一段尾巴第二句")
+        XCTAssertEqual(accumulator.finalText, "第一段尾巴第二句")
+    }
+
     func testPartialTranscriptDisplayThrottleEmitsFirstPartialImmediatelyAndBuffersRapidUpdates() {
         var throttle = PartialTranscriptDisplayThrottle(minimumInterval: 0.25)
 

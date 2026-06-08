@@ -511,6 +511,72 @@ final class ASRCaptureSessionTests: XCTestCase {
         await session.cancel()
     }
 
+    func testSenseVoiceNativeSessionKeepsDelayedEndpointTailAfterNextSpeechStarts() async throws {
+        let firstPartialExpectation = expectation(description: "first native partial before delayed endpoint")
+        let endpointStartedExpectation = expectation(description: "delayed endpoint preview started")
+        let endpointPartialExpectation = expectation(description: "delayed endpoint partial updates committed text")
+        let nextSpeechPartialExpectation = expectation(description: "next speech partial keeps delayed endpoint tail")
+        let recorder = SessionRecorder()
+        let session = SenseVoiceNativeCaptureSession(
+            languageCode: "zh-Hans",
+            firstPartialPreviewWindowSeconds: 0.000125,
+            partialPreviewWindowSeconds: 0.00025,
+            preSpeechPaddingSeconds: 0,
+            endpointSilenceSeconds: 0,
+            partialPreviewMinimumInterval: 0,
+            transcribe: { pcm16MonoData, _, _ in
+                await recorder.recordNativeTranscribe(byteCount: pcm16MonoData.count)
+                let callCount = await recorder.nativeTranscribeByteCounts.count
+                if callCount == 2 {
+                    endpointStartedExpectation.fulfill()
+                    try await Task.sleep(for: .milliseconds(80))
+                }
+                let text: String
+                switch callCount {
+                case 1:
+                    text = "第一段"
+                case 2:
+                    text = "第一段尾巴"
+                default:
+                    text = "第二句"
+                }
+                return LocalASRTranscriptionResult(
+                    text: text,
+                    duration: 0.01,
+                    commandSummary: "sensevoice-native-delayed-endpoint-test"
+                )
+            }
+        )
+
+        try await session.start(onPartial: { partialText in
+            Task {
+                let partialCount = await recorder.recordNativePartial(partialText)
+                if partialCount == 1 {
+                    firstPartialExpectation.fulfill()
+                } else if partialCount == 2 {
+                    endpointPartialExpectation.fulfill()
+                } else if partialCount == 3 {
+                    nextSpeechPartialExpectation.fulfill()
+                }
+            }
+        })
+
+        try await session.append(makeBuffer(sampleRate: 16_000, samples: [0.1, -0.1]))
+        await fulfillment(of: [firstPartialExpectation], timeout: 1)
+        try await session.append(makeBuffer(sampleRate: 16_000, samples: [0.2, -0.2]))
+        try await session.append(makeBuffer(sampleRate: 16_000, samples: [0, 0]))
+        await fulfillment(of: [endpointStartedExpectation], timeout: 1)
+        try await session.append(makeBuffer(sampleRate: 16_000, samples: [0.3, -0.3]))
+        await fulfillment(of: [endpointPartialExpectation, nextSpeechPartialExpectation], timeout: 1)
+
+        let transcribeByteCounts = await recorder.nativeTranscribeByteCounts
+        let partials = await recorder.nativePartials
+        XCTAssertEqual(transcribeByteCounts, [4, 8, 4])
+        XCTAssertEqual(partials, ["第一段", "第一段尾巴", "第一段尾巴第二句"])
+
+        await session.cancel()
+    }
+
     func testSenseVoiceNativeSessionRevisesOverlappingPartialPreview() async throws {
         let firstPartialExpectation = expectation(description: "first native revised partial preview")
         let secondPartialExpectation = expectation(description: "second native revised partial preview")
