@@ -1,0 +1,162 @@
+name: Open Code Review
+
+on:
+  pull_request:
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - ready_for_review
+    paths-ignore:
+      - "docs/releases/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: open-code-review-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  review:
+    name: Review PR diff
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    env:
+      OCR_LLM_URL: https://api.deepseek.com/chat/completions
+      OCR_LLM_MODEL: ${{ vars.OCR_LLM_MODEL || 'deepseek-v4-flash' }}
+      OCR_USE_ANTHROPIC: "false"
+      VOILY_OCR_BACKGROUND: |
+        Voily is a macOS 14+ SwiftUI/AppKit dictation app. Review with these project constraints:
+        - Do not use macOS 15/26-only APIs unless guarded by availability checks and fallbacks.
+        - Do not introduce Combine.
+        - ASR providers must go through the SpeechTranscriptionService abstraction.
+        - System audio muting while recording must stay centralized in SystemMediaPlaybackService.
+        - Text injection must use the Accessibility paste path, not synthetic keystrokes.
+        - Fn/trigger-key monitoring must stay on the IOKit path, not NSEvent global monitors.
+
+    steps:
+      - name: Check DeepSeek secret
+        id: deepseek
+        env:
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+        run: |
+          set -euo pipefail
+
+          if [[ -z "${DEEPSEEK_API_KEY:-}" ]]; then
+            {
+              echo "configured=false"
+              echo "reason=Repository secret DEEPSEEK_API_KEY is not configured."
+            } >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "configured=true" >> "$GITHUB_OUTPUT"
+
+      - name: Skip review
+        if: steps.deepseek.outputs.configured != 'true'
+        run: |
+          {
+            echo "## Open Code Review"
+            echo
+            echo "Skipped: ${DEEPSEEK_SKIP_REASON:-Repository secret DEEPSEEK_API_KEY is not configured.}"
+          } >> "$GITHUB_STEP_SUMMARY"
+        env:
+          DEEPSEEK_SKIP_REASON: ${{ steps.deepseek.outputs.reason }}
+
+      - name: Check out repository
+        if: steps.deepseek.outputs.configured == 'true'
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        if: steps.deepseek.outputs.configured == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install Open Code Review
+        if: steps.deepseek.outputs.configured == 'true'
+        run: npm install -g @alibaba-group/open-code-review@1.2.4
+
+      - name: Run Open Code Review
+        if: steps.deepseek.outputs.configured == 'true'
+        env:
+          OCR_LLM_TOKEN: ${{ secrets.DEEPSEEK_API_KEY }}
+        run: |
+          set -euo pipefail
+
+          if [[ "${GITHUB_EVENT_NAME}" == "pull_request" ]]; then
+            base_ref="origin/${GITHUB_BASE_REF}"
+            head_ref="HEAD"
+            git fetch origin "${GITHUB_BASE_REF}:refs/remotes/origin/${GITHUB_BASE_REF}" --depth=1
+          else
+            base_ref="origin/main"
+            head_ref="HEAD"
+            git fetch origin "main:refs/remotes/origin/main" --depth=1
+          fi
+
+          ocr version
+          ocr llm test
+          ocr review \
+            --audience agent \
+            --concurrency 2 \
+            --from "$base_ref" \
+            --to "$head_ref" \
+            --format json \
+            --background "$VOILY_OCR_BACKGROUND" \
+            > ocr-result.json
+
+      - name: Summarize review
+        if: steps.deepseek.outputs.configured == 'true'
+        run: |
+          set -euo pipefail
+
+          python3 - <<'PY'
+          import json
+          import os
+
+          with open("ocr-result.json", encoding="utf-8") as handle:
+              result = json.load(handle)
+
+          comments = result.get("comments") or []
+          warnings = result.get("warnings") or []
+          summary_path = os.environ["GITHUB_STEP_SUMMARY"]
+
+          with open(summary_path, "a", encoding="utf-8") as summary:
+              summary.write("## Open Code Review\n\n")
+              summary.write(f"- Comments: {len(comments)}\n")
+              summary.write(f"- Warnings: {len(warnings)}\n")
+              summary.write(f"- Model: `{os.environ.get('OCR_LLM_MODEL', '')}`\n\n")
+
+              if comments:
+                  summary.write("### Findings\n\n")
+                  for comment in comments[:20]:
+                      path = comment.get("path", "unknown")
+                      line = comment.get("start_line") or comment.get("end_line") or 0
+                      content = (comment.get("content") or "").strip().replace("\n", " ")
+                      if len(content) > 260:
+                          content = content[:257] + "..."
+                      summary.write(f"- `{path}:{line}` {content}\n")
+                  if len(comments) > 20:
+                      summary.write(f"\nOnly the first 20 findings are shown. See `ocr-result` artifact for all output.\n")
+              else:
+                  message = result.get("message") or "No comments generated."
+                  summary.write(message + "\n")
+          PY
+
+      - name: Upload OCR result
+        if: steps.deepseek.outputs.configured == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ocr-result
+          path: ocr-result.json
+          if-no-files-found: error

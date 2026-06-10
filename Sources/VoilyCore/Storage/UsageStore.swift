@@ -40,6 +40,26 @@ public struct TodayUsageSummary: Equatable, Sendable {
     public static let empty = TodayUsageSummary(totalDurationMs: 0, totalCharacters: 0, sessionCount: 0)
 }
 
+public struct LifetimeUsageSummary: Equatable, Sendable {
+    public let totalDurationMs: Int
+    public let totalCharacters: Int
+    public let sessionCount: Int
+    public let averageRecognitionMs: Int
+
+    public var averageCharactersPerMinute: Int {
+        guard totalDurationMs > 0, totalCharacters > 0 else { return 0 }
+        let charactersPerMinute = (Double(totalCharacters) * 60_000.0) / Double(totalDurationMs)
+        return Int(charactersPerMinute.rounded())
+    }
+
+    public static let empty = LifetimeUsageSummary(
+        totalDurationMs: 0,
+        totalCharacters: 0,
+        sessionCount: 0,
+        averageRecognitionMs: 0
+    )
+}
+
 public struct TodayASRPerformanceSummary: Equatable, Sendable {
     public let averageFirstPartialMs: Int
     public let averageRecognitionMs: Int
@@ -72,6 +92,32 @@ public struct DailyUsageSummary: Identifiable, Equatable, Sendable {
     }
 }
 
+public struct HourlyUsageSummary: Identifiable, Equatable, Sendable {
+    public let hour: Int
+    public let sessionCount: Int
+
+    public var id: Int { hour }
+
+    public init(hour: Int, sessionCount: Int) {
+        self.hour = hour
+        self.sessionCount = sessionCount
+    }
+}
+
+public struct FrontApplicationUsageSummary: Identifiable, Equatable, Sendable {
+    public let bundleID: String
+    public let name: String
+    public let sessionCount: Int
+
+    public var id: String { bundleID }
+
+    public init(bundleID: String, name: String, sessionCount: Int) {
+        self.bundleID = bundleID
+        self.name = name
+        self.sessionCount = sessionCount
+    }
+}
+
 public struct VoiceInputSessionDraft: Sendable {
     public let startedAt: Date
     public let endedAt: Date
@@ -85,6 +131,8 @@ public struct VoiceInputSessionDraft: Sendable {
     public let recognitionEngineMs: Int?
     public let recognitionFirstPartialMs: Int?
     public let recognitionPartialCount: Int
+    public let frontApplicationBundleID: String?
+    public let frontApplicationName: String?
 
     public init(
         startedAt: Date,
@@ -98,7 +146,9 @@ public struct VoiceInputSessionDraft: Sendable {
         recognitionTotalMs: Int,
         recognitionEngineMs: Int?,
         recognitionFirstPartialMs: Int?,
-        recognitionPartialCount: Int
+        recognitionPartialCount: Int,
+        frontApplicationBundleID: String? = nil,
+        frontApplicationName: String? = nil
     ) {
         self.startedAt = startedAt
         self.endedAt = endedAt
@@ -112,6 +162,8 @@ public struct VoiceInputSessionDraft: Sendable {
         self.recognitionEngineMs = recognitionEngineMs
         self.recognitionFirstPartialMs = recognitionFirstPartialMs
         self.recognitionPartialCount = recognitionPartialCount
+        self.frontApplicationBundleID = frontApplicationBundleID
+        self.frontApplicationName = frontApplicationName
     }
 }
 
@@ -128,6 +180,14 @@ public final class UsageStore {
         static let recentSessionLimit = 100
         static let trendDayCount = 7
         static let heatmapDayCount = 84
+        static let frontApplicationLimit = 4
+    }
+
+    private struct FrontApplicationDistributionSnapshot {
+        let summaries: [FrontApplicationUsageSummary]
+        let totalSessionCount: Int
+
+        static let empty = FrontApplicationDistributionSnapshot(summaries: [], totalSessionCount: 0)
     }
 
     private let calendar: Calendar
@@ -135,10 +195,15 @@ public final class UsageStore {
     nonisolated(unsafe) private var database: OpaquePointer?
 
     public private(set) var todaySummary: TodayUsageSummary = .empty
+    public private(set) var lifetimeSummary: LifetimeUsageSummary = .empty
     public private(set) var todayASRSummary: TodayASRPerformanceSummary = .empty
     public private(set) var weeklySummaries: [DailyUsageSummary] = []
     public private(set) var heatmapSummaries: [DailyUsageSummary] = []
+    public private(set) var hourlyUsageSummaries: [HourlyUsageSummary] = []
+    public private(set) var frontApplicationSummaries: [FrontApplicationUsageSummary] = []
+    public private(set) var frontApplicationSessionCount = 0
     public private(set) var recentSessions: [HistorySessionRow] = []
+    public private(set) var canLoadMoreRecentSessions = false
 
     public init(databasePath: String? = nil, calendar: Calendar = .autoupdatingCurrent) {
         self.calendar = calendar
@@ -158,10 +223,15 @@ public final class UsageStore {
 
     public func refresh(now: Date = Date()) {
         todaySummary = fetchTodaySummary(now: now)
+        lifetimeSummary = fetchLifetimeSummary()
         todayASRSummary = fetchTodayASRSummary(now: now)
         weeklySummaries = fetchLastDays(count: Constants.trendDayCount, now: now)
         heatmapSummaries = fetchLastDays(count: Constants.heatmapDayCount, now: now)
-        recentSessions = fetchRecentSessions(limit: Constants.recentSessionLimit, offset: 0)
+        hourlyUsageSummaries = fetchHourlyUsageSummaries()
+        let frontApplicationDistribution = fetchFrontApplicationDistribution(limit: Constants.frontApplicationLimit)
+        frontApplicationSummaries = frontApplicationDistribution.summaries
+        frontApplicationSessionCount = frontApplicationDistribution.totalSessionCount
+        refreshRecentSessions(limit: max(Constants.recentSessionLimit, recentSessions.count))
     }
 
     public func fetchTodaySummary(now: Date = Date()) -> TodayUsageSummary {
@@ -190,6 +260,37 @@ public final class UsageStore {
             totalDurationMs: Int(sqlite3_column_int64(statement, 0)),
             totalCharacters: Int(sqlite3_column_int64(statement, 1)),
             sessionCount: Int(sqlite3_column_int64(statement, 2))
+        )
+    }
+
+    public func fetchLifetimeSummary() -> LifetimeUsageSummary {
+        let sql = """
+        SELECT
+            total_duration_ms,
+            total_characters,
+            session_count,
+            total_recognition_ms
+        FROM usage_lifetime_summary
+        WHERE id = 1
+        LIMIT 1;
+        """
+
+        guard let statement = try? prepareStatement(sql: sql) else {
+            return .empty
+        }
+        defer { sqlite3_finalize(statement) }
+
+        guard sqlite3_step(statement) == SQLITE_ROW else {
+            return .empty
+        }
+
+        let sessionCount = Int(sqlite3_column_int64(statement, 2))
+        let totalRecognitionMs = Int(sqlite3_column_int64(statement, 3))
+        return LifetimeUsageSummary(
+            totalDurationMs: Int(sqlite3_column_int64(statement, 0)),
+            totalCharacters: Int(sqlite3_column_int64(statement, 1)),
+            sessionCount: sessionCount,
+            averageRecognitionMs: sessionCount > 0 ? totalRecognitionMs / sessionCount : 0
         )
     }
 
@@ -235,6 +336,125 @@ public final class UsageStore {
         }
 
         return grouped.values.sorted { $0.date < $1.date }
+    }
+
+    public func fetchHourlyUsageSummaries() -> [HourlyUsageSummary] {
+        let sql = """
+        SELECT
+            started_hour,
+            COUNT(*)
+        FROM voice_input_sessions
+        WHERE started_hour >= 0 AND started_hour < 24
+        GROUP BY started_hour
+        ORDER BY started_hour ASC;
+        """
+
+        guard let statement = try? prepareStatement(sql: sql) else {
+            return (0..<24).map { HourlyUsageSummary(hour: $0, sessionCount: 0) }
+        }
+        defer { sqlite3_finalize(statement) }
+
+        var counts = Array(repeating: 0, count: 24)
+        while sqlite3_step(statement) == SQLITE_ROW {
+            let hour = Int(sqlite3_column_int64(statement, 0))
+            guard counts.indices.contains(hour) else { continue }
+            counts[hour] = Int(sqlite3_column_int64(statement, 1))
+        }
+
+        return counts.enumerated().map { hour, count in
+            HourlyUsageSummary(hour: hour, sessionCount: count)
+        }
+    }
+
+    public func fetchFrontApplicationSummaries(limit: Int) -> [FrontApplicationUsageSummary] {
+        fetchFrontApplicationDistribution(limit: limit).summaries
+    }
+
+    private func fetchFrontApplicationDistribution(limit: Int) -> FrontApplicationDistributionSnapshot {
+        guard limit > 0 else { return .empty }
+        let sql = """
+        WITH grouped AS (
+            SELECT
+                front_application_bundle_id,
+                front_application_name,
+                COUNT(*) AS session_count
+            FROM voice_input_sessions
+            WHERE
+                front_application_bundle_id IS NOT NULL
+                AND front_application_bundle_id != ''
+                AND front_application_name IS NOT NULL
+                AND front_application_name != ''
+            GROUP BY front_application_bundle_id, front_application_name
+        ),
+        ranked AS (
+            SELECT
+                front_application_bundle_id,
+                front_application_name,
+                session_count,
+                SUM(session_count) OVER () AS total_session_count
+            FROM grouped
+        )
+        SELECT
+            front_application_bundle_id,
+            front_application_name,
+            session_count,
+            total_session_count
+        FROM ranked
+        ORDER BY session_count DESC, front_application_name ASC
+        LIMIT ?1;
+        """
+
+        guard let statement = try? prepareStatement(sql: sql) else {
+            return .empty
+        }
+        defer { sqlite3_finalize(statement) }
+
+        sqlite3_bind_int(statement, 1, Int32(limit))
+
+        var summaries: [FrontApplicationUsageSummary] = []
+        var totalSessionCount = 0
+        while sqlite3_step(statement) == SQLITE_ROW {
+            guard
+                let rawBundleID = sqlite3_column_text(statement, 0).map({ String(cString: $0) }),
+                let rawName = sqlite3_column_text(statement, 1).map({ String(cString: $0) })
+            else {
+                continue
+            }
+
+            summaries.append(
+                FrontApplicationUsageSummary(
+                    bundleID: rawBundleID,
+                    name: rawName,
+                    sessionCount: Int(sqlite3_column_int64(statement, 2))
+                )
+            )
+            totalSessionCount = Int(sqlite3_column_int64(statement, 3))
+        }
+
+        return FrontApplicationDistributionSnapshot(summaries: summaries, totalSessionCount: totalSessionCount)
+    }
+
+    public func fetchFrontApplicationSessionCount() -> Int {
+        let sql = """
+        SELECT COUNT(*)
+        FROM voice_input_sessions
+        WHERE
+            front_application_bundle_id IS NOT NULL
+            AND front_application_bundle_id != ''
+            AND front_application_name IS NOT NULL
+            AND front_application_name != '';
+        """
+
+        guard let statement = try? prepareStatement(sql: sql) else {
+            return 0
+        }
+        defer { sqlite3_finalize(statement) }
+
+        guard sqlite3_step(statement) == SQLITE_ROW else {
+            return 0
+        }
+
+        return Int(sqlite3_column_int64(statement, 0))
     }
 
     public func fetchTodayASRSummary(now: Date = Date()) -> TodayASRPerformanceSummary {
@@ -317,6 +537,11 @@ public final class UsageStore {
         return rows
     }
 
+    public func loadMoreRecentSessions() {
+        guard canLoadMoreRecentSessions else { return }
+        refreshRecentSessions(limit: recentSessions.count + Constants.recentSessionLimit)
+    }
+
     public func copyableText(for sessionID: UUID) -> String? {
         let sql = """
         SELECT final_text
@@ -347,6 +572,9 @@ public final class UsageStore {
         }
 
         let sessionID = UUID()
+        let durationMs = max(0, Int(draft.endedAt.timeIntervalSince(draft.startedAt) * 1000))
+        let characterCount = trimmedText.count
+        let recognitionTotalMs = max(0, draft.recognitionTotalMs)
         let sql = """
         INSERT INTO voice_input_sessions (
             id,
@@ -365,8 +593,11 @@ public final class UsageStore {
             recognition_total_ms,
             recognition_engine_ms,
             recognition_first_partial_ms,
-            recognition_partial_count
-        ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, NULL, ?11, ?12, ?13, ?14, ?15, ?16);
+            recognition_partial_count,
+            front_application_bundle_id,
+            front_application_name,
+            started_hour
+        ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, NULL, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19);
         """
 
         guard let statement = try? prepareStatement(sql: sql) else {
@@ -378,15 +609,15 @@ public final class UsageStore {
         sqlite3_bind_text(statement, 2, Self.dayKey(for: draft.endedAt, calendar: calendar), -1, transientDestructor)
         sqlite3_bind_double(statement, 3, draft.startedAt.timeIntervalSince1970)
         sqlite3_bind_double(statement, 4, draft.endedAt.timeIntervalSince1970)
-        sqlite3_bind_int64(statement, 5, sqlite3_int64(max(0, Int(draft.endedAt.timeIntervalSince(draft.startedAt) * 1000))))
+        sqlite3_bind_int64(statement, 5, sqlite3_int64(durationMs))
         sqlite3_bind_text(statement, 6, draft.languageCode, -1, transientDestructor)
         sqlite3_bind_text(statement, 7, draft.recognizedText, -1, transientDestructor)
         sqlite3_bind_text(statement, 8, trimmedText, -1, transientDestructor)
-        sqlite3_bind_int(statement, 9, Int32(trimmedText.count))
+        sqlite3_bind_int(statement, 9, Int32(characterCount))
         sqlite3_bind_int(statement, 10, draft.refinementApplied ? 1 : 0)
         sqlite3_bind_text(statement, 11, draft.asrProvider, -1, transientDestructor)
         sqlite3_bind_text(statement, 12, draft.asrSource, -1, transientDestructor)
-        sqlite3_bind_int64(statement, 13, sqlite3_int64(max(0, draft.recognitionTotalMs)))
+        sqlite3_bind_int64(statement, 13, sqlite3_int64(recognitionTotalMs))
         if let recognitionEngineMs = draft.recognitionEngineMs {
             sqlite3_bind_int64(statement, 14, sqlite3_int64(max(0, recognitionEngineMs)))
         } else {
@@ -398,13 +629,41 @@ public final class UsageStore {
             sqlite3_bind_null(statement, 15)
         }
         sqlite3_bind_int64(statement, 16, sqlite3_int64(max(0, draft.recognitionPartialCount)))
+        if let frontApplicationBundleID = draft.frontApplicationBundleID?.trimmingCharacters(in: .whitespacesAndNewlines),
+           !frontApplicationBundleID.isEmpty {
+            sqlite3_bind_text(statement, 17, frontApplicationBundleID, -1, transientDestructor)
+        } else {
+            sqlite3_bind_null(statement, 17)
+        }
+        if let frontApplicationName = draft.frontApplicationName?.trimmingCharacters(in: .whitespacesAndNewlines),
+           !frontApplicationName.isEmpty {
+            sqlite3_bind_text(statement, 18, frontApplicationName, -1, transientDestructor)
+        } else {
+            sqlite3_bind_null(statement, 18)
+        }
+        sqlite3_bind_int(statement, 19, Int32(localHour(for: draft.startedAt)))
 
         guard sqlite3_step(statement) == SQLITE_DONE else {
             return nil
         }
 
+        if !incrementLifetimeSummaryCache(
+            durationMs: durationMs,
+            characterCount: characterCount,
+            recognitionTotalMs: recognitionTotalMs
+        ) {
+            try? rebuildLifetimeSummaryCache()
+        }
+
         refresh(now: now)
         return sessionID
+    }
+
+    private func refreshRecentSessions(limit: Int) {
+        let requestedLimit = max(Constants.recentSessionLimit, limit)
+        let rows = fetchRecentSessions(limit: requestedLimit + 1, offset: 0)
+        canLoadMoreRecentSessions = rows.count > requestedLimit
+        recentSessions = Array(rows.prefix(requestedLimit))
     }
 
     public func markInjectionResult(sessionID: UUID, succeeded: Bool, now: Date = Date()) {
@@ -516,6 +775,7 @@ public final class UsageStore {
             day_key TEXT NOT NULL,
             started_at DOUBLE NOT NULL,
             ended_at DOUBLE NOT NULL,
+            started_hour INTEGER NULL,
             duration_ms INTEGER NOT NULL,
             language_code TEXT NOT NULL,
             recognized_text TEXT NOT NULL,
@@ -528,7 +788,9 @@ public final class UsageStore {
             recognition_total_ms INTEGER NOT NULL DEFAULT 0,
             recognition_engine_ms INTEGER NULL,
             recognition_first_partial_ms INTEGER NULL,
-            recognition_partial_count INTEGER NOT NULL DEFAULT 0
+            recognition_partial_count INTEGER NOT NULL DEFAULT 0,
+            front_application_bundle_id TEXT NULL,
+            front_application_name TEXT NULL
         );
 
         CREATE INDEX IF NOT EXISTS idx_voice_input_sessions_day_key
@@ -547,6 +809,24 @@ public final class UsageStore {
         try addColumnIfNeeded(name: "recognition_engine_ms", definition: "INTEGER NULL")
         try addColumnIfNeeded(name: "recognition_first_partial_ms", definition: "INTEGER NULL")
         try addColumnIfNeeded(name: "recognition_partial_count", definition: "INTEGER NOT NULL DEFAULT 0")
+        try addColumnIfNeeded(name: "front_application_bundle_id", definition: "TEXT NULL")
+        try addColumnIfNeeded(name: "front_application_name", definition: "TEXT NULL")
+        try addColumnIfNeeded(name: "started_hour", definition: "INTEGER NULL")
+        try createLifetimeSummaryCacheIfNeeded()
+        try createIndexIfNeeded(
+            sql: """
+            CREATE INDEX IF NOT EXISTS idx_voice_input_sessions_started_hour
+                ON voice_input_sessions(started_hour);
+            """
+        )
+        try createIndexIfNeeded(
+            sql: """
+            CREATE INDEX IF NOT EXISTS idx_voice_input_sessions_front_application
+                ON voice_input_sessions(front_application_bundle_id, front_application_name);
+            """
+        )
+        try backfillStartedHourIfNeeded()
+        try rebuildLifetimeSummaryCache()
     }
 
     private func addColumnIfNeeded(name: String, definition: String) throws {
@@ -564,6 +844,138 @@ public final class UsageStore {
 
         let alterSQL = "ALTER TABLE voice_input_sessions ADD COLUMN \(name) \(definition);"
         guard sqlite3_exec(database, alterSQL, nil, nil, nil) == SQLITE_OK else {
+            throw UsageStoreError.statementExecutionFailed(lastSQLiteErrorMessage())
+        }
+    }
+
+    private func createIndexIfNeeded(sql: String) throws {
+        guard sqlite3_exec(database, sql, nil, nil, nil) == SQLITE_OK else {
+            throw UsageStoreError.statementExecutionFailed(lastSQLiteErrorMessage())
+        }
+    }
+
+    private func createLifetimeSummaryCacheIfNeeded() throws {
+        let sql = """
+        CREATE TABLE IF NOT EXISTS usage_lifetime_summary (
+            id INTEGER PRIMARY KEY CHECK (id = 1),
+            session_count INTEGER NOT NULL,
+            total_duration_ms INTEGER NOT NULL,
+            total_characters INTEGER NOT NULL,
+            total_recognition_ms INTEGER NOT NULL
+        );
+        """
+
+        guard sqlite3_exec(database, sql, nil, nil, nil) == SQLITE_OK else {
+            throw UsageStoreError.statementExecutionFailed(lastSQLiteErrorMessage())
+        }
+    }
+
+    private func rebuildLifetimeSummaryCache() throws {
+        let sql = """
+        INSERT OR REPLACE INTO usage_lifetime_summary (
+            id,
+            session_count,
+            total_duration_ms,
+            total_characters,
+            total_recognition_ms
+        )
+        SELECT
+            1,
+            COUNT(*),
+            COALESCE(SUM(duration_ms), 0),
+            COALESCE(SUM(character_count), 0),
+            COALESCE(SUM(recognition_total_ms), 0)
+        FROM voice_input_sessions;
+        """
+
+        guard sqlite3_exec(database, sql, nil, nil, nil) == SQLITE_OK else {
+            throw UsageStoreError.statementExecutionFailed(lastSQLiteErrorMessage())
+        }
+    }
+
+    private func incrementLifetimeSummaryCache(durationMs: Int, characterCount: Int, recognitionTotalMs: Int) -> Bool {
+        let sql = """
+        INSERT INTO usage_lifetime_summary (
+            id,
+            session_count,
+            total_duration_ms,
+            total_characters,
+            total_recognition_ms
+        ) VALUES (1, 1, ?1, ?2, ?3)
+        ON CONFLICT(id) DO UPDATE SET
+            session_count = session_count + 1,
+            total_duration_ms = total_duration_ms + excluded.total_duration_ms,
+            total_characters = total_characters + excluded.total_characters,
+            total_recognition_ms = total_recognition_ms + excluded.total_recognition_ms;
+        """
+
+        guard let statement = try? prepareStatement(sql: sql) else {
+            return false
+        }
+        defer { sqlite3_finalize(statement) }
+
+        sqlite3_bind_int64(statement, 1, sqlite3_int64(durationMs))
+        sqlite3_bind_int64(statement, 2, sqlite3_int64(characterCount))
+        sqlite3_bind_int64(statement, 3, sqlite3_int64(recognitionTotalMs))
+
+        return sqlite3_step(statement) == SQLITE_DONE
+    }
+
+    private func backfillStartedHourIfNeeded() throws {
+        let selectSQL = """
+        SELECT id, started_at
+        FROM voice_input_sessions
+        WHERE started_hour IS NULL;
+        """
+
+        var pendingUpdates: [(id: String, hour: Int)] = []
+        do {
+            guard let selectStatement = try? prepareStatement(sql: selectSQL) else {
+                throw UsageStoreError.statementPrepareFailed(lastSQLiteErrorMessage())
+            }
+            defer { sqlite3_finalize(selectStatement) }
+
+            while sqlite3_step(selectStatement) == SQLITE_ROW {
+                guard let rawID = sqlite3_column_text(selectStatement, 0).map({ String(cString: $0) }) else {
+                    continue
+                }
+                let startedAt = Date(timeIntervalSince1970: sqlite3_column_double(selectStatement, 1))
+                pendingUpdates.append((id: rawID, hour: localHour(for: startedAt)))
+            }
+        }
+
+        guard !pendingUpdates.isEmpty else { return }
+
+        guard sqlite3_exec(database, "BEGIN TRANSACTION;", nil, nil, nil) == SQLITE_OK else {
+            throw UsageStoreError.statementExecutionFailed(lastSQLiteErrorMessage())
+        }
+
+        let updateSQL = """
+        UPDATE voice_input_sessions
+        SET started_hour = ?1
+        WHERE id = ?2;
+        """
+
+        guard let updateStatement = try? prepareStatement(sql: updateSQL) else {
+            _ = sqlite3_exec(database, "ROLLBACK;", nil, nil, nil)
+            throw UsageStoreError.statementPrepareFailed(lastSQLiteErrorMessage())
+        }
+        defer { sqlite3_finalize(updateStatement) }
+
+        for update in pendingUpdates {
+            sqlite3_reset(updateStatement)
+            sqlite3_clear_bindings(updateStatement)
+            sqlite3_bind_int(updateStatement, 1, Int32(update.hour))
+            sqlite3_bind_text(updateStatement, 2, update.id, -1, transientDestructor)
+
+            guard sqlite3_step(updateStatement) == SQLITE_DONE else {
+                _ = sqlite3_exec(database, "ROLLBACK;", nil, nil, nil)
+                throw UsageStoreError.statementExecutionFailed(lastSQLiteErrorMessage())
+            }
+        }
+
+        guard sqlite3_exec(database, "COMMIT;", nil, nil, nil) == SQLITE_OK else {
+            _ = sqlite3_exec(database, "ROLLBACK;", nil, nil, nil)
             throw UsageStoreError.statementExecutionFailed(lastSQLiteErrorMessage())
         }
     }
@@ -605,6 +1017,10 @@ public final class UsageStore {
         formatter.timeZone = calendar.timeZone
         formatter.dateFormat = "yyyy-MM-dd"
         return formatter.date(from: dayKey)
+    }
+
+    private func localHour(for date: Date) -> Int {
+        calendar.component(.hour, from: date)
     }
 }
 
