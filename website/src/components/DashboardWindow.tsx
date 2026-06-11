@@ -1,10 +1,24 @@
+import type { ReactElement } from 'react'
+
 import { AppWindow, TrafficLights } from './AppWindow'
 import { OverlayCapsule } from './OverlayCapsule'
 
 // High-fidelity recreation of Voily's Home dashboard (see assets/screenshots/hero.png).
 // English-labelled to match the rest of the marketing site.
 
-const navGroups = [
+type NavItem = {
+  id: string
+  name: string
+  icon: () => ReactElement
+  active?: boolean
+}
+
+type NavGroup = {
+  label: string
+  items: NavItem[]
+}
+
+const navGroups: NavGroup[] = [
   {
     label: 'General',
     items: [{ id: 'home', name: 'Home', icon: HomeIcon, active: true }],

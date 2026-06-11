@@ -101,7 +101,7 @@ function FeatureBlock(props: {
   children: React.ReactNode
 }) {
   return (
-    <article className="feature-block" ref={props.setRef as never} data-idx={props.idx}>
+    <article className="feature-block" ref={props.setRef} data-idx={props.idx}>
       <div className="feature-copy">
         <span className="feature-eyebrow">{props.eyebrow}</span>
         <h3>{props.title}</h3>
