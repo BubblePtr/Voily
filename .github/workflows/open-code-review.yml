@@ -13,7 +13,7 @@ on:
 
 permissions:
   contents: read
-  pull-requests: read
+  pull-requests: write
 
 concurrency:
   group: open-code-review-${{ github.event.pull_request.number || github.ref }}
@@ -152,6 +152,53 @@ jobs:
                   message = result.get("message") or "No comments generated."
                   summary.write(message + "\n")
           PY
+
+      - name: Post review comment
+        if: steps.deepseek.outputs.configured == 'true' && github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+
+          python3 - <<'PY' > comment-body.md
+          import json
+          import os
+
+          with open("ocr-result.json", encoding="utf-8") as handle:
+              result = json.load(handle)
+
+          comments = result.get("comments") or []
+          warnings = result.get("warnings") or []
+          model = os.environ.get("OCR_LLM_MODEL", "")
+
+          lines = [
+              "<!-- open-code-review -->",
+              "## 🤖 Open Code Review",
+              "",
+              f"Model `{model}` · **{len(comments)}** comments · **{len(warnings)}** warnings",
+              "",
+          ]
+
+          if comments:
+              for comment in comments[:30]:
+                  path = comment.get("path", "unknown")
+                  line = comment.get("start_line") or comment.get("end_line") or 0
+                  content = " ".join((comment.get("content") or "").split())
+                  if len(content) > 500:
+                      content = content[:497] + "..."
+                  lines.append(f"- **`{path}:{line}`** — {content}")
+              if len(comments) > 30:
+                  lines.append("")
+                  lines.append(f"_Showing first 30 of {len(comments)}. Full output in the `ocr-result` artifact._")
+          else:
+              lines.append(result.get("message") or "No findings 🎉")
+
+          print("\n".join(lines))
+          PY
+
+          # Upsert a single sticky comment so repeated pushes update in place.
+          gh pr comment "$PR_NUMBER" --body-file comment-body.md --edit-last --create-if-none
 
       - name: Upload OCR result
         if: steps.deepseek.outputs.configured == 'true'
