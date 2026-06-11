@@ -29,6 +29,11 @@ private struct RecognitionOutcome {
     let partialCount: Int
 }
 
+private struct FrontApplicationMetadata {
+    let bundleID: String
+    let name: String
+}
+
 private enum CaptureSessionMode: Equatable {
     case dictation
     case quickTranslationZhToEn
@@ -145,6 +150,7 @@ final class AppController: NSObject {
     private var smoothedRMS: Float = 0
     private var currentSessionStartedAt: Date?
     private var currentSessionMode: CaptureSessionMode?
+    private var currentFrontApplicationMetadata: FrontApplicationMetadata?
     private var activeASRSession: ActiveASRCaptureSession?
     private var currentFirstPartialMs: Int?
     private var currentPartialCount = 0
@@ -231,6 +237,7 @@ final class AppController: NSObject {
         activeASRSession = nil
         currentCaptureAppendError = nil
         currentSessionMode = nil
+        currentFrontApplicationMetadata = nil
         currentOverlayControls = .none
         realtimeAppendCounter.reset()
     }
@@ -696,6 +703,7 @@ final class AppController: NSObject {
         }
 
         currentSessionMode = mode
+        currentFrontApplicationMetadata = currentFrontApplication()
         currentText = ""
         smoothedRMS = 0
         currentSessionStartedAt = Date()
@@ -840,7 +848,9 @@ final class AppController: NSObject {
                 recognitionTotalMs: recognitionOutcome.totalDurationMs,
                 recognitionEngineMs: recognitionOutcome.engineDurationMs,
                 recognitionFirstPartialMs: recognitionOutcome.firstPartialMs,
-                recognitionPartialCount: recognitionOutcome.partialCount
+                recognitionPartialCount: recognitionOutcome.partialCount,
+                frontApplicationBundleID: currentFrontApplicationMetadata?.bundleID,
+                frontApplicationName: currentFrontApplicationMetadata?.name
             )
         )
 
@@ -905,6 +915,7 @@ final class AppController: NSObject {
         await restoreAudioOutputIfNeeded()
 
         currentSessionMode = nil
+        currentFrontApplicationMetadata = nil
         currentFirstPartialMs = nil
         currentPartialCount = 0
         currentCaptureAppendError = nil
@@ -989,6 +1000,26 @@ final class AppController: NSObject {
         }
 
         return true
+    }
+
+    private func currentFrontApplication() -> FrontApplicationMetadata? {
+        guard let application = NSWorkspace.shared.frontmostApplication else {
+            return nil
+        }
+        guard let bundleID = application.bundleIdentifier?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !bundleID.isEmpty,
+              bundleID != Bundle.main.bundleIdentifier
+        else {
+            return nil
+        }
+
+        let name = (application.localizedName ?? application.bundleURL?.deletingPathExtension().lastPathComponent ?? bundleID)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !name.isEmpty else {
+            return nil
+        }
+
+        return FrontApplicationMetadata(bundleID: bundleID, name: name)
     }
 
     private func recognizeText() async -> RecognitionOutcome {

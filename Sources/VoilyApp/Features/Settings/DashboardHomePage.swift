@@ -15,6 +15,12 @@ private enum DashboardFormatters {
         formatter.timeStyle = .short
         return formatter
     }()
+
+    static let integer: NumberFormatter = {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .decimal
+        return formatter
+    }()
 }
 
 struct DashboardHomePage: View {
@@ -48,34 +54,21 @@ struct DashboardHomePage: View {
                     onOpenInputSettings: onOpenInputSettings
                 )
 
-                TodayMetricsSection(
-                    summary: usageStore.todaySummary,
-                    asrSummary: usageStore.todayASRSummary
+                OverviewMetricsSection(summary: usageStore.lifetimeSummary)
+
+                BehaviorInsightsSection(
+                    frontApplications: usageStore.frontApplicationSummaries,
+                    hourlySummaries: usageStore.hourlyUsageSummaries,
+                    frontApplicationSessionCount: usageStore.frontApplicationSessionCount
                 )
-
-                LazyVGrid(columns: historyColumns, spacing: 20) {
-                    TrendChartsSection(
-                        title: AppLocalization.localized("近 7 天语音输入时长"),
-                        subtitle: AppLocalization.localized("观察最近一周的活跃度变化"),
-                        summaries: usageStore.weeklySummaries,
-                        value: \.totalDurationMs,
-                        accentColor: .blue,
-                        formatter: formatDuration
-                    )
-
-                    TrendChartsSection(
-                        title: AppLocalization.localized("近 7 天输出字数"),
-                        subtitle: AppLocalization.localized("统计最终结果文本的累计字数"),
-                        summaries: usageStore.weeklySummaries,
-                        value: \.totalCharacters,
-                        accentColor: .green,
-                        formatter: formatCharacters
-                    )
-                }
 
                 HistoryListSection(
                     usageStore: usageStore,
                     sessions: usageStore.recentSessions,
+                    canLoadMore: usageStore.canLoadMoreRecentSessions,
+                    onLoadMore: {
+                        usageStore.loadMoreRecentSessions()
+                    },
                     onCopySuccess: {
                         copyToastTask?.cancel()
                         withAnimation(.easeInOut(duration: 0.18)) {
@@ -233,9 +226,8 @@ private struct DashboardPermissionReminderBanner: View {
     }
 }
 
-private struct TodayMetricsSection: View {
-    let summary: TodayUsageSummary
-    let asrSummary: TodayASRPerformanceSummary
+private struct OverviewMetricsSection: View {
+    let summary: LifetimeUsageSummary
 
     private let columns = [
         GridItem(.flexible(), spacing: 16),
@@ -246,50 +238,46 @@ private struct TodayMetricsSection: View {
 
     var body: some View {
         LazyVGrid(columns: columns, spacing: 16) {
-            MetricCard(
-                title: AppLocalization.localized("今日语音输入时长"),
+            OverviewMetricCard(
+                title: AppLocalization.localized("累计语音时长"),
                 value: formattedDuration(summary.totalDurationMs),
                 footnote: summary.sessionCount == 0
-                    ? AppLocalization.localized("今天还没有记录")
+                    ? AppLocalization.localized("还没有记录")
                     : String(
-                        format: AppLocalization.localized("共 %@ 次语音输入"),
-                        "\(summary.sessionCount)"
+                        format: AppLocalization.localized("共 %@ 次"),
+                        formattedInteger(summary.sessionCount)
                     ),
                 accent: .blue
             )
 
-            MetricCard(
-                title: AppLocalization.localized("今日输出字数"),
-                value: "\(summary.totalCharacters)",
+            OverviewMetricCard(
+                title: AppLocalization.localized("累计输出字数"),
+                value: formattedInteger(summary.totalCharacters),
                 footnote: summary.totalCharacters == 0
                     ? AppLocalization.localized("当前没有最终文本产出")
-                    : AppLocalization.localized("按最终结果文本统计"),
+                    : AppLocalization.localized("最终结果文本"),
                 accent: .green
             )
 
-            MetricCard(
+            OverviewMetricCard(
                 title: AppLocalization.localized("平均每分钟字数"),
-                value: averageCharactersPerMinute(summary: summary),
+                value: formattedInteger(summary.averageCharactersPerMinute),
                 footnote: summary.totalDurationMs == 0
                     ? AppLocalization.localized("还没有足够的语音输入数据")
-                    : AppLocalization.localized("按今日语音输入时长折算"),
+                    : AppLocalization.localized("全部时长折算"),
                 accent: .orange
             )
-            MetricCard(
-                title: AppLocalization.localized("今日平均延时"),
-                value: formattedRecognitionDuration(asrSummary.averageRecognitionMs),
-                footnote: asrSummary.sessionCount == 0
+
+            OverviewMetricCard(
+                title: AppLocalization.localized("平均延时"),
+                value: formattedRecognitionDuration(summary.averageRecognitionMs),
+                footnote: summary.sessionCount == 0
                     ? AppLocalization.localized("还没有识别性能数据")
-                    : AppLocalization.localized("从结束录音到转文字完成"),
-                accent: .pink
+                    : AppLocalization.localized("录音 -> 转文字"),
+                accent: .blue,
+                highlighted: true
             )
         }
-    }
-
-    private func averageCharactersPerMinute(summary: TodayUsageSummary) -> String {
-        guard summary.totalDurationMs > 0, summary.totalCharacters > 0 else { return "0" }
-        let charactersPerMinute = (Double(summary.totalCharacters) * 60_000.0) / Double(summary.totalDurationMs)
-        return "\(Int(charactersPerMinute.rounded()))"
     }
 
     private func formattedDuration(_ durationMs: Int) -> String {
@@ -314,31 +302,27 @@ private struct TodayMetricsSection: View {
         }
         return "\(durationMs) ms"
     }
+
+    private func formattedInteger(_ value: Int) -> String {
+        DashboardFormatters.integer.string(from: NSNumber(value: value)) ?? "\(value)"
+    }
 }
 
-private struct MetricCard: View {
+private struct OverviewMetricCard: View {
     let title: String
     let value: String
     let footnote: String
     let accent: Color
+    var highlighted = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .fill(accent.opacity(0.12))
-                .frame(width: 40, height: 40)
-                .overlay(
-                    Circle()
-                        .fill(accent)
-                        .frame(width: 10, height: 10)
-                )
-
+        VStack(alignment: .leading, spacing: 12) {
             Text(title)
-                .font(.system(size: 14, weight: .medium))
+                .font(.system(size: 14, weight: .semibold))
                 .foregroundStyle(.secondary)
 
             Text(value)
-                .font(.system(size: 30, weight: .semibold))
+                .font(.system(size: 28, weight: .semibold))
                 .lineLimit(1)
                 .minimumScaleFactor(0.75)
 
@@ -346,17 +330,287 @@ private struct MetricCard: View {
                 .font(.system(size: 12))
                 .foregroundStyle(.secondary)
         }
-        .padding(18)
-        .frame(maxWidth: .infinity, minHeight: 152, alignment: .leading)
+        .padding(.horizontal, 20)
+        .padding(.vertical, 18)
+        .frame(maxWidth: .infinity, minHeight: 128, alignment: .leading)
         .background(
             RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .fill(Color(nsColor: .controlBackgroundColor))
+                .fill(highlighted ? accent.opacity(0.07) : Color(nsColor: .controlBackgroundColor))
         )
         .overlay(
             RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .stroke(Color.primary.opacity(0.06), lineWidth: 1)
+                .stroke(highlighted ? accent.opacity(0.20) : Color.primary.opacity(0.06), lineWidth: 1)
         )
     }
+}
+
+private struct BehaviorInsightsSection: View {
+    let frontApplications: [FrontApplicationUsageSummary]
+    let hourlySummaries: [HourlyUsageSummary]
+    let frontApplicationSessionCount: Int
+
+    private let columns = [
+        GridItem(.flexible(minimum: 360), spacing: 20, alignment: .top),
+        GridItem(.flexible(minimum: 360), spacing: 20, alignment: .top),
+    ]
+
+    var body: some View {
+        LazyVGrid(columns: columns, spacing: 20) {
+            FrontApplicationDistributionSection(
+                summaries: frontApplications,
+                totalSessionCount: frontApplicationSessionCount
+            )
+
+            TimeOfDayDistributionSection(summaries: hourlySummaries)
+        }
+    }
+}
+
+private struct FrontApplicationDistributionSection: View {
+    let summaries: [FrontApplicationUsageSummary]
+    let totalSessionCount: Int
+
+    var body: some View {
+        SettingsCard(
+            title: AppLocalization.localized("语音输入场景"),
+            subtitle: AppLocalization.localized("按前台 App 统计")
+        ) {
+            if summaries.isEmpty {
+                EmptyApplicationDistributionView()
+                    .frame(height: 180)
+            } else {
+                let displaySummaries = summariesIncludingOther
+                HStack(alignment: .center, spacing: 24) {
+                    ApplicationDonutChart(
+                        summaries: displaySummaries,
+                        totalSessionCount: max(totalSessionCount, displaySummaries.reduce(0) { $0 + $1.sessionCount })
+                    )
+                    .frame(width: 180, height: 180)
+
+                    ApplicationLegendView(
+                        summaries: displaySummaries,
+                        totalSessionCount: max(totalSessionCount, displaySummaries.reduce(0) { $0 + $1.sessionCount })
+                    )
+                }
+                .frame(maxWidth: .infinity, minHeight: 180, alignment: .leading)
+            }
+        }
+    }
+
+    private var summariesIncludingOther: [FrontApplicationUsageSummary] {
+        let displayedCount = summaries.reduce(0) { $0 + $1.sessionCount }
+        let otherCount = totalSessionCount - displayedCount
+        guard otherCount > 0 else { return summaries }
+        return summaries + [
+            FrontApplicationUsageSummary(
+                bundleID: "__other__",
+                name: AppLocalization.localized("其他"),
+                sessionCount: otherCount
+            ),
+        ]
+    }
+}
+
+private struct EmptyApplicationDistributionView: View {
+    var body: some View {
+        VStack(alignment: .center, spacing: 8) {
+            Image(systemName: "chart.pie")
+                .font(.system(size: 28, weight: .semibold))
+                .foregroundStyle(.secondary)
+
+            Text(AppLocalization.localized("暂无场景数据"))
+                .font(.system(size: 14, weight: .semibold))
+
+            Text(AppLocalization.localized("完成新的语音输入后开始统计"))
+                .font(.system(size: 12))
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+}
+
+private enum ApplicationDistributionPalette {
+    static let colors: [Color] = [
+        Color(red: 0.27, green: 0.66, blue: 0.96),
+        Color(red: 0.04, green: 0.52, blue: 0.96),
+        Color(red: 0.00, green: 0.40, blue: 0.82),
+        Color(red: 0.02, green: 0.28, blue: 0.64),
+        Color(red: 0.02, green: 0.20, blue: 0.48),
+    ]
+}
+
+private struct ApplicationDonutChart: View {
+    let summaries: [FrontApplicationUsageSummary]
+    let totalSessionCount: Int
+
+    private let colors = ApplicationDistributionPalette.colors
+
+    var body: some View {
+        ZStack {
+            Circle()
+                .stroke(Color.primary.opacity(0.06), lineWidth: 18)
+
+            ForEach(Array(segments.enumerated()), id: \.offset) { index, segment in
+                DonutSegmentShape(startAngle: segment.startAngle, endAngle: segment.endAngle)
+                    .stroke(colors[index % colors.count], style: StrokeStyle(lineWidth: 18, lineCap: .round))
+            }
+
+            VStack(spacing: 2) {
+                Text(formattedInteger(totalSessionCount))
+                    .font(.system(size: 24, weight: .semibold))
+                Text(AppLocalization.localized("次"))
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .padding(18)
+    }
+
+    private var segments: [DonutSegment] {
+        guard !summaries.isEmpty else { return [] }
+        let total = max(1, totalSessionCount)
+        let gap = summaries.count > 1 ? 3.0 : 0.0
+        let availableSweep = max(0.0, 360.0 - (Double(summaries.count) * gap))
+        var cursor = -90.0
+        return summaries.map { summary in
+            let sweep = (Double(summary.sessionCount) / Double(total)) * availableSweep
+            let segment = DonutSegment(startAngle: .degrees(cursor), endAngle: .degrees(cursor + sweep))
+            cursor += sweep + gap
+            return segment
+        }
+    }
+
+    private func formattedInteger(_ value: Int) -> String {
+        DashboardFormatters.integer.string(from: NSNumber(value: value)) ?? "\(value)"
+    }
+}
+
+private struct DonutSegment {
+    let startAngle: Angle
+    let endAngle: Angle
+}
+
+private struct DonutSegmentShape: Shape {
+    let startAngle: Angle
+    let endAngle: Angle
+
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        let center = CGPoint(x: rect.midX, y: rect.midY)
+        let radius = min(rect.width, rect.height) / 2
+        path.addArc(center: center, radius: radius, startAngle: startAngle, endAngle: endAngle, clockwise: false)
+        return path
+    }
+}
+
+private struct ApplicationLegendView: View {
+    let summaries: [FrontApplicationUsageSummary]
+    let totalSessionCount: Int
+
+    private let colors = ApplicationDistributionPalette.colors
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            ForEach(Array(summaries.enumerated()), id: \.element.id) { index, summary in
+                HStack(spacing: 10) {
+                    RoundedRectangle(cornerRadius: 4, style: .continuous)
+                        .fill(colors[index % colors.count])
+                        .frame(width: 10, height: 10)
+
+                    Text(summary.name)
+                        .font(.system(size: 13))
+                        .lineLimit(1)
+
+                    Spacer(minLength: 12)
+
+                    Text(percentText(for: summary.sessionCount))
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func percentText(for count: Int) -> String {
+        let total = max(1, totalSessionCount)
+        return "\(Int((Double(count) / Double(total) * 100.0).rounded()))%"
+    }
+}
+
+private struct TimeOfDayDistributionSection: View {
+    let summaries: [HourlyUsageSummary]
+
+    var body: some View {
+        SettingsCard(
+            title: AppLocalization.localized("使用时段分布"),
+            subtitle: AppLocalization.localized("你在什么时段开口")
+        ) {
+            HourlyUsageBarChart(summaries: summaries)
+                .frame(height: 180)
+        }
+    }
+}
+
+private struct HourlyUsageBarChart: View {
+    let summaries: [HourlyUsageSummary]
+
+    var body: some View {
+        VStack(spacing: 8) {
+            GeometryReader { geometry in
+                let buckets = bucketedSummaries
+                let maxValue = max(buckets.map(\.sessionCount).max() ?? 0, 1)
+
+                ZStack(alignment: .bottomLeading) {
+                    Rectangle()
+                        .fill(Color.primary.opacity(0.07))
+                        .frame(height: 1)
+                        .offset(y: -18)
+
+                    HStack(alignment: .bottom, spacing: 10) {
+                        ForEach(buckets) { bucket in
+                            let ratio = CGFloat(bucket.sessionCount) / CGFloat(maxValue)
+                            RoundedRectangle(cornerRadius: 4, style: .continuous)
+                                .fill(Color.blue.opacity(bucket.sessionCount == 0 ? 0.18 : 0.82))
+                                .frame(height: max(8, (geometry.size.height - 32) * ratio))
+                                .frame(maxWidth: .infinity, alignment: .bottom)
+                                .accessibilityLabel(Text("\(bucket.startHour):00"))
+                                .accessibilityValue(Text("\(bucket.sessionCount)"))
+                        }
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+                    .padding(.horizontal, 8)
+                    .padding(.bottom, 20)
+                }
+            }
+
+            HStack {
+                Text("0")
+                Spacer()
+                Text("12")
+                Spacer()
+                Text("24")
+            }
+            .font(.system(size: 11, weight: .medium))
+            .foregroundStyle(.secondary)
+        }
+    }
+
+    private var bucketedSummaries: [HourlyUsageBucket] {
+        stride(from: 0, to: 24, by: 2).map { startHour in
+            let sessionCount = summaries
+                .filter { $0.hour >= startHour && $0.hour < startHour + 2 }
+                .reduce(0) { $0 + $1.sessionCount }
+            return HourlyUsageBucket(startHour: startHour, sessionCount: sessionCount)
+        }
+    }
+}
+
+private struct HourlyUsageBucket: Identifiable {
+    let startHour: Int
+    let sessionCount: Int
+
+    var id: Int { startHour }
 }
 
 private struct TrendChartsSection: View {
@@ -459,6 +713,8 @@ private struct SparklineChart: View {
 private struct HistoryListSection: View {
     let usageStore: UsageStore
     let sessions: [HistorySessionRow]
+    let canLoadMore: Bool
+    let onLoadMore: () -> Void
     let onCopySuccess: () -> Void
 
     var body: some View {
@@ -475,6 +731,15 @@ private struct HistoryListSection: View {
                             session: session,
                             onCopySuccess: onCopySuccess
                         )
+                    }
+
+                    if canLoadMore {
+                        Button(action: onLoadMore) {
+                            Label(AppLocalization.localized("加载更多历史记录"), systemImage: "chevron.down.circle")
+                        }
+                        .buttonStyle(.bordered)
+                        .controlSize(.small)
+                        .padding(.top, 4)
                     }
                 }
             }
