@@ -1,5 +1,6 @@
-import { capabilities, apps, openSourceBenefits } from './content'
-import { DemoCard } from './DemoCard'
+import { apps, openSourceBenefits } from './content'
+import { DashboardWindow } from './DashboardWindow'
+import { Features } from './Features'
 import { DotFieldBackground } from './DotFieldBackground'
 
 const downloadUrl = 'https://github.com/BubblePtr/Voily/releases/latest'
@@ -51,21 +52,18 @@ export function LandingPage() {
             macOS 14+ · Apple Silicon · Open Source
           </span>
         </div>
-        <a className="scroll-cue" href="#demo" aria-label="Scroll to demo">
+      </section>
+
+      <section className="showcase" id="showcase" aria-label="Voily app">
+        <div className="showcase-frame">
+          <DashboardWindow />
+        </div>
+        <a className="scroll-cue" href="#features" aria-label="Scroll to features">
           <span />
         </a>
       </section>
 
-      <section className="demo-section" id="demo" aria-labelledby="demo-title">
-        <div className="section-heading">
-          <h2 id="demo-title">See the difference.</h2>
-          <p>
-            Voily turns rough, spoken language into text that is ready to send,
-            ship, or paste into your next prompt.
-          </p>
-        </div>
-        <DemoCard />
-      </section>
+      <Features />
 
       <section className="works-section" aria-label="Works everywhere">
         <p>If you can type there, you can speak there.</p>
@@ -91,18 +89,6 @@ export function LandingPage() {
               </div>
             ))}
           </div>
-        </div>
-      </section>
-
-      <section className="capabilities-section" aria-labelledby="capabilities-title">
-        <h2 id="capabilities-title">Why Voily, not dictation.</h2>
-        <div className="capability-grid">
-          {capabilities.map((capability) => (
-            <article className="capability-card" key={capability.title}>
-              <h3>{capability.title}</h3>
-              <p>{capability.copy}</p>
-            </article>
-          ))}
         </div>
       </section>
 
