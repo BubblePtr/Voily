@@ -42,6 +42,16 @@ jobs:
         - Text injection must use the Accessibility paste path, not synthetic keystrokes.
         - Fn/trigger-key monitoring must stay on the IOKit path, not NSEvent global monitors.
 
+        Review discipline (mimic PR-Agent's focused review):
+        - Focus only on code lines changed in this PR diff. Do not re-review unchanged code or speculate about code defined elsewhere.
+        - Report at most 3 findings per review. If more issues exist, prioritize the most severe.
+        - Only report issues you are confident about: real bugs, security vulnerabilities, data races, crashes, user-facing regressions, or clear violations of the project constraints above.
+        - Do not report style, naming, formatting, minor optimizations, missing comments, or nitpicks.
+        - Do not flag intentional design choices unless they introduce a clear defect.
+        - Each finding must describe a concrete problem and a realistic trigger scenario. If you cannot, skip it.
+        - After a finding is fixed, do not introduce new non-blocking suggestions for the same area just because the diff context changed.
+        - Prefix every comment content with exactly one of: [BLOCKER] for blocking issues, [CRITICAL] for severe bugs/violations. Do not use [WARNING] or [SUGGESTION].
+
     steps:
       - name: Check DeepSeek secret
         id: deepseek
@@ -124,33 +134,62 @@ jobs:
           import json
           import os
 
+          BLOCKER_TAG = "[BLOCKER]"
+          CRITICAL_TAG = "[CRITICAL]"
+          MAX_SUMMARY_FINDINGS = 10
+
+          def severity_rank(comment):
+              content = (comment.get("content") or "").upper()
+              if BLOCKER_TAG in content:
+                  return 0
+              if CRITICAL_TAG in content:
+                  return 1
+              return 2
+
           with open("ocr-result.json", encoding="utf-8") as handle:
               result = json.load(handle)
 
-          comments = result.get("comments") or []
+          raw_comments = result.get("comments") or []
           warnings = result.get("warnings") or []
+
+          # Keep only blocker/critical findings. If the model ignored the tagging
+          # instruction, fall back to the raw list but cap it tightly so the
+          # review does not explode with style nits.
+          blocking = [c for c in raw_comments if severity_rank(c) <= 1]
+          if blocking:
+              comments = blocking
+              model_tagged = True
+          else:
+              comments = raw_comments[:3]
+              model_tagged = False
+
+          comments.sort(key=severity_rank)
+          comments = comments[:MAX_SUMMARY_FINDINGS]
           summary_path = os.environ["GITHUB_STEP_SUMMARY"]
 
           with open(summary_path, "a", encoding="utf-8") as summary:
               summary.write("## Open Code Review\n\n")
-              summary.write(f"- Comments: {len(comments)}\n")
+              summary.write(f"- Raw findings: {len(raw_comments)}\n")
+              summary.write(f"- Blocking/critical shown: {len(comments)}\n")
               summary.write(f"- Warnings: {len(warnings)}\n")
-              summary.write(f"- Model: `{os.environ.get('OCR_LLM_MODEL', '')}`\n\n")
+              summary.write(f"- Model: `{os.environ.get('OCR_LLM_MODEL', '')}`\n")
+              if not model_tagged and raw_comments:
+                  summary.write("- Note: model did not tag severities; showing only the first 3 raw findings.\n")
+              summary.write("\n")
 
               if comments:
                   summary.write("### Findings\n\n")
-                  for comment in comments[:20]:
+                  for comment in comments:
                       path = comment.get("path", "unknown")
                       line = comment.get("start_line") or comment.get("end_line") or 0
                       content = (comment.get("content") or "").strip().replace("\n", " ")
                       if len(content) > 260:
                           content = content[:257] + "..."
                       summary.write(f"- `{path}:{line}` {content}\n")
-                  if len(comments) > 20:
-                      summary.write(f"\nOnly the first 20 findings are shown. See `ocr-result` artifact for all output.\n")
+                  if len(blocking) > MAX_SUMMARY_FINDINGS:
+                      summary.write(f"\nOnly the first {MAX_SUMMARY_FINDINGS} blocking/critical findings are shown. See `ocr-result` artifact for all output.\n")
               else:
-                  message = result.get("message") or "No comments generated."
-                  summary.write(message + "\n")
+                  summary.write("No blocking issues 🎉\n")
           PY
 
       - name: Post review comment
@@ -165,34 +204,64 @@ jobs:
           import json
           import os
 
+          BLOCKER_TAG = "[BLOCKER]"
+          CRITICAL_TAG = "[CRITICAL]"
+          MAX_PR_FINDINGS = 5
+
+          def severity_rank(comment):
+              content = (comment.get("content") or "").upper()
+              if BLOCKER_TAG in content:
+                  return 0
+              if CRITICAL_TAG in content:
+                  return 1
+              return 2
+
           with open("ocr-result.json", encoding="utf-8") as handle:
               result = json.load(handle)
 
-          comments = result.get("comments") or []
+          raw_comments = result.get("comments") or []
           warnings = result.get("warnings") or []
           model = os.environ.get("OCR_LLM_MODEL", "")
 
+          blocking = [c for c in raw_comments if severity_rank(c) <= 1]
+          if blocking:
+              comments = blocking
+              model_tagged = True
+          else:
+              comments = raw_comments[:3]
+              model_tagged = False
+
+          comments.sort(key=severity_rank)
+          comments = comments[:MAX_PR_FINDINGS]
+
           lines = [
               "<!-- open-code-review -->",
-              "## 🤖 Open Code Review",
+              "## 🤖 Open Code Review — Blockers & Critical only",
               "",
-              f"Model `{model}` · **{len(comments)}** comments · **{len(warnings)}** warnings",
+              f"Model `{model}` · **{len(comments)}** blocking/critical findings",
               "",
           ]
 
+          if not model_tagged and raw_comments:
+              lines.append(
+                  "_⚠️ The model did not tag severities as requested; showing only the first 3 raw findings. "
+                  "Full output is available in the `ocr-result` artifact._"
+              )
+              lines.append("")
+
           if comments:
-              for comment in comments[:30]:
+              for comment in comments:
                   path = comment.get("path", "unknown")
                   line = comment.get("start_line") or comment.get("end_line") or 0
                   content = " ".join((comment.get("content") or "").split())
                   if len(content) > 500:
                       content = content[:497] + "..."
                   lines.append(f"- **`{path}:{line}`** — {content}")
-              if len(comments) > 30:
+              if len(blocking) > MAX_PR_FINDINGS:
                   lines.append("")
-                  lines.append(f"_Showing first 30 of {len(comments)}. Full output in the `ocr-result` artifact._")
+                  lines.append(f"_Showing first {MAX_PR_FINDINGS} of {len(blocking)} blocking/critical findings. Full output in the `ocr-result` artifact._")
           else:
-              lines.append(result.get("message") or "No findings 🎉")
+              lines.append("No blocking issues 🎉")
 
           print("\n".join(lines))
           PY
