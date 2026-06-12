@@ -1,4 +1,4 @@
-import type { ReactElement } from 'react'
+import { useId, type CSSProperties, type ReactElement } from 'react'
 
 import { AppWindow, TrafficLights } from './AppWindow'
 import { OverlayCapsule } from './OverlayCapsule'
@@ -45,17 +45,92 @@ const stats = [
   { tone: 'pink', label: 'Avg latency', value: '249 ms', caption: 'Record → text', highlight: true },
 ]
 
+type SceneSegmentSource = {
+  name: string
+  pct: number
+}
+
+type SceneSegment = SceneSegmentSource & {
+  color: string
+}
+
+type SceneDonutSegment = SceneSegment & {
+  visiblePct: number
+  hiddenPct: number
+  offsetPct: number
+}
+
+const sceneSegmentColors = ['#5aa6ff', '#1f86ff', '#0b63d6', '#0a3f93', '#0b2a5e']
+const sceneSegmentGapPct = 1.2
+export const sceneHourBarDelayStepMs = 45
+export const sceneDonutCounterclockwiseRevealPath =
+  'M 60 13 A 47 47 0 1 0 60 107 A 47 47 0 1 0 60 13'
+export const sceneDonutRevealMaskLineCap = 'butt'
+export const sceneDonutRevealHeadRadius = 8
+export const sceneDonutSegmentStrokeWidth = 11
+export const sceneDonutTerminalCapRadius = sceneDonutSegmentStrokeWidth / 2
+
 // "Where you dictate" donut — share of sessions by front-most app.
-const sceneSegments = [
-  { name: 'Claude', pct: 37, color: '#5aa6ff' },
-  { name: 'Cursor', pct: 26, color: '#1f86ff' },
-  { name: 'Codex', pct: 16, color: '#0b63d6' },
-  { name: 'Google Chrome', pct: 16, color: '#0a3f93' },
-  { name: 'Discord', pct: 5, color: '#0b2a5e' },
+const sceneSegmentSources: SceneSegmentSource[] = [
+  { name: 'Claude', pct: 37 },
+  { name: 'Cursor', pct: 26 },
+  { name: 'Codex', pct: 16 },
+  { name: 'Google Chrome', pct: 12 },
+  { name: 'Discord', pct: 5 },
+  { name: 'Notion', pct: 4 },
 ]
 
 // "When you dictate" — relative activity per ~2h bucket across the day.
 const hourBuckets = [40, 12, 8, 9, 11, 20, 85, 54, 78, 100, 58, 72, 46]
+
+export function buildSceneSegments(sources: SceneSegmentSource[]): SceneSegment[] {
+  const mainSegments = sources.slice(0, 4).map((segment, index) => ({
+    ...segment,
+    color: sceneSegmentColors[index],
+  }))
+  const otherPct = sources.slice(4).reduce((sum, segment) => sum + segment.pct, 0)
+
+  if (otherPct <= 0) {
+    return mainSegments
+  }
+
+  return [
+    ...mainSegments,
+    {
+      name: 'Others',
+      pct: otherPct,
+      color: sceneSegmentColors[4],
+    },
+  ]
+}
+
+const sceneSegments = buildSceneSegments(sceneSegmentSources)
+
+export function buildSceneDonutSegments(segments: SceneSegment[]): SceneDonutSegment[] {
+  const gap = segments.length > 1 ? sceneSegmentGapPct : 0
+  let offsetPct = 0
+
+  return segments.map((segment) => {
+    const visiblePct = roundPct(Math.max(0, segment.pct - gap))
+    const donutSegment = {
+      ...segment,
+      visiblePct,
+      hiddenPct: roundPct(100 - visiblePct),
+      offsetPct: roundPct(offsetPct),
+    }
+
+    offsetPct += segment.pct
+    return donutSegment
+  })
+}
+
+export function getSceneDonutTerminalCapColor(segments: SceneSegment[]): string | undefined {
+  return segments.at(-1)?.color
+}
+
+function roundPct(value: number): number {
+  return Math.round(value * 10) / 10
+}
 
 export function DashboardWindow() {
   return (
@@ -161,10 +236,10 @@ export function DashboardWindow() {
 
 // Donut of session share by app, with a centred total and a percentage legend.
 function SceneDonut() {
+  const revealMaskID = useId()
   const r = 47
-  const c = 2 * Math.PI * r
-  const gap = 4
-  let offset = 0
+  const donutSegments = buildSceneDonutSegments(sceneSegments)
+  const terminalCapColor = getSceneDonutTerminalCapColor(sceneSegments)
 
   return (
     <div className="dash-chart dash-scene">
@@ -175,28 +250,68 @@ function SceneDonut() {
       <div className="scene-body">
         <div className="scene-donut">
           <svg viewBox="0 0 120 120" aria-hidden="true">
-            <g transform="rotate(-90 60 60)">
-              {sceneSegments.map((s) => {
-                const len = (s.pct / 100) * c
-                const visible = Math.max(0, len - gap)
-                const el = (
+            <defs>
+              <mask id={revealMaskID}>
+                <rect width="120" height="120" fill="black" />
+                <path
+                  className="scene-donut-reveal-mask-path"
+                  d={sceneDonutCounterclockwiseRevealPath}
+                  fill="none"
+                  stroke="white"
+                  strokeLinecap={sceneDonutRevealMaskLineCap}
+                  strokeWidth="16"
+                  pathLength="100"
+                />
+                <g className="scene-donut-reveal-head-orbit">
                   <circle
-                    key={s.name}
+                    className="scene-donut-reveal-head"
                     cx="60"
-                    cy="60"
-                    r={r}
-                    fill="none"
-                    stroke={s.color}
-                    strokeWidth="13"
-                    strokeLinecap="round"
-                    strokeDasharray={`${visible} ${c - visible}`}
-                    strokeDashoffset={-offset}
+                    cy="13"
+                    r={sceneDonutRevealHeadRadius}
+                    fill="white"
                   />
-                )
-                offset += len
-                return el
-              })}
+                </g>
+              </mask>
+            </defs>
+            <circle
+              className="scene-donut-track"
+              cx="60"
+              cy="60"
+              r={r}
+              fill="none"
+              strokeWidth={sceneDonutSegmentStrokeWidth}
+            />
+            <g
+              className="scene-donut-segments"
+              transform="rotate(-90 60 60)"
+              mask={`url(#${revealMaskID})`}
+            >
+              {donutSegments.map((s) => (
+                <circle
+                  key={s.name}
+                  className="scene-donut-segment"
+                  cx="60"
+                  cy="60"
+                  r={r}
+                  fill="none"
+                  stroke={s.color}
+                  strokeWidth={sceneDonutSegmentStrokeWidth}
+                  strokeLinecap="round"
+                  strokeDashoffset={-s.offsetPct}
+                  pathLength="100"
+                  strokeDasharray={`${s.visiblePct} ${s.hiddenPct}`}
+                />
+              ))}
             </g>
+            {terminalCapColor && (
+              <circle
+                className="scene-donut-terminal-cap"
+                cx="60"
+                cy="13"
+                r={sceneDonutTerminalCapRadius}
+                fill={terminalCapColor}
+              />
+            )}
           </svg>
           <div className="scene-donut-center">
             <strong>19</strong>
@@ -232,7 +347,12 @@ function HoursBars() {
           <span
             key={i}
             className={`hours-bar${v < 18 ? ' is-faint' : ''}`}
-            style={{ height: `${Math.max(6, (v / max) * 100)}%` }}
+            style={
+              {
+                height: `${Math.max(6, (v / max) * 100)}%`,
+                '--bar-delay': `${i * sceneHourBarDelayStepMs}ms`,
+              } as CSSProperties
+            }
           />
         ))}
       </div>

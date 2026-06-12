@@ -23,6 +23,42 @@ private enum DashboardFormatters {
     }()
 }
 
+struct DashboardUsageTimingCurve {
+    let controlPoint1X: Double
+    let controlPoint1Y: Double
+    let controlPoint2X: Double
+    let controlPoint2Y: Double
+}
+
+enum DashboardUsageMotion {
+    static let closingEaseCurve = DashboardUsageTimingCurve(
+        controlPoint1X: 0.24,
+        controlPoint1Y: 0.72,
+        controlPoint2X: 0.22,
+        controlPoint2Y: 1
+    )
+    static let donutRevealDuration: TimeInterval = 0.96
+    static let hourlyBarGrowDuration: TimeInterval = 0.58
+    static let hourlyBarDelayStep: TimeInterval = 0.045
+
+    static var donutRevealAnimation: Animation {
+        closingEaseAnimation(duration: donutRevealDuration)
+    }
+
+    static func closingEaseAnimation(duration: TimeInterval, delay: TimeInterval = 0) -> Animation {
+        let curve = closingEaseCurve
+        return Animation
+            .timingCurve(
+                curve.controlPoint1X,
+                curve.controlPoint1Y,
+                curve.controlPoint2X,
+                curve.controlPoint2Y,
+                duration: duration
+            )
+            .delay(delay)
+    }
+}
+
 struct DashboardHomePage: View {
     let usageStore: UsageStore
     let permissionActions: SettingsPermissionActions
@@ -379,32 +415,50 @@ private struct FrontApplicationDistributionSection: View {
                 EmptyApplicationDistributionView()
                     .frame(height: 180)
             } else {
-                let displaySummaries = summariesIncludingOther
+                let displaySummaries = FrontApplicationDistributionDisplay.summaries(
+                    from: summaries,
+                    totalSessionCount: totalSessionCount,
+                    otherName: AppLocalization.localized("其他")
+                )
+                let displayedTotal = max(totalSessionCount, displaySummaries.reduce(0) { $0 + $1.sessionCount })
                 HStack(alignment: .center, spacing: 24) {
                     ApplicationDonutChart(
                         summaries: displaySummaries,
-                        totalSessionCount: max(totalSessionCount, displaySummaries.reduce(0) { $0 + $1.sessionCount })
+                        totalSessionCount: displayedTotal
                     )
                     .frame(width: 180, height: 180)
 
                     ApplicationLegendView(
                         summaries: displaySummaries,
-                        totalSessionCount: max(totalSessionCount, displaySummaries.reduce(0) { $0 + $1.sessionCount })
+                        totalSessionCount: displayedTotal
                     )
                 }
                 .frame(maxWidth: .infinity, minHeight: 180, alignment: .leading)
             }
         }
     }
+}
 
-    private var summariesIncludingOther: [FrontApplicationUsageSummary] {
-        let displayedCount = summaries.reduce(0) { $0 + $1.sessionCount }
-        let otherCount = totalSessionCount - displayedCount
-        guard otherCount > 0 else { return summaries }
-        return summaries + [
+enum FrontApplicationDistributionDisplay {
+    static let otherBundleID = "__other__"
+    private static let majorApplicationLimit = 4
+
+    static func summaries(
+        from summaries: [FrontApplicationUsageSummary],
+        totalSessionCount: Int,
+        otherName: String
+    ) -> [FrontApplicationUsageSummary] {
+        let majorSummaries = Array(summaries.prefix(majorApplicationLimit))
+        let majorCount = majorSummaries.reduce(0) { $0 + $1.sessionCount }
+        let knownCount = summaries.reduce(0) { $0 + $1.sessionCount }
+        let effectiveTotalCount = max(totalSessionCount, knownCount)
+        let otherCount = max(0, effectiveTotalCount - majorCount)
+
+        guard otherCount > 0 else { return majorSummaries }
+        return majorSummaries + [
             FrontApplicationUsageSummary(
-                bundleID: "__other__",
-                name: AppLocalization.localized("其他"),
+                bundleID: otherBundleID,
+                name: otherName,
                 sessionCount: otherCount
             ),
         ]
@@ -444,15 +498,47 @@ private struct ApplicationDonutChart: View {
     let totalSessionCount: Int
 
     private let colors = ApplicationDistributionPalette.colors
+    private let ringLineWidth: CGFloat = 15
+
+    @State private var revealProgress = 0.02
 
     var body: some View {
         ZStack {
             Circle()
-                .stroke(Color.primary.opacity(0.06), lineWidth: 18)
+                .stroke(Color.primary.opacity(0.06), lineWidth: ringLineWidth)
 
-            ForEach(Array(segments.enumerated()), id: \.offset) { index, segment in
-                DonutSegmentShape(startAngle: segment.startAngle, endAngle: segment.endAngle)
-                    .stroke(colors[index % colors.count], style: StrokeStyle(lineWidth: 18, lineCap: .round))
+            ZStack {
+                ForEach(Array(segments.enumerated()), id: \.offset) { index, segment in
+                    DonutSegmentShape(startAngle: segment.startAngle, endAngle: segment.endAngle)
+                        .stroke(
+                            colors[index % colors.count],
+                            style: StrokeStyle(lineWidth: ringLineWidth, lineCap: .round)
+                        )
+                }
+            }
+            .mask {
+                let revealLineWidth = ringLineWidth + 3
+                ZStack {
+                    DonutRevealMaskShape(progress: revealProgress)
+                        .stroke(
+                            Color.white,
+                            style: DonutRevealMaskStroke.arcStyle(lineWidth: revealLineWidth)
+                        )
+
+                    DonutRevealMovingHeadShape(
+                        progress: revealProgress,
+                        lineWidth: revealLineWidth
+                    )
+                    .fill(Color.white)
+                }
+            }
+
+            if let terminalCapColor = terminalCapColor {
+                DonutRevealTerminalCapShape(
+                    progress: revealProgress,
+                    lineWidth: ringLineWidth
+                )
+                .fill(terminalCapColor)
             }
 
             VStack(spacing: 2) {
@@ -464,6 +550,10 @@ private struct ApplicationDonutChart: View {
             }
         }
         .padding(18)
+        .onAppear(perform: animateReveal)
+        .onChange(of: animationToken) { _, _ in
+            animateReveal()
+        }
     }
 
     private var segments: [DonutSegment] {
@@ -474,9 +564,35 @@ private struct ApplicationDonutChart: View {
         var cursor = -90.0
         return summaries.map { summary in
             let sweep = (Double(summary.sessionCount) / Double(total)) * availableSweep
-            let segment = DonutSegment(startAngle: .degrees(cursor), endAngle: .degrees(cursor + sweep))
+            let segment = DonutSegment(startDegrees: cursor, endDegrees: cursor + sweep)
             cursor += sweep + gap
             return segment
+        }
+    }
+
+    private var terminalCapColor: Color? {
+        guard let colorIndex = DonutTerminalCapStyle.colorIndex(
+            forSegmentCount: segments.count,
+            paletteCount: colors.count
+        ) else {
+            return nil
+        }
+
+        return colors[colorIndex]
+    }
+
+    private var animationToken: String {
+        summaries
+            .map { "\($0.bundleID):\($0.sessionCount)" }
+            .joined(separator: "|") + "|\(totalSessionCount)"
+    }
+
+    private func animateReveal() {
+        revealProgress = 0.02
+        DispatchQueue.main.async {
+            withAnimation(DashboardUsageMotion.donutRevealAnimation) {
+                revealProgress = 1
+            }
         }
     }
 
@@ -486,8 +602,206 @@ private struct ApplicationDonutChart: View {
 }
 
 private struct DonutSegment {
-    let startAngle: Angle
-    let endAngle: Angle
+    let startDegrees: Double
+    let endDegrees: Double
+
+    var startAngle: Angle {
+        .degrees(startDegrees)
+    }
+
+    var endAngle: Angle {
+        .degrees(endDegrees)
+    }
+}
+
+struct DonutRevealArc {
+    let progress: Double
+
+    var startDegrees: Double {
+        -90
+    }
+
+    var endDegrees: Double {
+        startDegrees - (360 * normalizedProgress)
+    }
+
+    var startAngle: Angle {
+        .degrees(startDegrees)
+    }
+
+    var endAngle: Angle {
+        .degrees(endDegrees)
+    }
+
+    var drawsClockwise: Bool {
+        true
+    }
+
+    private var normalizedProgress: Double {
+        max(0, min(1, progress))
+    }
+}
+
+enum DonutRevealMaskStroke {
+    static func arcStyle(lineWidth: CGFloat) -> StrokeStyle {
+        StrokeStyle(lineWidth: lineWidth, lineCap: .butt)
+    }
+}
+
+enum DonutTerminalCapStyle {
+    static func colorIndex(forSegmentCount segmentCount: Int, paletteCount: Int) -> Int? {
+        guard segmentCount > 0, paletteCount > 0 else { return nil }
+        return (segmentCount - 1) % paletteCount
+    }
+}
+
+struct DonutRevealMovingHead {
+    let progress: Double
+    let lineWidth: CGFloat
+
+    private static let fadeStartProgress = 0.96
+
+    var radius: CGFloat {
+        (lineWidth / 2) * radiusScale
+    }
+
+    func center(in rect: CGRect) -> CGPoint {
+        let arc = DonutRevealArc(progress: progress)
+        let center = CGPoint(x: rect.midX, y: rect.midY)
+        let radius = min(rect.width, rect.height) / 2
+        let radians = arc.endDegrees * .pi / 180
+
+        return CGPoint(
+            x: center.x + (cos(radians) * radius),
+            y: center.y + (sin(radians) * radius)
+        )
+    }
+
+    private var radiusScale: CGFloat {
+        guard normalizedProgress < 1 else { return 0 }
+        guard normalizedProgress > Self.fadeStartProgress else { return 1 }
+
+        let remaining = (1 - normalizedProgress) / (1 - Self.fadeStartProgress)
+        return CGFloat(max(0, min(1, remaining)))
+    }
+
+    private var normalizedProgress: Double {
+        max(0, min(1, progress))
+    }
+}
+
+struct DonutRevealTerminalCap {
+    let progress: Double
+    let lineWidth: CGFloat
+
+    private static let appearanceEndProgress = 0.08
+
+    var radius: CGFloat {
+        (lineWidth / 2) * radiusScale
+    }
+
+    func center(in rect: CGRect) -> CGPoint {
+        let center = CGPoint(x: rect.midX, y: rect.midY)
+        let radius = min(rect.width, rect.height) / 2
+        let radians = DonutRevealArc(progress: 0).startDegrees * .pi / 180
+
+        return CGPoint(
+            x: center.x + (cos(radians) * radius),
+            y: center.y + (sin(radians) * radius)
+        )
+    }
+
+    private var radiusScale: CGFloat {
+        guard normalizedProgress > 0 else { return 0 }
+        guard normalizedProgress < Self.appearanceEndProgress else { return 1 }
+
+        let completed = normalizedProgress / Self.appearanceEndProgress
+        return CGFloat(max(0, min(1, completed)))
+    }
+
+    private var normalizedProgress: Double {
+        max(0, min(1, progress))
+    }
+}
+
+private struct DonutRevealMaskShape: Shape {
+    var progress: Double
+
+    var animatableData: Double {
+        get { progress }
+        set { progress = newValue }
+    }
+
+    func path(in rect: CGRect) -> Path {
+        let arc = DonutRevealArc(progress: progress)
+        var path = Path()
+        let center = CGPoint(x: rect.midX, y: rect.midY)
+        let radius = min(rect.width, rect.height) / 2
+        path.addArc(
+            center: center,
+            radius: radius,
+            startAngle: arc.startAngle,
+            endAngle: arc.endAngle,
+            clockwise: arc.drawsClockwise
+        )
+        return path
+    }
+}
+
+private struct DonutRevealMovingHeadShape: Shape {
+    var progress: Double
+    let lineWidth: CGFloat
+
+    var animatableData: Double {
+        get { progress }
+        set { progress = newValue }
+    }
+
+    func path(in rect: CGRect) -> Path {
+        let head = DonutRevealMovingHead(progress: progress, lineWidth: lineWidth)
+        let radius = head.radius
+        guard radius > 0 else { return Path() }
+
+        let center = head.center(in: rect)
+        var path = Path()
+        path.addEllipse(
+            in: CGRect(
+                x: center.x - radius,
+                y: center.y - radius,
+                width: radius * 2,
+                height: radius * 2
+            )
+        )
+        return path
+    }
+}
+
+private struct DonutRevealTerminalCapShape: Shape {
+    var progress: Double
+    let lineWidth: CGFloat
+
+    var animatableData: Double {
+        get { progress }
+        set { progress = newValue }
+    }
+
+    func path(in rect: CGRect) -> Path {
+        let cap = DonutRevealTerminalCap(progress: progress, lineWidth: lineWidth)
+        let radius = cap.radius
+        guard radius > 0 else { return Path() }
+
+        let center = cap.center(in: rect)
+        var path = Path()
+        path.addEllipse(
+            in: CGRect(
+                x: center.x - radius,
+                y: center.y - radius,
+                width: radius * 2,
+                height: radius * 2
+            )
+        )
+        return path
+    }
 }
 
 private struct DonutSegmentShape: Shape {
@@ -555,6 +869,8 @@ private struct TimeOfDayDistributionSection: View {
 private struct HourlyUsageBarChart: View {
     let summaries: [HourlyUsageSummary]
 
+    @State private var barsVisible = false
+
     var body: some View {
         VStack(spacing: 8) {
             GeometryReader { geometry in
@@ -568,14 +884,15 @@ private struct HourlyUsageBarChart: View {
                         .offset(y: -18)
 
                     HStack(alignment: .bottom, spacing: 10) {
-                        ForEach(buckets) { bucket in
+                        ForEach(Array(buckets.enumerated()), id: \.element.id) { index, bucket in
                             let ratio = CGFloat(bucket.sessionCount) / CGFloat(maxValue)
-                            RoundedRectangle(cornerRadius: 4, style: .continuous)
-                                .fill(Color.blue.opacity(bucket.sessionCount == 0 ? 0.18 : 0.82))
-                                .frame(height: max(8, (geometry.size.height - 32) * ratio))
-                                .frame(maxWidth: .infinity, alignment: .bottom)
-                                .accessibilityLabel(Text("\(bucket.startHour):00"))
-                                .accessibilityValue(Text("\(bucket.sessionCount)"))
+                            HourlyUsageBar(
+                                bucket: bucket,
+                                ratio: ratio,
+                                availableHeight: geometry.size.height - 32,
+                                isVisible: barsVisible,
+                                animationDelay: Double(index) * DashboardUsageMotion.hourlyBarDelayStep
+                            )
                         }
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
@@ -594,6 +911,10 @@ private struct HourlyUsageBarChart: View {
             .font(.system(size: 11, weight: .medium))
             .foregroundStyle(.secondary)
         }
+        .onAppear(perform: animateBars)
+        .onChange(of: summaries) { _, _ in
+            animateBars()
+        }
     }
 
     private var bucketedSummaries: [HourlyUsageBucket] {
@@ -603,6 +924,43 @@ private struct HourlyUsageBarChart: View {
                 .reduce(0) { $0 + $1.sessionCount }
             return HourlyUsageBucket(startHour: startHour, sessionCount: sessionCount)
         }
+    }
+
+    private func animateBars() {
+        barsVisible = false
+        DispatchQueue.main.async {
+            barsVisible = true
+        }
+    }
+}
+
+private struct HourlyUsageBar: View {
+    let bucket: HourlyUsageBucket
+    let ratio: CGFloat
+    let availableHeight: CGFloat
+    let isVisible: Bool
+    let animationDelay: Double
+
+    var body: some View {
+        RoundedRectangle(cornerRadius: 4, style: .continuous)
+            .fill(Color.blue.opacity(bucket.sessionCount == 0 ? 0.18 : 0.82))
+            .frame(height: targetHeight)
+            .scaleEffect(x: 1, y: isVisible ? 1 : 0.06, anchor: .bottom)
+            .opacity(isVisible ? 1 : 0.35)
+            .frame(maxWidth: .infinity, alignment: .bottom)
+            .animation(
+                DashboardUsageMotion.closingEaseAnimation(
+                    duration: DashboardUsageMotion.hourlyBarGrowDuration,
+                    delay: animationDelay
+                ),
+                value: isVisible
+            )
+            .accessibilityLabel(Text("\(bucket.startHour):00"))
+            .accessibilityValue(Text("\(bucket.sessionCount)"))
+    }
+
+    private var targetHeight: CGFloat {
+        max(8, availableHeight * ratio)
     }
 }
 
