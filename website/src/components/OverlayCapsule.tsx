@@ -60,9 +60,22 @@ function barHeight(index: number, time: number, rms: number): number {
 
 function Waveform({ phase }: { phase: CapsulePhase }) {
   const barsRef = useRef<(HTMLSpanElement | null)[]>([])
+  const barSetters = useRef<((el: HTMLSpanElement | null) => void)[]>([])
   const phaseRef = useRef(phase)
   phaseRef.current = phase
 
+  // Stable per-bar ref callback so re-renders don't detach/reattach each node.
+  const setBarRef = (i: number) => {
+    if (!barSetters.current[i]) {
+      barSetters.current[i] = (el: HTMLSpanElement | null) => {
+        barsRef.current[i] = el
+      }
+    }
+    return barSetters.current[i]
+  }
+
+  // Empty deps on purpose: the rAF loop runs for the component's lifetime and
+  // reads the latest phase via phaseRef, so it never needs to restart.
   useEffect(() => {
     const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches
     if (reduce) {
@@ -90,13 +103,7 @@ function Waveform({ phase }: { phase: CapsulePhase }) {
   return (
     <span className="oc-wave" aria-hidden="true">
       {BAR_WEIGHTS.map((_, i) => (
-        <span
-          className="oc-bar"
-          key={i}
-          ref={(el) => {
-            barsRef.current[i] = el
-          }}
-        />
+        <span className="oc-bar" key={i} ref={setBarRef(i)} />
       ))}
     </span>
   )

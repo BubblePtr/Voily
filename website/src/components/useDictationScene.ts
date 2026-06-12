@@ -79,22 +79,39 @@ const RESTING: SceneView = {
   index: 0,
 }
 
+const REDUCED_MOTION_QUERY = '(prefers-reduced-motion: reduce)'
+
 export function useDictationScene(examples: SceneExample[], active: boolean): SceneView {
   const [view, setView] = useState<SceneView>(RESTING)
+  const [reducedMotion, setReducedMotion] = useState(
+    () => typeof window !== 'undefined' && window.matchMedia(REDUCED_MOTION_QUERY).matches
+  )
   const startRef = useRef<number | null>(null)
   const lastRef = useRef<string>('')
+
+  // Track the preference reactively so toggling "Reduce motion" takes effect
+  // immediately, not only after the scene scrolls out and back.
+  useEffect(() => {
+    const media = window.matchMedia(REDUCED_MOTION_QUERY)
+    const update = () => setReducedMotion(media.matches)
+    update()
+    media.addEventListener('change', update)
+    return () => media.removeEventListener('change', update)
+  }, [])
 
   useEffect(() => {
     if (!active) {
       startRef.current = null
       return
     }
-    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-    if (reduce) {
+    if (reducedMotion) {
       setView(viewAt(REDUCED_MOTION_ELAPSED_MS, examples))
       return
     }
 
+    // Re-baseline on every (re)start so an examples swap can't carry a stale
+    // timestamp into the elapsed calculation.
+    startRef.current = null
     let raf = 0
     const tick = (now: number) => {
       if (startRef.current === null) startRef.current = now
@@ -108,7 +125,7 @@ export function useDictationScene(examples: SceneExample[], active: boolean): Sc
     }
     raf = requestAnimationFrame(tick)
     return () => cancelAnimationFrame(raf)
-  }, [active, examples])
+  }, [active, examples, reducedMotion])
 
   return view
 }

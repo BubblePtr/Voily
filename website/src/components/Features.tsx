@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 
 import { AppWindow } from './AppWindow'
+import { apps } from './content'
 import { OverlayCapsule } from './OverlayCapsule'
 import { useDictationScene, type SceneExample } from './useDictationScene'
 
@@ -15,13 +16,22 @@ function useActiveSection(count: number) {
 
   useEffect(() => {
     const observer = new IntersectionObserver(
-      (entries) => {
-        for (const entry of entries) {
-          if (entry.isIntersecting) {
-            const idx = Number((entry.target as HTMLElement).dataset.idx)
-            setActive(idx)
+      () => {
+        // A crossing fired — pick the section whose center is closest to the
+        // viewport center, so overlapping sections never flip to the wrong one.
+        const middle = window.innerHeight / 2
+        let best = -1
+        let bestDist = Infinity
+        refs.current.forEach((el, idx) => {
+          if (!el) return
+          const rect = el.getBoundingClientRect()
+          const dist = Math.abs((rect.top + rect.bottom) / 2 - middle)
+          if (dist < bestDist) {
+            bestDist = dist
+            best = idx
           }
-        }
+        })
+        if (best >= 0) setActive(best)
       },
       { rootMargin: '-45% 0px -45% 0px', threshold: 0 }
     )
@@ -276,13 +286,10 @@ const anywhereExamples: SceneExample[] = [
   },
 ]
 
-const desktopApps = [
-  '/app-icons/cursor.svg',
-  '/app-icons/slack.svg',
-  '/app-icons/gmail.svg',
-  '/app-icons/notion.svg',
-  '/app-icons/chatgpt.svg',
-]
+// Derive the desktop dock icons from the shared app list so icon paths live in
+// one place (content.ts).
+const desktopAppNames = new Set(['Cursor', 'Slack', 'Gmail', 'Notion', 'ChatGPT'])
+const desktopApps = apps.filter((app) => desktopAppNames.has(app.name)).map((app) => app.iconPath)
 
 function AnywhereScene({ active }: { active: boolean }) {
   const view = useDictationScene(anywhereExamples, active)

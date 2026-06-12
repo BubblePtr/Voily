@@ -1671,6 +1671,8 @@ a {
     flex-wrap: wrap;
     gap: 12px;
     margin-bottom: 8px;
+    /* Drop the desktop sticky-alignment offset once the nav stacks above. */
+    padding-top: 0;
   }
 
   .features-nav-kicker {
@@ -1680,6 +1682,7 @@ a {
 
   .feature-block {
     min-height: auto;
+    padding-top: 0;
   }
 
   .dash {
@@ -1731,12 +1734,5 @@ a {
 
   .chat-thread {
     min-height: 150px;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .anywhere-dock,
-  .chat-msg-me {
-    animation: none !important;
   }
 }
