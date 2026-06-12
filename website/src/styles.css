@@ -158,6 +158,7 @@ a {
   padding: 0;
   margin: -1px;
   overflow: hidden;
+  clip: rect(0, 0, 0, 0);
   clip-path: inset(50%);
   white-space: nowrap;
   border: 0;
@@ -853,7 +854,7 @@ a {
 }
 
 .dash-nav-item.is-active {
-  background: #1877ff;
+  background: var(--blue);
   color: #fff;
   box-shadow: 0 6px 14px rgba(24, 119, 255, 0.3);
 }
@@ -939,7 +940,7 @@ a {
 }
 
 .tone-blue {
-  background: #1877ff;
+  background: var(--blue);
 }
 
 .tone-green {
@@ -1175,7 +1176,7 @@ a {
 
 .dash-history-copy {
   flex: 0 0 auto;
-  color: #1877ff;
+  color: var(--blue);
   font-size: 12px;
   font-weight: 650;
 }
@@ -1288,7 +1289,7 @@ a {
 }
 
 .feature-eyebrow {
-  color: #1877ff;
+  color: var(--blue);
   font-size: 13px;
   font-weight: 750;
   letter-spacing: 0.02em;
@@ -1451,7 +1452,7 @@ a {
   height: 16px;
   margin-left: 1px;
   vertical-align: -3px;
-  background: #1877ff;
+  background: var(--blue);
   animation: caret-blink 1s steps(1) infinite;
 }
 
@@ -1476,7 +1477,7 @@ a {
 }
 
 .chat-send.is-ready {
-  background: #1877ff;
+  background: var(--blue);
   color: #fff;
 }
 
@@ -1574,7 +1575,7 @@ a {
   border-radius: 20px;
   overflow: hidden;
   background:
-    radial-gradient(circle at 30% 20%, rgba(24, 119, 255, 0.16), transparent 45%),
+    radial-gradient(circle at 30% 20%, var(--glow), transparent 45%),
     radial-gradient(circle at 75% 75%, rgba(120, 180, 255, 0.18), transparent 50%),
     linear-gradient(160deg, #1b2330, #0f1620);
 }

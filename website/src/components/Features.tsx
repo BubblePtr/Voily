@@ -10,6 +10,7 @@ const navItems = ['AI Rewrite', 'In context', 'Always ready']
 // of the viewport, and tell that section it may animate.
 function useActiveSection(count: number) {
   const refs = useRef<(HTMLElement | null)[]>([])
+  const setters = useRef<((el: HTMLElement | null) => void)[]>([])
   const [active, setActive] = useState(0)
 
   useEffect(() => {
@@ -28,8 +29,14 @@ function useActiveSection(count: number) {
     return () => observer.disconnect()
   }, [count])
 
-  const setRef = (idx: number) => (el: HTMLElement | null) => {
-    refs.current[idx] = el
+  // Stable per-index ref callback so re-renders don't detach/reattach the node.
+  const setRef = (idx: number) => {
+    if (!setters.current[idx]) {
+      setters.current[idx] = (el: HTMLElement | null) => {
+        refs.current[idx] = el
+      }
+    }
+    return setters.current[idx]
   }
 
   return { active, setRef }
@@ -39,7 +46,7 @@ export function Features() {
   const { active, setRef } = useActiveSection(3)
 
   return (
-    <section className="features" aria-labelledby="features-title">
+    <section className="features" id="features" aria-labelledby="features-title">
       <h2 id="features-title" className="sr-only">
         How Voily works
       </h2>

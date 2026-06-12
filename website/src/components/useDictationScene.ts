@@ -33,6 +33,7 @@ const REDUCED_MOTION_ELAPSED_MS = 5000
 // One full dictation cycle expressed as a pure function of elapsed time, so the
 // loop can be paused/resumed and stays in sync with the waveform.
 function viewAt(totalElapsed: number, examples: SceneExample[]): SceneView {
+  if (examples.length === 0) return RESTING
   const index = Math.floor(totalElapsed / LOOP_MS) % examples.length
   const t = totalElapsed % LOOP_MS
   const { said, writes } = examples[index]
