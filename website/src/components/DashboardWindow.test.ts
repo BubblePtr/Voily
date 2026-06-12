@@ -9,6 +9,7 @@ import {
   sceneDonutCenter,
   sceneDonutRevealHeadRadius,
   sceneDonutRevealMaskLineCap,
+  sceneDonutRevealMaskStrokeWidth,
   sceneDonutRadius,
   sceneDonutTopY,
   sceneDonutTerminalCapRadius,
@@ -66,6 +67,7 @@ describe('buildSceneDonutSegments', () => {
   test('uses a flat reveal body with separate rounded moving and terminal caps', () => {
     expect(sceneDonutRevealMaskLineCap).toBe('butt')
     expect(sceneDonutRevealHeadRadius).toBe(8)
+    expect(sceneDonutRevealMaskStrokeWidth).toBe(sceneDonutRevealHeadRadius * 2)
     expect(sceneDonutTerminalCapRadius).toBe(5.5)
   })
 

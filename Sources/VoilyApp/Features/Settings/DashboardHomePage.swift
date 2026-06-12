@@ -30,6 +30,7 @@ struct DashboardUsageTimingCurve {
     let controlPoint2Y: Double
 }
 
+/// Matches the website dashboard timing so both surfaces share the same closing slowdown.
 enum DashboardUsageMotion {
     static let closingEaseCurve = DashboardUsageTimingCurve(
         controlPoint1X: 0.24,
@@ -37,6 +38,7 @@ enum DashboardUsageMotion {
         controlPoint2X: 0.22,
         controlPoint2Y: 1
     )
+    static let donutRevealStartProgress = 0.02
     static let donutRevealDuration: TimeInterval = 0.96
     static let hourlyBarGrowDuration: TimeInterval = 0.58
     static let hourlyBarDelayStep: TimeInterval = 0.045
@@ -56,6 +58,14 @@ enum DashboardUsageMotion {
                 duration: duration
             )
             .delay(delay)
+    }
+
+    static func shouldStartDonutReveal(currentProgress: Double) -> Bool {
+        currentProgress <= donutRevealStartProgress
+    }
+
+    static func shouldStartHourlyBars(isVisible: Bool) -> Bool {
+        !isVisible
     }
 }
 
@@ -500,7 +510,7 @@ private struct ApplicationDonutChart: View {
     private let colors = ApplicationDistributionPalette.colors
     private let ringLineWidth: CGFloat = 15
 
-    @State private var revealProgress = 0.02
+    @State private var revealProgress = DashboardUsageMotion.donutRevealStartProgress
 
     var body: some View {
         ZStack {
@@ -588,7 +598,9 @@ private struct ApplicationDonutChart: View {
     }
 
     private func animateReveal() {
-        revealProgress = 0.02
+        guard DashboardUsageMotion.shouldStartDonutReveal(currentProgress: revealProgress) else { return }
+
+        revealProgress = DashboardUsageMotion.donutRevealStartProgress
         DispatchQueue.main.async {
             withAnimation(DashboardUsageMotion.donutRevealAnimation) {
                 revealProgress = 1
@@ -927,7 +939,8 @@ private struct HourlyUsageBarChart: View {
     }
 
     private func animateBars() {
-        barsVisible = false
+        guard DashboardUsageMotion.shouldStartHourlyBars(isVisible: barsVisible) else { return }
+
         DispatchQueue.main.async {
             barsVisible = true
         }

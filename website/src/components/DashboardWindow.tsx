@@ -81,6 +81,7 @@ export const sceneDonutCounterclockwiseRevealPath = buildSceneDonutRevealPath(
 )
 export const sceneDonutRevealMaskLineCap = 'butt'
 export const sceneDonutRevealHeadRadius = 8
+export const sceneDonutRevealMaskStrokeWidth = sceneDonutRevealHeadRadius * 2
 export const sceneDonutSegmentStrokeWidth = 11
 export const sceneDonutTerminalCapRadius = sceneDonutSegmentStrokeWidth / 2
 
@@ -273,7 +274,7 @@ function SceneDonut() {
                   fill="none"
                   stroke="white"
                   strokeLinecap={sceneDonutRevealMaskLineCap}
-                  strokeWidth="16"
+                  strokeWidth={sceneDonutRevealMaskStrokeWidth}
                   pathLength="100"
                 />
                 <g className="scene-donut-reveal-head-orbit">

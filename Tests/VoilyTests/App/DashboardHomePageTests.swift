@@ -157,4 +157,17 @@ final class DashboardHomePageTests: XCTestCase {
         XCTAssertEqual(DashboardUsageMotion.hourlyBarGrowDuration, 0.58, accuracy: 0.001)
         XCTAssertEqual(DashboardUsageMotion.hourlyBarDelayStep, 0.045, accuracy: 0.001)
     }
+
+    func testUsageDashboardAnimationsDoNotRestartAfterInitialReveal() {
+        XCTAssertEqual(DashboardUsageMotion.donutRevealStartProgress, 0.02, accuracy: 0.001)
+        XCTAssertTrue(
+            DashboardUsageMotion.shouldStartDonutReveal(
+                currentProgress: DashboardUsageMotion.donutRevealStartProgress
+            )
+        )
+        XCTAssertFalse(DashboardUsageMotion.shouldStartDonutReveal(currentProgress: 0.5))
+        XCTAssertFalse(DashboardUsageMotion.shouldStartDonutReveal(currentProgress: 1))
+        XCTAssertTrue(DashboardUsageMotion.shouldStartHourlyBars(isVisible: false))
+        XCTAssertFalse(DashboardUsageMotion.shouldStartHourlyBars(isVisible: true))
+    }
 }
