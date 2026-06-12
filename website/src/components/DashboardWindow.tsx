@@ -1,4 +1,4 @@
-import type { ReactElement } from 'react'
+import { useId, type CSSProperties, type ReactElement } from 'react'
 
 import { AppWindow, TrafficLights } from './AppWindow'
 import { OverlayCapsule } from './OverlayCapsule'
@@ -45,17 +45,110 @@ const stats = [
   { tone: 'pink', label: 'Avg latency', value: '249 ms', caption: 'Record → text', highlight: true },
 ]
 
+type SceneSegmentSource = {
+  name: string
+  pct: number
+}
+
+type SceneSegment = SceneSegmentSource & {
+  color: string
+}
+
+type SceneDonutSegment = SceneSegment & {
+  visiblePct: number
+  hiddenPct: number
+  offsetPct: number
+}
+
+const sceneSegmentColors = ['#5aa6ff', '#1f86ff', '#0b63d6', '#0a3f93', '#0b2a5e']
+const sceneSegmentGapPct = 1.2
+export const sceneHourBarDelayStepMs = 45
+export const sceneDonutViewBoxSize = 120
+export const sceneDonutCenter = sceneDonutViewBoxSize / 2
+export const sceneDonutRadius = 47
+export const sceneDonutTopY = sceneDonutCenter - sceneDonutRadius
+
+export function buildSceneDonutRevealPath(center: number, radius: number): string {
+  const topY = center - radius
+  const bottomY = center + radius
+
+  return `M ${center} ${topY} A ${radius} ${radius} 0 1 0 ${center} ${bottomY} A ${radius} ${radius} 0 1 0 ${center} ${topY}`
+}
+
+export const sceneDonutCounterclockwiseRevealPath = buildSceneDonutRevealPath(
+  sceneDonutCenter,
+  sceneDonutRadius,
+)
+export const sceneDonutRevealMaskLineCap = 'butt'
+export const sceneDonutRevealHeadRadius = 8
+export const sceneDonutRevealMaskStrokeWidth = sceneDonutRevealHeadRadius * 2
+export const sceneDonutSegmentStrokeWidth = 11
+export const sceneDonutTerminalCapRadius = sceneDonutSegmentStrokeWidth / 2
+
 // "Where you dictate" donut — share of sessions by front-most app.
-const sceneSegments = [
-  { name: 'Claude', pct: 37, color: '#5aa6ff' },
-  { name: 'Cursor', pct: 26, color: '#1f86ff' },
-  { name: 'Codex', pct: 16, color: '#0b63d6' },
-  { name: 'Google Chrome', pct: 16, color: '#0a3f93' },
-  { name: 'Discord', pct: 5, color: '#0b2a5e' },
+const sceneSegmentSources: SceneSegmentSource[] = [
+  { name: 'Claude', pct: 37 },
+  { name: 'Cursor', pct: 26 },
+  { name: 'Codex', pct: 16 },
+  { name: 'Google Chrome', pct: 12 },
+  { name: 'Discord', pct: 5 },
+  { name: 'Notion', pct: 4 },
 ]
 
 // "When you dictate" — relative activity per ~2h bucket across the day.
 const hourBuckets = [40, 12, 8, 9, 11, 20, 85, 54, 78, 100, 58, 72, 46]
+
+export function buildSceneSegments(sources: SceneSegmentSource[]): SceneSegment[] {
+  const mainSegments = sources.slice(0, 4).map((segment, index) => ({
+    ...segment,
+    color: sceneSegmentColors[index],
+  }))
+  const otherPct = sources.slice(4).reduce((sum, segment) => sum + segment.pct, 0)
+
+  if (otherPct <= 0) {
+    return mainSegments
+  }
+
+  return [
+    ...mainSegments,
+    {
+      name: 'Others',
+      pct: otherPct,
+      color: sceneSegmentColors[4],
+    },
+  ]
+}
+
+const sceneSegments = buildSceneSegments(sceneSegmentSources)
+
+export function buildSceneDonutSegments(segments: SceneSegment[]): SceneDonutSegment[] {
+  const gap = segments.length > 1 ? sceneSegmentGapPct : 0
+  let offsetPct = 0
+
+  return segments.map((segment) => {
+    const visiblePct = roundPct(Math.max(0, segment.pct - gap))
+    const donutSegment = {
+      ...segment,
+      visiblePct,
+      hiddenPct: roundPct(100 - visiblePct),
+      offsetPct: roundPct(offsetPct),
+    }
+
+    offsetPct += segment.pct
+    return donutSegment
+  })
+}
+
+export function getSceneDonutTerminalCapColor(segments: SceneSegment[]): string | undefined {
+  return segments.at(-1)?.color
+}
+
+const sceneDonutSegments = buildSceneDonutSegments(sceneSegments)
+const sceneDonutTerminalCapColor = getSceneDonutTerminalCapColor(sceneSegments)
+
+function roundPct(value: number): number {
+  return Math.round(value * 10) / 10
+}
 
 export function DashboardWindow() {
   return (
@@ -161,10 +254,7 @@ export function DashboardWindow() {
 
 // Donut of session share by app, with a centred total and a percentage legend.
 function SceneDonut() {
-  const r = 47
-  const c = 2 * Math.PI * r
-  const gap = 4
-  let offset = 0
+  const revealMaskID = useId()
 
   return (
     <div className="dash-chart dash-scene">
@@ -174,29 +264,69 @@ function SceneDonut() {
       </div>
       <div className="scene-body">
         <div className="scene-donut">
-          <svg viewBox="0 0 120 120" aria-hidden="true">
-            <g transform="rotate(-90 60 60)">
-              {sceneSegments.map((s) => {
-                const len = (s.pct / 100) * c
-                const visible = Math.max(0, len - gap)
-                const el = (
+          <svg viewBox={`0 0 ${sceneDonutViewBoxSize} ${sceneDonutViewBoxSize}`} aria-hidden="true">
+            <defs>
+              <mask id={revealMaskID}>
+                <rect width={sceneDonutViewBoxSize} height={sceneDonutViewBoxSize} fill="black" />
+                <path
+                  className="scene-donut-reveal-mask-path"
+                  d={sceneDonutCounterclockwiseRevealPath}
+                  fill="none"
+                  stroke="white"
+                  strokeLinecap={sceneDonutRevealMaskLineCap}
+                  strokeWidth={sceneDonutRevealMaskStrokeWidth}
+                  pathLength="100"
+                />
+                <g className="scene-donut-reveal-head-orbit">
                   <circle
-                    key={s.name}
-                    cx="60"
-                    cy="60"
-                    r={r}
-                    fill="none"
-                    stroke={s.color}
-                    strokeWidth="13"
-                    strokeLinecap="round"
-                    strokeDasharray={`${visible} ${c - visible}`}
-                    strokeDashoffset={-offset}
+                    className="scene-donut-reveal-head"
+                    cx={sceneDonutCenter}
+                    cy={sceneDonutTopY}
+                    r={sceneDonutRevealHeadRadius}
+                    fill="white"
                   />
-                )
-                offset += len
-                return el
-              })}
+                </g>
+              </mask>
+            </defs>
+            <circle
+              className="scene-donut-track"
+              cx={sceneDonutCenter}
+              cy={sceneDonutCenter}
+              r={sceneDonutRadius}
+              fill="none"
+              strokeWidth={sceneDonutSegmentStrokeWidth}
+            />
+            <g
+              className="scene-donut-segments"
+              transform={`rotate(-90 ${sceneDonutCenter} ${sceneDonutCenter})`}
+              mask={`url(#${revealMaskID})`}
+            >
+              {sceneDonutSegments.map((s) => (
+                <circle
+                  key={s.name}
+                  className="scene-donut-segment"
+                  cx={sceneDonutCenter}
+                  cy={sceneDonutCenter}
+                  r={sceneDonutRadius}
+                  fill="none"
+                  stroke={s.color}
+                  strokeWidth={sceneDonutSegmentStrokeWidth}
+                  strokeLinecap="round"
+                  strokeDashoffset={-s.offsetPct}
+                  pathLength="100"
+                  strokeDasharray={`${s.visiblePct} ${s.hiddenPct}`}
+                />
+              ))}
             </g>
+            {sceneDonutTerminalCapColor && (
+              <circle
+                className="scene-donut-terminal-cap"
+                cx={sceneDonutCenter}
+                cy={sceneDonutTopY}
+                r={sceneDonutTerminalCapRadius}
+                fill={sceneDonutTerminalCapColor}
+              />
+            )}
           </svg>
           <div className="scene-donut-center">
             <strong>19</strong>
@@ -232,7 +362,12 @@ function HoursBars() {
           <span
             key={i}
             className={`hours-bar${v < 18 ? ' is-faint' : ''}`}
-            style={{ height: `${Math.max(6, (v / max) * 100)}%` }}
+            style={
+              {
+                height: `${Math.max(6, (v / max) * 100)}%`,
+                '--bar-delay': `${i * sceneHourBarDelayStepMs}ms`,
+              } as CSSProperties
+            }
           />
         ))}
       </div>

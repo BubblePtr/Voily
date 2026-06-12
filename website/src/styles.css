@@ -16,6 +16,7 @@
   --glow: rgba(24, 119, 255, 0.16);
   --radius: 30px;
   --shadow: 0 34px 90px rgba(14, 18, 24, 0.1);
+  --dashboard-closing-ease: cubic-bezier(0.24, 0.72, 0.22, 1);
 }
 
 * {
@@ -1016,6 +1017,85 @@ a {
   height: 100%;
 }
 
+.scene-donut-track {
+  stroke: #edf3fb;
+}
+
+.scene-donut-reveal-mask-path {
+  stroke-dasharray: 0 100;
+  animation: scene-donut-counterclockwise-reveal 960ms var(--dashboard-closing-ease) 120ms forwards;
+}
+
+.scene-donut-reveal-head-orbit {
+  transform-box: view-box;
+  transform-origin: 60px 60px;
+  animation: scene-donut-counterclockwise-head-orbit 960ms var(--dashboard-closing-ease) 120ms forwards;
+}
+
+.scene-donut-reveal-head {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: scene-donut-head-hide-at-end 960ms var(--dashboard-closing-ease) 120ms forwards;
+}
+
+.scene-donut-terminal-cap {
+  opacity: 0;
+  transform: scale(0);
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: scene-donut-terminal-cap-appear 960ms var(--dashboard-closing-ease) 120ms forwards;
+}
+
+@keyframes scene-donut-counterclockwise-reveal {
+  from {
+    stroke-dasharray: 0 100;
+  }
+
+  to {
+    stroke-dasharray: 100 0;
+  }
+}
+
+@keyframes scene-donut-counterclockwise-head-orbit {
+  from {
+    transform: rotate(0deg);
+  }
+
+  96% {
+    transform: rotate(-345.6deg);
+  }
+
+  to {
+    transform: rotate(-360deg);
+  }
+}
+
+@keyframes scene-donut-head-hide-at-end {
+  from,
+  96% {
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  to {
+    opacity: 0;
+    transform: scale(0);
+  }
+}
+
+@keyframes scene-donut-terminal-cap-appear {
+  from {
+    opacity: 0;
+    transform: scale(0);
+  }
+
+  8%,
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
 .scene-donut-center {
   position: absolute;
   inset: 0;
@@ -1090,10 +1170,54 @@ a {
   min-height: 6px;
   border-radius: 5px 5px 3px 3px;
   background: #1f86ff;
+  transform-origin: bottom;
+  animation: hours-bar-grow 580ms var(--dashboard-closing-ease) both;
+  animation-delay: var(--bar-delay);
 }
 
 .hours-bar.is-faint {
   background: #cfe2ff;
+}
+
+@keyframes hours-bar-grow {
+  from {
+    opacity: 0.35;
+    transform: scaleY(0.06);
+  }
+
+  to {
+    opacity: 1;
+    transform: scaleY(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scene-donut-reveal-mask-path,
+  .scene-donut-reveal-head-orbit,
+  .scene-donut-reveal-head,
+  .scene-donut-terminal-cap,
+  .hours-bar {
+    animation: none;
+  }
+
+  .scene-donut-reveal-mask-path {
+    stroke-dasharray: 100 0;
+  }
+
+  .scene-donut-reveal-head {
+    opacity: 0;
+    transform: scale(0);
+  }
+
+  .scene-donut-terminal-cap {
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  .hours-bar {
+    opacity: 1;
+    transform: none;
+  }
 }
 
 .hours-axis {
