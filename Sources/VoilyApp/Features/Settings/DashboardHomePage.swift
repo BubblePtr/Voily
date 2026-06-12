@@ -451,6 +451,7 @@ private struct FrontApplicationDistributionSection: View {
 
 enum FrontApplicationDistributionDisplay {
     static let otherBundleID = "__other__"
+    // Keep four named apps to match the website legend, then group the rest into Other.
     private static let majorApplicationLimit = 4
 
     static func summaries(
@@ -601,10 +602,8 @@ private struct ApplicationDonutChart: View {
         guard DashboardUsageMotion.shouldStartDonutReveal(currentProgress: revealProgress) else { return }
 
         revealProgress = DashboardUsageMotion.donutRevealStartProgress
-        DispatchQueue.main.async {
-            withAnimation(DashboardUsageMotion.donutRevealAnimation) {
-                revealProgress = 1
-            }
+        withAnimation(DashboardUsageMotion.donutRevealAnimation) {
+            revealProgress = 1
         }
     }
 
@@ -646,6 +645,7 @@ struct DonutRevealArc {
     }
 
     var drawsClockwise: Bool {
+        // macOS SwiftUI reveals left from the top with a decreasing end angle and clockwise arc drawing.
         true
     }
 
@@ -941,9 +941,7 @@ private struct HourlyUsageBarChart: View {
     private func animateBars() {
         guard DashboardUsageMotion.shouldStartHourlyBars(isVisible: barsVisible) else { return }
 
-        DispatchQueue.main.async {
-            barsVisible = true
-        }
+        barsVisible = true
     }
 }
 
