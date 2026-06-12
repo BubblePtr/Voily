@@ -26,3 +26,6 @@ Voily.xcodeproj/project.xcworkspace/xcuserdata/
 Voily.xcodeproj/xcuserdata/
 
 docs/superpowers/plans/
+
+# Claude Code local/personal config (permissions, launch configs) — also matches website/.claude/
+.claude/
