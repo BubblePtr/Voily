@@ -63,8 +63,22 @@ type SceneDonutSegment = SceneSegment & {
 const sceneSegmentColors = ['#5aa6ff', '#1f86ff', '#0b63d6', '#0a3f93', '#0b2a5e']
 const sceneSegmentGapPct = 1.2
 export const sceneHourBarDelayStepMs = 45
-export const sceneDonutCounterclockwiseRevealPath =
-  'M 60 13 A 47 47 0 1 0 60 107 A 47 47 0 1 0 60 13'
+export const sceneDonutViewBoxSize = 120
+export const sceneDonutCenter = sceneDonutViewBoxSize / 2
+export const sceneDonutRadius = 47
+export const sceneDonutTopY = sceneDonutCenter - sceneDonutRadius
+
+export function buildSceneDonutRevealPath(center: number, radius: number): string {
+  const topY = center - radius
+  const bottomY = center + radius
+
+  return `M ${center} ${topY} A ${radius} ${radius} 0 1 0 ${center} ${bottomY} A ${radius} ${radius} 0 1 0 ${center} ${topY}`
+}
+
+export const sceneDonutCounterclockwiseRevealPath = buildSceneDonutRevealPath(
+  sceneDonutCenter,
+  sceneDonutRadius,
+)
 export const sceneDonutRevealMaskLineCap = 'butt'
 export const sceneDonutRevealHeadRadius = 8
 export const sceneDonutSegmentStrokeWidth = 11
@@ -127,6 +141,9 @@ export function buildSceneDonutSegments(segments: SceneSegment[]): SceneDonutSeg
 export function getSceneDonutTerminalCapColor(segments: SceneSegment[]): string | undefined {
   return segments.at(-1)?.color
 }
+
+const sceneDonutSegments = buildSceneDonutSegments(sceneSegments)
+const sceneDonutTerminalCapColor = getSceneDonutTerminalCapColor(sceneSegments)
 
 function roundPct(value: number): number {
   return Math.round(value * 10) / 10
@@ -237,9 +254,6 @@ export function DashboardWindow() {
 // Donut of session share by app, with a centred total and a percentage legend.
 function SceneDonut() {
   const revealMaskID = useId()
-  const r = 47
-  const donutSegments = buildSceneDonutSegments(sceneSegments)
-  const terminalCapColor = getSceneDonutTerminalCapColor(sceneSegments)
 
   return (
     <div className="dash-chart dash-scene">
@@ -249,10 +263,10 @@ function SceneDonut() {
       </div>
       <div className="scene-body">
         <div className="scene-donut">
-          <svg viewBox="0 0 120 120" aria-hidden="true">
+          <svg viewBox={`0 0 ${sceneDonutViewBoxSize} ${sceneDonutViewBoxSize}`} aria-hidden="true">
             <defs>
               <mask id={revealMaskID}>
-                <rect width="120" height="120" fill="black" />
+                <rect width={sceneDonutViewBoxSize} height={sceneDonutViewBoxSize} fill="black" />
                 <path
                   className="scene-donut-reveal-mask-path"
                   d={sceneDonutCounterclockwiseRevealPath}
@@ -265,8 +279,8 @@ function SceneDonut() {
                 <g className="scene-donut-reveal-head-orbit">
                   <circle
                     className="scene-donut-reveal-head"
-                    cx="60"
-                    cy="13"
+                    cx={sceneDonutCenter}
+                    cy={sceneDonutTopY}
                     r={sceneDonutRevealHeadRadius}
                     fill="white"
                   />
@@ -275,24 +289,24 @@ function SceneDonut() {
             </defs>
             <circle
               className="scene-donut-track"
-              cx="60"
-              cy="60"
-              r={r}
+              cx={sceneDonutCenter}
+              cy={sceneDonutCenter}
+              r={sceneDonutRadius}
               fill="none"
               strokeWidth={sceneDonutSegmentStrokeWidth}
             />
             <g
               className="scene-donut-segments"
-              transform="rotate(-90 60 60)"
+              transform={`rotate(-90 ${sceneDonutCenter} ${sceneDonutCenter})`}
               mask={`url(#${revealMaskID})`}
             >
-              {donutSegments.map((s) => (
+              {sceneDonutSegments.map((s) => (
                 <circle
                   key={s.name}
                   className="scene-donut-segment"
-                  cx="60"
-                  cy="60"
-                  r={r}
+                  cx={sceneDonutCenter}
+                  cy={sceneDonutCenter}
+                  r={sceneDonutRadius}
                   fill="none"
                   stroke={s.color}
                   strokeWidth={sceneDonutSegmentStrokeWidth}
@@ -303,13 +317,13 @@ function SceneDonut() {
                 />
               ))}
             </g>
-            {terminalCapColor && (
+            {sceneDonutTerminalCapColor && (
               <circle
                 className="scene-donut-terminal-cap"
-                cx="60"
-                cy="13"
+                cx={sceneDonutCenter}
+                cy={sceneDonutTopY}
                 r={sceneDonutTerminalCapRadius}
-                fill={terminalCapColor}
+                fill={sceneDonutTerminalCapColor}
               />
             )}
           </svg>

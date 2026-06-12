@@ -5,7 +5,9 @@ import VoilyCore
 
 @MainActor
 final class DashboardHomePageTests: XCTestCase {
-    func testFrontApplicationDisplaySummariesKeepFourMajorAppsAndCollapseTheRestIntoOther() {
+    private static let otherName = "Other"
+
+    func testDisplaySummariesCollapseExtraAppsIntoOther() {
         let summaries = [
             FrontApplicationUsageSummary(bundleID: "com.example.a", name: "Alpha", sessionCount: 8),
             FrontApplicationUsageSummary(bundleID: "com.example.b", name: "Beta", sessionCount: 6),
@@ -18,7 +20,7 @@ final class DashboardHomePageTests: XCTestCase {
         let displaySummaries = FrontApplicationDistributionDisplay.summaries(
             from: summaries,
             totalSessionCount: 27,
-            otherName: "Other"
+            otherName: Self.otherName
         )
 
         XCTAssertEqual(
@@ -28,12 +30,12 @@ final class DashboardHomePageTests: XCTestCase {
                 FrontApplicationUsageSummary(bundleID: "com.example.b", name: "Beta", sessionCount: 6),
                 FrontApplicationUsageSummary(bundleID: "com.example.c", name: "Gamma", sessionCount: 4),
                 FrontApplicationUsageSummary(bundleID: "com.example.d", name: "Delta", sessionCount: 3),
-                FrontApplicationUsageSummary(bundleID: "__other__", name: "Other", sessionCount: 6),
+                FrontApplicationUsageSummary(bundleID: "__other__", name: Self.otherName, sessionCount: 6),
             ]
         )
     }
 
-    func testFrontApplicationDisplaySummariesUseHiddenTotalForOtherWhenStoreAlreadyLimitsInput() {
+    func testDisplaySummariesUseHiddenTotalForOther() {
         let summaries = [
             FrontApplicationUsageSummary(bundleID: "com.example.a", name: "Alpha", sessionCount: 5),
             FrontApplicationUsageSummary(bundleID: "com.example.b", name: "Beta", sessionCount: 4),
@@ -44,7 +46,7 @@ final class DashboardHomePageTests: XCTestCase {
         let displaySummaries = FrontApplicationDistributionDisplay.summaries(
             from: summaries,
             totalSessionCount: 17,
-            otherName: "Other"
+            otherName: Self.otherName
         )
 
         XCTAssertEqual(
@@ -54,9 +56,50 @@ final class DashboardHomePageTests: XCTestCase {
                 FrontApplicationUsageSummary(bundleID: "com.example.b", name: "Beta", sessionCount: 4),
                 FrontApplicationUsageSummary(bundleID: "com.example.c", name: "Gamma", sessionCount: 3),
                 FrontApplicationUsageSummary(bundleID: "com.example.d", name: "Delta", sessionCount: 2),
-                FrontApplicationUsageSummary(bundleID: "__other__", name: "Other", sessionCount: 3),
+                FrontApplicationUsageSummary(bundleID: "__other__", name: Self.otherName, sessionCount: 3),
             ]
         )
+    }
+
+    func testDisplaySummariesReturnEmptyForEmptyUsage() {
+        let displaySummaries = FrontApplicationDistributionDisplay.summaries(
+            from: [],
+            totalSessionCount: 0,
+            otherName: Self.otherName
+        )
+
+        XCTAssertEqual(displaySummaries, [])
+    }
+
+    func testDisplaySummariesUseOtherForUnattributedTotal() {
+        let displaySummaries = FrontApplicationDistributionDisplay.summaries(
+            from: [],
+            totalSessionCount: 3,
+            otherName: Self.otherName
+        )
+
+        XCTAssertEqual(
+            displaySummaries,
+            [
+                FrontApplicationUsageSummary(bundleID: "__other__", name: Self.otherName, sessionCount: 3),
+            ]
+        )
+    }
+
+    func testDisplaySummariesKeepSmallMatchingTotals() {
+        let summaries = [
+            FrontApplicationUsageSummary(bundleID: "com.example.a", name: "Alpha", sessionCount: 5),
+            FrontApplicationUsageSummary(bundleID: "com.example.b", name: "Beta", sessionCount: 4),
+            FrontApplicationUsageSummary(bundleID: "com.example.c", name: "Gamma", sessionCount: 3),
+        ]
+
+        let displaySummaries = FrontApplicationDistributionDisplay.summaries(
+            from: summaries,
+            totalSessionCount: 12,
+            otherName: Self.otherName
+        )
+
+        XCTAssertEqual(displaySummaries, summaries)
     }
 
     func testDonutRevealArcPushesCounterclockwiseFromTheTop() {

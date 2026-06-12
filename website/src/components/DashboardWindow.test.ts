@@ -3,12 +3,17 @@ import { describe, expect, test } from 'bun:test'
 
 import {
   buildSceneDonutSegments,
+  buildSceneDonutRevealPath,
   buildSceneSegments,
   getSceneDonutTerminalCapColor,
+  sceneDonutCenter,
   sceneDonutRevealHeadRadius,
   sceneDonutRevealMaskLineCap,
+  sceneDonutRadius,
+  sceneDonutTopY,
   sceneDonutTerminalCapRadius,
   sceneDonutCounterclockwiseRevealPath,
+  sceneDonutViewBoxSize,
   sceneHourBarDelayStepMs,
 } from './DashboardWindow'
 
@@ -49,8 +54,12 @@ describe('buildSceneDonutSegments', () => {
   })
 
   test('uses an explicit counterclockwise reveal path', () => {
+    expect(sceneDonutViewBoxSize).toBe(120)
+    expect(sceneDonutCenter).toBe(60)
+    expect(sceneDonutRadius).toBe(47)
+    expect(sceneDonutTopY).toBe(13)
     expect(sceneDonutCounterclockwiseRevealPath).toBe(
-      'M 60 13 A 47 47 0 1 0 60 107 A 47 47 0 1 0 60 13',
+      buildSceneDonutRevealPath(sceneDonutCenter, sceneDonutRadius),
     )
   })
 
