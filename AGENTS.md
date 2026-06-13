@@ -299,3 +299,17 @@ ARTIFACT=build/release/artifacts/Voily-0.1.5.dmg make verify-release
 | 历史设计稿与回归用例 | `docs/superpowers/specs/` |
 | 自动化审查规则 | `.coderabbit.yaml`、`.github/workflows/open-code-review.yml` |
 | 自托管 agent workflow 规则 | `WORKFLOW.md` |
+
+## Agent skills
+
+### Issue tracker
+
+Issues and PRDs are tracked as local markdown under `.scratch/`. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Triage uses the default five-role vocabulary. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+This repo uses a single-context layout, with `AGENTS.md` as the current domain context source and `docs/decisions/` for ADRs. See `docs/agents/domain.md`.
